@@ -1,0 +1,183 @@
+# 8-Bit Music Box song
+format 1
+title "Ode to Joy (Beethoven)"
+tempo 112
+time 4/4
+key 2
+bars 16
+
+
+track "Violin"
+instrument violin
+volume 0.8
+pan -0.4
+mute 0
+solo 0
+note 0 24 F#5 100
+note 24 24 F#5 100
+note 48 24 G5 100
+note 72 24 A5 100
+note 96 24 A5 100
+note 120 24 G5 100
+note 144 24 F#5 100
+note 168 24 E5 100
+note 192 24 D5 100
+note 216 24 D5 100
+note 240 24 E5 100
+note 264 24 F#5 100
+note 288 36 F#5 100
+note 324 12 E5 100
+note 336 48 E5 100
+note 384 24 F#5 100
+note 408 24 F#5 100
+note 432 24 G5 100
+note 456 24 A5 100
+note 480 24 A5 100
+note 504 24 G5 100
+note 528 24 F#5 100
+note 552 24 E5 100
+note 576 24 D5 100
+note 600 24 D5 100
+note 624 24 E5 100
+note 648 24 F#5 100
+note 672 36 E5 100
+note 708 12 D5 100
+note 720 48 D5 100
+note 768 24 E5 100
+note 792 24 E5 100
+note 816 24 F#5 100
+note 840 24 D5 100
+note 864 24 E5 100
+note 888 12 F#5 100
+note 900 12 G5 100
+note 912 24 F#5 100
+note 936 24 D5 100
+note 960 24 E5 100
+note 984 12 F#5 100
+note 996 12 G5 100
+note 1008 24 F#5 100
+note 1032 24 E5 100
+note 1056 24 D5 100
+note 1080 24 E5 100
+note 1104 48 A4 100
+note 1152 24 F#5 100
+note 1176 24 F#5 100
+note 1200 24 G5 100
+note 1224 24 A5 100
+note 1248 24 A5 100
+note 1272 24 G5 100
+note 1296 24 F#5 100
+note 1320 24 E5 100
+note 1344 24 D5 100
+note 1368 24 D5 100
+note 1392 24 E5 100
+note 1416 24 F#5 100
+note 1440 36 E5 100
+note 1476 12 D5 100
+note 1488 48 D5 100
+end
+
+track "Flute"
+instrument flute
+volume 0.7
+pan -0.1
+mute 0
+solo 0
+note 768 24 E5 90
+note 792 24 E5 90
+note 816 24 F#5 90
+note 840 24 D5 90
+note 864 24 E5 90
+note 888 12 F#5 90
+note 900 12 G5 90
+note 912 24 F#5 90
+note 936 24 D5 90
+note 960 24 E5 90
+note 984 12 F#5 90
+note 996 12 G5 90
+note 1008 24 F#5 90
+note 1032 24 E5 90
+note 1056 24 D5 90
+note 1080 24 E5 90
+note 1104 48 A4 90
+note 1152 24 F#5 90
+note 1176 24 F#5 90
+note 1200 24 G5 90
+note 1224 24 A5 90
+note 1248 24 A5 90
+note 1272 24 G5 90
+note 1296 24 F#5 90
+note 1320 24 E5 90
+note 1344 24 D5 90
+note 1368 24 D5 90
+note 1392 24 E5 90
+note 1416 24 F#5 90
+note 1440 36 E5 90
+note 1476 12 D5 90
+note 1488 48 D5 90
+end
+
+track "Cello"
+instrument cello
+volume 0.8
+pan 0.35
+mute 0
+solo 0
+note 0 48 D3 95
+note 48 48 D3 95
+note 96 48 A2 95
+note 144 48 A2 95
+note 192 48 D3 95
+note 240 48 D3 95
+note 288 48 A2 95
+note 336 48 A2 95
+note 384 48 D3 95
+note 432 48 D3 95
+note 480 48 A2 95
+note 528 48 A2 95
+note 576 48 D3 95
+note 624 48 D3 95
+note 672 48 A2 95
+note 720 48 D3 95
+note 768 48 A2 95
+note 816 48 D3 95
+note 864 48 A2 95
+note 912 48 D3 95
+note 960 48 A2 95
+note 1008 48 D3 95
+note 1056 48 A2 95
+note 1104 48 E3 95
+note 1152 48 A2 95
+note 1200 48 A2 95
+note 1248 48 D3 95
+note 1296 48 D3 95
+note 1344 48 A2 95
+note 1392 48 A2 95
+note 1440 48 D3 95
+note 1488 48 D3 95
+end
+
+track "Timpani"
+instrument timpani
+volume 0.7
+pan 0.0
+mute 0
+solo 0
+note 0 24 D2 110
+note 96 24 A2 110
+note 192 24 D2 110
+note 288 24 A2 110
+note 384 24 D2 110
+note 480 24 A2 110
+note 576 24 D2 110
+note 672 24 A2 110
+note 768 24 A2 110
+note 864 24 A2 110
+note 960 24 A2 110
+note 1056 24 A2 110
+note 1152 24 A2 110
+note 1248 24 D2 110
+note 1344 24 A2 110
+note 1440 24 D2 110
+note 1488 24 D2 120
+end

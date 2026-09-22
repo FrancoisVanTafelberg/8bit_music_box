@@ -1,23 +1,6 @@
 build/
-*.o
-*.obj
+exports/*
+!exports/.gitkeep
+last_song.txt
 *.pdb
-*.so
-*.dll
-*.dylib
-shot_*.png
-
-# generated view of .design/*.md — rebuild with tools/design_html.py
-.output/
-
-# python bytecode cache — never worth committing
-__pycache__/
-*.pyc
-
-# per-machine, written by the game
-settings.txt
-
-# one file per run, written by the game
-log/
-Claude outputs/
-/settings.txt
+Claude outputs
