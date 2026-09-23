@@ -4,3 +4,5 @@ exports/*
 last_song.txt
 *.pdb
 Claude outputs
+imports
+songs_that_cannot_be_used_for_legal_reasons

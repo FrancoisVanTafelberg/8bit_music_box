@@ -288,7 +288,7 @@ research problem. What is realistic, in order of effort:
 
 Recommendation: option 3 now, option 2 in-app later if it is still wanted.
 
-## 9. Capturing music from DosBox (research, high value)
+## 9. How to Dosbox capture (research, high value)
 
 The game's music is not in the MP3s as notes, but it is in the game as a **score**:
 `ASOUND.COL`, `GSOUND.COL`, `PSOUND.COL` and `RSOUND.COL` in `MPS/COLONIZE` look like

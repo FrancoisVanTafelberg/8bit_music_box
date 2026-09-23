@@ -249,7 +249,9 @@ open_last_song :: proc() -> bool {
 	if data, err := os.read_entire_file_from_path(join(LAST_SONG_FILE), context.temp_allocator); err == nil {
 		append(&candidates, strings.trim_space(string(data)))
 	}
-	append(&candidates, join("songs", "ode_to_joy.song"))
+	// Otherwise the first song in songs/, whatever it has been renamed to.
+	files_scan()
+	for f in g.open_files do if strings.has_suffix(f, music.SONG_EXT) do append(&candidates, f)
 	for c in candidates {
 		if c == "" || !os.is_file(c) do continue
 		file_open(c)

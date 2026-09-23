@@ -54,8 +54,21 @@ Rows the active instrument cannot play are shaded and refuse clicks.
 | `imports/` | MIDI files to open |
 | `exports/` | rendered audio |
 
-## How to Dosbox capture
+## Copying to the GitHub repo
 
-Try this before any audio transcription: run DOSBox with General MIDI
+`E:\.workspace\8bit_music_box` is the git repository that talks to GitHub; this
+folder is where the work happens. To bring the repo up to date:
+
+    copy_to_repo.bat -DryRun      say what would happen, change nothing
+    copy_to_repo.bat              back up, clear, copy (asks first)
+    copy_to_repo.bat -Force -Prune 5
+
+It backs the repo folder up to `8bit_music_box.bak.YYYY-MM-DD-HH-MM` first, keeps its
+`.git` and `.gitignore`, and does not copy `.temp`, `build`, `exports` or
+`last_song.txt`. Nothing is written back here.
+
+## Getting the original Colonization music
+
+Try this before any audio transcription: run Colonization in DOSBox with General MIDI
 music, press **Ctrl+Alt+F8** to start/stop DOSBox's MIDI capture, and open the captured
 `.mid` here. Details in DESIGN.md section 9.
