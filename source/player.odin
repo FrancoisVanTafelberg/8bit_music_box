@@ -111,13 +111,13 @@ player_tick :: proc(p: ^Player, song: ^music.Song) -> i32 {
 }
 
 // One note, now: what you hear when you place or click a note.
-player_preview :: proc(p: ^Player, inst: music.Inst, pitch: music.Pitch) {
+player_preview :: proc(p: ^Player, inst: music.Inst_Id, pitch: music.Pitch) {
 	if !p.has_stream do return
 	if p.has_preview {
 		rl.UnloadSound(p.preview)
 		p.has_preview = false
 	}
-	samples := music.render_preview(inst, pitch)
+	samples := music.render_preview(music.inst_get(&g.song, inst)^, pitch)
 	defer delete(samples)
 	wave := rl.Wave {
 		frameCount = u32(len(samples) / 2),

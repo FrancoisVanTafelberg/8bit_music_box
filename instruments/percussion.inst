@@ -1,0 +1,145 @@
+# 8-Bit Music Box instruments: percussion
+#
+# Percussion. For the drums (snare, field drum, bass drum, cymbals) the row
+# on the sheet sets brightness or weight rather than a pitch.
+#
+# The format is described in README.txt in this folder. Ranges are sounding
+# pitch (what you hear), not the written pitch of transposing instruments.
+
+define_instrument timpani
+name "Timpani"
+family percussion
+range D2 A3
+wave triangle
+layer noise 0.2 24
+envelope 0.002 1.1 0 0.3
+vibrato 0 0 0
+sweep 3 0.04
+breath 0
+tone 0.4
+metallic 0
+gain 0.9
+pan 0
+color 170 150 220
+end
+
+define_instrument glockenspiel
+name "Glockenspiel"
+family percussion
+range G5 C8
+wave sine
+layer sine 0.3 24
+envelope 0.001 1.2 0 0.5
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 1
+metallic 0
+gain 0.9
+pan 0.3
+color 200 190 255
+end
+
+define_instrument xylophone
+name "Xylophone"
+family percussion
+range F4 C8
+wave triangle
+layer sine 0.3 19
+envelope 0.001 0.25 0 0.08
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 0.9
+metallic 0
+gain 1.4
+pan 0.3
+color 190 160 240
+end
+
+define_instrument tubular_bells
+name "Tubular Bells"
+family percussion
+range C4 F5
+wave sine
+layer sine 0.35 15.3
+envelope 0.001 2.5 0 1
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 1
+metallic 0
+gain 0.6
+pan -0.3
+color 220 210 255
+end
+
+define_instrument snare
+name "Snare Drum"
+family percussion
+range G3 G5
+wave noise
+layer triangle 0.25 -24
+envelope 0.001 0.18 0 0.05
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 0.8
+metallic 0
+gain 0.8
+pan 0.1
+color 150 140 180
+end
+
+# The field drum: the deep, rope-tensioned side drum of the colonial corps.
+# Darker and longer than the modern snare, with more of the shell in it.
+define_instrument field_drum
+name "Field Drum"
+family percussion
+range C3 G4
+wave noise
+layer triangle 0.4 -19
+envelope 0.001 0.26 0 0.06
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 0.55
+metallic 0
+gain 0.95
+pan 0.15
+color 176 128 96
+end
+
+define_instrument bass_drum
+name "Bass Drum"
+family percussion
+range E1 G2
+wave triangle
+layer none
+envelope 0.001 0.35 0 0.05
+vibrato 0 0 0
+sweep 12 0.03
+breath 0
+tone 0.6
+metallic 0
+gain 1
+pan 0
+color 120 110 160
+end
+
+define_instrument cymbals
+name "Cymbals"
+family percussion
+range C5 C7
+wave noise
+layer noise 0.5 7
+envelope 0.001 0.9 0 0.3
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 1
+metallic 1
+gain 0.45
+pan -0.2
+color 210 200 230
+end

@@ -216,10 +216,10 @@ midi_import :: proc(data: []u8, out: ^Song, title: string) -> Midi_Report {
 		if gr.channel == 9 {
 			// Drums: one layer per kind, at a fixed pitch that suits it.
 			Kit :: struct {
-				inst: Inst,
+				inst: string,
 				midi: int,
 			}
-			kits := [3]Kit{{.Bass_Drum, 36}, {.Snare, 67}, {.Cymbals, 84}}
+			kits := [3]Kit{{"bass_drum", 36}, {"snare", 67}, {"cymbals", 84}}
 			idx: [3]int = {-1, -1, -1}
 			for n in gr.notes {
 				k := 1
@@ -240,8 +240,8 @@ midi_import :: proc(data: []u8, out: ^Song, title: string) -> Midi_Report {
 			continue
 		}
 
-		inst := inst_from_gm(programs[gr.channel])
-		ins := INSTRUMENTS[inst]
+		inst := inst_or_default(&s, inst_from_gm(programs[gr.channel]))
+		ins := inst_get(&s, inst)^
 		name := ""
 		if gr.name != "" do name = fmt.tprintf("%s (%s)", ins.name, gr.name)
 		ti := song_add_track(&s, inst, name)

@@ -8,8 +8,8 @@ rem   copy_to_repo.bat -Force       ... without the questions
 rem   copy_to_repo.bat -Prune 5     ... and keep only the 5 newest backups
 rem
 rem 8bit_music_box\.git and 8bit_music_box\.gitignore are both preserved: the
-rem target is a git repository and the source is not. .temp, build, exports and
-rem last_song.txt are not copied across. Nothing is ever written back here.
+rem target is a git repository and the source is not. .temp, build, exports,
+rem last_song.txt and songs_that_cannot_be_used_for_legal_reasons\ are not copied across. Nothing is ever written back here.
 setlocal
 cd /d "%~dp0"
 where pwsh >nul 2>&1 && (

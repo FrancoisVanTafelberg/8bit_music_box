@@ -153,7 +153,7 @@ panel_draw :: proc() {
 		on := i == g.active
 		fill(r, on ? COL_PANEL_HI : (hovered(r) ? COL_BUTTON : COL_SHEET))
 		if on do outline(r, COL_ACCENT)
-		fill(rect(r.x + 4, r.y + 5, 9, 9), inst_color(music.INSTRUMENTS[t.inst].color))
+		fill(rect(r.x + 4, r.y + 5, 9, 9), inst_color(inst_of(t).color))
 		audible := music.track_audible(&g.song, t)
 		text(fit_text(t.name, w - 64), r.x + 18, r.y + 5, audible ? COL_TEXT : COL_FAINT)
 		mr := rect(r.x + w - 40, r.y + 2, 18, 15)
@@ -206,10 +206,10 @@ panel_draw :: proc() {
 
 	// The active instrument.
 	if t := active_track(); t != nil {
-		ins := &music.INSTRUMENTS[t.inst]
-		fill(rect(x, y, w, 96), COL_SHEET)
-		outline(rect(x, y, w, 96), COL_EDGE)
-		fill(rect(x, y, 4, 96), inst_color(ins.color))
+		ins := inst_of(t)
+		fill(rect(x, y, w, 120), COL_SHEET)
+		outline(rect(x, y, w, 120), COL_EDGE)
+		fill(rect(x, y, 4, 120), inst_color(ins.color))
 		text(ins.name, x + 10, y + 6, COL_TEXT, FONT_BIG)
 		text(music.FAMILY_NAME[ins.family], x + 10, y + 28, COL_DIM)
 		text(fmt.tprintf("range  %s - %s", midi_name(int(ins.lo)), midi_name(int(ins.hi))), x + 10, y + 42, COL_TEXT)
@@ -219,6 +219,21 @@ panel_draw :: proc() {
 		text_centered(fmt.tprintf("%d%%", int(t.volume * 100 + 0.5)), rect(x + 74, y + 72, 40, 16))
 		if button(rect(x + 114, y + 72, 18, 16), "+") {t.volume = min(t.volume + 0.1, 2); g.dirty = true}
 		if button(rect(x + 140, y + 72, 40, 16), "hear") do player_preview(&g.player, t.inst, music.pitch_from_midi(int(ins.lo + ins.hi) / 2, int(g.song.key)))
+		// Where the definition lives, and a way to make the song carry it.
+		switch ins.origin {
+		case .Fallback:
+			text("no instrument files!", x + 10, y + 98, COL_BAD)
+		case .File:
+			text(fit_text(fmt.tprintf("file: %s", ins.source), w - 70), x + 10, y + 98, COL_DIM)
+		case .Song:
+			text("defined in this song", x + 10, y + 98, COL_GOOD)
+		}
+		if ins.origin != .Song && button(rect(x + w - 56, y + 94, 50, 16), "embed") {
+			key := ins.key
+			music.song_embed_instrument(&g.song, t.inst)
+			g.dirty = true
+			set_status("%s is now defined inside this song: it plays the same on any copy of the app", key)
+		}
 	}
 }
 
@@ -311,17 +326,20 @@ instruments_overlay :: proc() {
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Add an instrument layer", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
-	text("Each is built from chip oscillators: see .design/DESIGN.md section 2. Esc closes.", r.x + 12, r.y + 34, COL_DIM)
+	text("Instruments come from the .inst files in instruments/ (F7 reloads them)   (song) = defined in this song   Esc closes", r.x + 12, r.y + 34, COL_DIM)
 	colw := (r.width - 24) / f32(len(music.Family))
 	for fam, fi in music.Family {
 		cx := r.x + 12 + f32(fi) * colw
 		cy := r.y + 60
 		text(music.FAMILY_NAME[fam], cx, cy, COL_ACCENT)
 		cy += 16
-		for ins, id in music.INSTRUMENTS {
-			if ins.family != fam do continue
-			br := rect(cx, cy, colw - 8, 22)
-			if button(br, ins.name) {
+		// The registry (built-in, then instrument files), then the song's own.
+		// A song definition hides a registry one with the same key.
+		pick :: proc(ins: ^music.Instrument, id: music.Inst_Id, cx, cy, w: f32) {
+			label := ins.name
+			if ins.origin == .Song do label = fmt.tprintf("%s (song)", ins.name)
+			br := rect(cx, cy, w, 22)
+			if button(br, label) {
 				i := music.song_add_track(&g.song, id)
 				select_layer(i)
 				g.overlay = .None
@@ -329,6 +347,18 @@ instruments_overlay :: proc() {
 				set_status("added %s  (%s - %s)", ins.name, midi_name(int(ins.lo)), midi_name(int(ins.hi)))
 			}
 			fill(rect(br.x + 2, br.y + 2, 4, br.height - 4), inst_color(ins.color))
+		}
+		for &ins, i in music.reg().list {
+			if ins.family != fam do continue
+			shadowed := false
+			for d in g.song.defs do if d.key == ins.key do shadowed = true
+			if shadowed do continue
+			pick(&ins, music.Inst_Id(i), cx, cy, colw - 8)
+			cy += 26
+		}
+		for &ins, i in g.song.defs {
+			if ins.family != fam do continue
+			pick(&ins, music.SONG_INST_BASE + music.Inst_Id(i), cx, cy, colw - 8)
 			cy += 26
 		}
 	}
@@ -348,7 +378,7 @@ open_overlay_draw :: proc() {
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Open", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
-	text("Songs from songs/, MIDI files from imports/. You can also drag a .song or .mid onto the window.", r.x + 12, r.y + 34, COL_DIM)
+	text("Songs from songs/, MIDI from imports/, [private] = not public domain. Or drag a .song / .mid onto the window.", r.x + 12, r.y + 34, COL_DIM)
 	if len(g.open_files) == 0 {
 		text("Nothing here yet. Save a song, or put a .mid file in imports/.", r.x + 12, r.y + 70, COL_TEXT)
 	}
@@ -362,7 +392,9 @@ open_overlay_draw :: proc() {
 		name := f
 		if k := strings.last_index_any(name, "/\\"); k >= 0 do name = name[k + 1:]
 		is_midi := !strings.has_suffix(name, music.SONG_EXT)
-		if button(rect(cx, cy, colw - 8, 20), is_midi ? fmt.tprintf("[midi] %s", name) : name) {
+		shown := is_midi ? fmt.tprintf("[midi] %s", name) : name
+		if strings.contains(f, PRIVATE_DIR) do shown = fmt.tprintf("[private] %s", shown)
+		if button(rect(cx, cy, colw - 8, 20), shown) {
 			if !g.dirty || confirmed(f, "Unsaved changes will be lost") {
 				g.overlay = .None
 				file_open(f)

@@ -38,7 +38,7 @@ MASTER :: f32(0.32)
 Event :: struct {
 	start:   int, // frame the note begins
 	gate:    int, // frames it is held
-	inst:    Inst,
+	inst:    u16, // index into Engine.insts
 	midi:    f32,
 	amp:     f32, // velocity × track volume × instrument gain
 	pan:     f32,
@@ -49,6 +49,9 @@ Event :: struct {
 
 Voice :: struct {
 	ev:        Event,
+	// A copy, not a pointer: the instrument files can be reloaded (F7)
+	// mid-note, and a voice keeps the sound it started with.
+	ins:       Instrument,
 	age:       int,
 	life:      int, // gate + release, in frames
 	phase:     f32,
@@ -67,6 +70,8 @@ Voice :: struct {
 
 Engine :: struct {
 	events: [dynamic]Event,
+	// The instrument of each track, copied when playback starts.
+	insts:  [dynamic]Instrument,
 	next:   int,
 	voices: [dynamic]Voice,
 	frame:  int,
@@ -82,8 +87,9 @@ engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, crush := true)
 	e.white = 0x9E3779B9
 	spt := tick_seconds(song)
 	for &t, ti in song.tracks {
+		append(&e.insts, inst_get(song, t.inst)^)
 		if !track_audible(song, &t) do continue
-		ins := INSTRUMENTS[t.inst]
+		ins := e.insts[ti]
 		for n, ni in t.notes {
 			end := n.tick + n.len
 			if end <= from_tick do continue
@@ -95,7 +101,7 @@ engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, crush := true)
 			append(&e.events, Event{
 				start = int(f64(start - from_tick) * spt * SAMPLE_RATE),
 				gate = max(int(secs * SAMPLE_RATE), 64),
-				inst = t.inst,
+				inst = u16(ti),
 				midi = f32(pitch_midi(n.pitch)),
 				amp = f32(n.vel) / 127 * t.volume * ins.gain,
 				pan = clamp(t.pan, -1, 1),
@@ -109,6 +115,7 @@ engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, crush := true)
 
 engine_destroy :: proc(e: ^Engine) {
 	delete(e.events)
+	delete(e.insts)
 	delete(e.voices)
 	e^ = {}
 }
@@ -126,7 +133,8 @@ engine_render :: proc(e: ^Engine, out: []f32) -> bool {
 	block_end := e.frame + frames
 
 	for e.next < len(e.events) && e.events[e.next].start < block_end {
-		append(&e.voices, voice_make(e.events[e.next]))
+		ev := e.events[e.next]
+		append(&e.voices, voice_make(ev, e.insts[ev.inst]))
 		e.next += 1
 	}
 
@@ -158,16 +166,14 @@ render_song :: proc(song: ^Song, crush := true, allocator := context.allocator) 
 }
 
 // One note on its own, for the click you hear when placing it.
-render_preview :: proc(inst: Inst, p: Pitch, seconds: f32 = 0.35, allocator := context.allocator) -> []f32 {
-	ins := INSTRUMENTS[inst]
+render_preview :: proc(ins: Instrument, p: Pitch, seconds: f32 = 0.35, allocator := context.allocator) -> []f32 {
 	ev := Event {
 		gate = int(seconds * RATE),
-		inst = inst,
 		midi = f32(pitch_midi(p)),
 		amp  = 0.8 * ins.gain,
 		pan  = 0,
 	}
-	v := voice_make(ev)
+	v := voice_make(ev, ins)
 	out := make([]f32, v.life * 2, allocator)
 	white: u32 = 0x9E3779B9
 	voice_render(&v, out, true, &white)
@@ -188,10 +194,10 @@ normalize :: proc(s: []f32, peak: f32 = 0.9) {
 // ---------------------------------------------------------------------------
 
 @(private)
-voice_make :: proc(ev: Event) -> Voice {
-	ins := INSTRUMENTS[ev.inst]
+voice_make :: proc(ev: Event, ins: Instrument) -> Voice {
 	v := Voice {
 		ev    = ev,
+		ins   = ins,
 		lfsr  = 1,
 		lfsr2 = 0x5A5A,
 		freq  = midi_freq(ev.midi),
@@ -282,7 +288,7 @@ lfsr_step :: #force_inline proc(r: ^u32, metallic: bool) -> f32 {
 // Render into `out` from its start. Returns true when the voice is finished.
 @(private)
 voice_render :: proc(v: ^Voice, out: []f32, crush: bool, white: ^u32) -> bool {
-	ins := INSTRUMENTS[v.ev.inst]
+	ins := &v.ins
 	frames := len(out) / 2
 	gate := f32(v.ev.gate) / RATE
 	ratio2 := math.pow(2, ins.semis2 / 12)
@@ -331,7 +337,7 @@ voice_render :: proc(v: ^Voice, out: []f32, crush: bool, white: ^u32) -> bool {
 		// The muffle from sounds_example: one pole, 1 = open.
 		v.lp += clamp(ins.tone, 0.01, 1) * (s - v.lp)
 
-		env := envelope(&ins, t, gate)
+		env := envelope(ins, t, gate)
 		if crush do env = math.round(env * 15) / 15
 		a := v.lp * env * v.ev.amp
 		out[i * 2] += a * v.gl

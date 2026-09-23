@@ -1,0 +1,92 @@
+# 8-Bit Music Box instruments: strings
+#
+# Strings: saw waves, a quick bow attack, vibrato arriving late. The contrabass
+# is a dark pulse with some saw in it; the harp is a plucked triangle.
+#
+# The format is described in README.txt in this folder. Ranges are sounding
+# pitch (what you hear), not the written pitch of transposing instruments.
+
+define_instrument violin
+name "Violin"
+family strings
+range G3 G7
+wave saw
+layer none
+envelope 0.03 0.1 0.85 0.08
+vibrato 5.8 0.14 0.18
+sweep 0 0
+breath 0.02
+tone 0.55
+metallic 0
+gain 0.55
+pan -0.45
+color 236 112 84
+end
+
+define_instrument viola
+name "Viola"
+family strings
+range C3 E6
+wave saw
+layer none
+envelope 0.04 0.1 0.85 0.1
+vibrato 5.5 0.13 0.2
+sweep 0 0
+breath 0.02
+tone 0.42
+metallic 0
+gain 0.55
+pan 0.1
+color 232 146 70
+end
+
+define_instrument cello
+name "Cello"
+family strings
+range C2 A5
+wave saw
+layer none
+envelope 0.05 0.12 0.85 0.12
+vibrato 5.2 0.12 0.22
+sweep 0 0
+breath 0.015
+tone 0.32
+metallic 0
+gain 0.6
+pan 0.35
+color 200 70 130
+end
+
+define_instrument contrabass
+name "Contrabass"
+family strings
+range E1 G4
+wave pulse 0.5
+layer saw 0.4 0
+envelope 0.05 0.15 0.8 0.12
+vibrato 4.8 0.08 0.3
+sweep 0 0
+breath 0
+tone 0.22
+metallic 0
+gain 0.7
+pan 0.55
+color 176 70 58
+end
+
+define_instrument harp
+name "Harp"
+family strings
+range C1 G7
+wave triangle
+layer pulse 0.15 12
+envelope 0.002 1.6 0 0.4
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 0.7
+metallic 0
+gain 0.7
+pan -0.6
+color 246 190 120
+end

@@ -1,4 +1,4 @@
-# 8-Bit Music Box
+# Bob's 8-Bit Music Box
 
 A sheet-music editor with a chiptune orchestra, in Odin and raylib. Draw notes onto a
 4-bar page that holds the whole piano range at once, one instrument layer at a time,
@@ -38,6 +38,7 @@ you are editing survives. `F5` forces a reload, `F6` restarts.
 | **Import** | put `.mid` files in `imports\` and Open them, or drag a `.mid` / `.song` onto the window |
 | **Export** | WAV built in; MP3 / OGG / FLAC light up when `ffmpeg` is on PATH |
 | **4-bit** | toggles NES-style 16-step volume (on = grittier, off = smoother) |
+| `F7` | reload the instrument files |
 | `F11` | fullscreen |
 
 Rows the active instrument cannot play are shaded and refuse clicks.
@@ -50,9 +51,11 @@ Rows the active instrument cannot play are shaded and refuse clicks.
 | `source/music/` | package `music`, no raylib: theory, song model, `.song` format, instruments, synth, WAV, MIDI import |
 | `source/rlu/` | virtual resolution (1280 × 720 canvas), from Animal Kingdoms |
 | `tools/render/` | `odin run tools/render -- songs/ode_to_joy.song` renders to WAV with no window |
+| `instruments/` | every instrument, as text files (`.inst`): add or change them without a rebuild, F7 reloads. See `instruments/README.txt` |
 | `songs/` | saved songs (plain text, hand-editable) |
 | `imports/` | MIDI files to open |
 | `exports/` | rendered audio |
+| `songs_that_cannot_be_used_for_legal_reasons/` | songs and MIDI of music that is **not** public domain: playable here, never copied to the repo or committed |
 
 ## Copying to the GitHub repo
 
@@ -64,11 +67,5 @@ folder is where the work happens. To bring the repo up to date:
     copy_to_repo.bat -Force -Prune 5
 
 It backs the repo folder up to `8bit_music_box.bak.YYYY-MM-DD-HH-MM` first, keeps its
-`.git` and `.gitignore`, and does not copy `.temp`, `build`, `exports` or
-`last_song.txt`. Nothing is written back here.
-
-## Getting the original Colonization music
-
-Try this before any audio transcription: run Colonization in DOSBox with General MIDI
-music, press **Ctrl+Alt+F8** to start/stop DOSBox's MIDI capture, and open the captured
-`.mid` here. Details in DESIGN.md section 9.
+`.git` and `.gitignore`, and does not copy `.temp`, `build`, `exports`,
+`last_song.txt` or `songs_that_cannot_be_used_for_legal_reasons`. Nothing is written back here.

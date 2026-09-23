@@ -132,8 +132,13 @@ placed_pitch :: proc(step: int) -> music.Pitch {
 	return {i8(step), alter}
 }
 
-in_range :: proc(inst: music.Inst, p: music.Pitch) -> bool {
-	ins := &music.INSTRUMENTS[inst]
+// The instrument a track plays: built in, from a file, or from the song.
+inst_of :: proc(t: ^music.Track) -> ^music.Instrument {
+	return music.inst_get(&g.song, t.inst)
+}
+
+in_range :: proc(inst: music.Inst_Id, p: music.Pitch) -> bool {
+	ins := music.inst_get(&g.song, inst)
 	m := i32(music.pitch_midi(p))
 	return m >= ins.lo && m <= ins.hi
 }
@@ -214,7 +219,7 @@ sheet_draw :: proc() {
 	if hov.ok && t != nil && !g.drag.active && overlay_none() {
 		if music.track_note_at(t, hov.step, hov.raw_tick) < 0 {
 			p := placed_pitch(hov.step)
-			col := inst_color(music.INSTRUMENTS[t.inst].color)
+			col := inst_color(inst_of(t).color)
 			if !in_range(t.inst, p) do col = COL_BAD
 			x0 := tick_x(hov.tick)
 			w := f32(music.note_ticks(g.length, g.mod)) * px_per_tick()
@@ -234,7 +239,7 @@ sheet_draw :: proc() {
 
 @(private = "file")
 notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32) {
-	ins := &music.INSTRUMENTS[t.inst]
+	ins := inst_of(t)
 	base := inst_color(ins.color)
 	ps := page_start()
 	pe := ps + page_ticks()
@@ -336,7 +341,7 @@ strip_draw :: proc() {
 			for note in t.notes {
 				if note.tick >= e do break
 				if note.tick >= s {
-					fill(rect(r.x + 2, r.y + 2, 4, 4), inst_color(music.INSTRUMENTS[t.inst].color))
+					fill(rect(r.x + 2, r.y + 2, 4, 4), inst_color(inst_of(t).color))
 					break
 				}
 			}
@@ -393,7 +398,7 @@ sheet_input :: proc() {
 		} else {
 			p := placed_pitch(hov.step)
 			if !in_range(t.inst, p) {
-				ins := music.INSTRUMENTS[t.inst]
+				ins := inst_of(t)
 				set_error(
 					"%s is outside the %s's range (%s - %s)",
 					music.pitch_name_temp(p),

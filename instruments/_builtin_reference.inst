@@ -1,0 +1,4 @@
+# OBSOLETE - safe to delete.
+# The instruments are no longer built into the code, so there is no
+# built-in reference to generate: see strings.inst, woodwinds.inst and the
+# other files in this folder. (Files starting with _ are never loaded.)

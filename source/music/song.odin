@@ -23,7 +23,7 @@ Note :: struct {
 
 Track :: struct {
 	name:   string,
-	inst:   Inst,
+	inst:   Inst_Id,
 	notes:  [dynamic]Note,
 	volume: f32,
 	pan:    f32,
@@ -39,6 +39,9 @@ Song :: struct {
 	key:       i32, // sharps (+) / flats (-)
 	bars:      i32,
 	tracks:    [dynamic]Track,
+	// Instruments defined in the song itself (`define_instrument` blocks).
+	// Tracks reach them through ids at SONG_INST_BASE and above.
+	defs:      [dynamic]Instrument,
 }
 
 DEFAULT_VELOCITY :: u8(100)
@@ -55,6 +58,11 @@ song_init :: proc(s: ^Song) {
 song_destroy :: proc(s: ^Song) {
 	for &t in s.tracks do track_destroy(&t)
 	delete(s.tracks)
+	for d in s.defs {
+		delete(d.key)
+		delete(d.name)
+	}
+	delete(s.defs)
 	delete(s.title)
 	s^ = {}
 }
@@ -99,8 +107,18 @@ song_fit_bars :: proc(s: ^Song, per_page: i32, min_bars: i32 = 4) {
 	s.bars = (need + per_page - 1) / per_page * per_page
 }
 
-song_add_track :: proc(s: ^Song, inst: Inst, name := "") -> int {
-	ins := INSTRUMENTS[inst]
+song_add_track :: proc {
+	song_add_track_id,
+	song_add_track_key,
+}
+
+// A new layer playing the instrument with this key (or the default one).
+song_add_track_key :: proc(s: ^Song, key: string, name := "") -> int {
+	return song_add_track_id(s, inst_or_default(s, key), name)
+}
+
+song_add_track_id :: proc(s: ^Song, inst: Inst_Id, name := "") -> int {
+	ins := inst_get(s, inst)
 	label := name
 	if label == "" {
 		// A second violin layer is "Violin 2", so the list can tell them apart.
@@ -110,6 +128,22 @@ song_add_track :: proc(s: ^Song, inst: Inst, name := "") -> int {
 	}
 	append(&s.tracks, Track{name = strings.clone(label), inst = inst, volume = 0.8, pan = ins.pan})
 	return len(s.tracks) - 1
+}
+
+// Copy an instrument into the song, so the song carries it. Every track that
+// played `id` now plays the song's copy. Returns the copy's id.
+song_embed_instrument :: proc(s: ^Song, id: Inst_Id) -> Inst_Id {
+	if id >= SONG_INST_BASE do return id
+	src := inst_get(s, id)^
+	for d, i in s.defs do if d.key == src.key do return SONG_INST_BASE + Inst_Id(i)
+	src.key = strings.clone(src.key)
+	src.name = strings.clone(src.name)
+	src.origin = .Song
+	src.source = ""
+	append(&s.defs, src)
+	new_id := SONG_INST_BASE + Inst_Id(len(s.defs) - 1)
+	for &t in s.tracks do if t.inst == id do t.inst = new_id
+	return new_id
 }
 
 song_remove_track :: proc(s: ^Song, i: int) {

@@ -20,11 +20,15 @@ import rl "vendor:raylib"
 
 LAST_SONG_FILE :: "last_song.txt"
 
+// Music that is not public domain: arrangements you may play with, never
+// publish. The copy-to-repo script and .gitignore both leave this folder out.
+PRIVATE_DIR :: "songs_that_cannot_be_used_for_legal_reasons"
+
 files_init :: proc() {
 	base := "."
 	if !os.is_dir("songs") && os.is_dir("../songs") do base = ".."
 	g.base_dir = strings.clone(base)
-	for d in ([3]string{"songs", "imports", "exports"}) {
+	for d in ([5]string{"songs", "imports", "exports", PRIVATE_DIR, music.INST_DIR}) {
 		p := join(d)
 		if !os.is_dir(p) do _ = os.make_directory(p)
 	}
@@ -65,6 +69,7 @@ files_scan :: proc() {
 	}
 	scan("songs", {music.SONG_EXT})
 	scan("imports", {".mid", ".midi"})
+	scan(PRIVATE_DIR, {music.SONG_EXT, ".mid", ".midi"})
 }
 
 file_new :: proc() {
@@ -72,9 +77,10 @@ file_new :: proc() {
 	player_stop(&g.player)
 	music.song_destroy(&g.song)
 	music.song_init(&g.song)
-	music.song_add_track(&g.song, .Violin)
+	music.song_add_track(&g.song, music.DEFAULT_KEY)
 	set_path("")
 	after_load()
+	g.private = false
 	set_status("new song")
 }
 
@@ -91,6 +97,7 @@ file_open :: proc(path: string) {
 		}
 		set_path(path)
 		after_load()
+		g.private = strings.contains(path, PRIVATE_DIR)
 		if len(rep.errors) > 0 {
 			set_error("opened with %d problem(s): %s", len(rep.errors), rep.errors[0])
 		} else if len(rep.warnings) > 0 {
@@ -100,6 +107,7 @@ file_open :: proc(path: string) {
 		}
 		remember_last(path)
 	case strings.has_suffix(lower, ".mid"), strings.has_suffix(lower, ".midi"):
+		private := strings.contains(path, PRIVATE_DIR)
 		rep := music.midi_import_file(path, &g.song)
 		if rep.message != "" {
 			set_error("MIDI import failed: %s", rep.message)
@@ -109,6 +117,7 @@ file_open :: proc(path: string) {
 		// An import is a new song: saving it writes a .song, not over the .mid.
 		set_path("")
 		after_load()
+		g.private = private
 		g.dirty = true
 		set_status(
 			"imported %d notes into %d layers%s - Save to keep it as a .song",
@@ -163,7 +172,10 @@ slug :: proc(s: string) -> string {
 
 file_save :: proc() {
 	path := g.path
-	if path == "" do path = join("songs", strings.concatenate({slug(g.song.title), music.SONG_EXT}, context.temp_allocator))
+	if path == "" {
+		dir := g.private ? PRIVATE_DIR : "songs"
+		path = join(dir, strings.concatenate({slug(g.song.title), music.SONG_EXT}, context.temp_allocator))
+	}
 	if !music.song_save(&g.song, path) {
 		set_error("could not write %s", path)
 		return
@@ -258,4 +270,31 @@ open_last_song :: proc() -> bool {
 		if len(g.song.tracks) > 0 do return true
 	}
 	return false
+}
+
+// ---------------------------------------------------------------------------
+// Instrument files
+// ---------------------------------------------------------------------------
+
+// Read the .inst files in instruments/: the whole orchestra. At startup
+// (`first`) the registry is built from scratch; on F7 the files are read again
+// over what is there, so every instrument a track points at stays where it is.
+instruments_reload :: proc(first: bool) {
+	if first do music.registry_init(&g.instruments)
+	music.registry_bind(&g.instruments)
+	rep: music.Load_Report
+	defer music.report_destroy(&rep)
+	n := music.registry_load_dir(&g.instruments, join(music.INST_DIR), &rep)
+	if music.registry_ensure(&g.instruments) {
+		set_error("no instruments found in %s/ - playing everything as a square wave", join(music.INST_DIR))
+		return
+	}
+	switch {
+	case len(rep.errors) > 0:
+		set_error("instruments: %d problem(s) - %s", len(rep.errors), rep.errors[0])
+	case len(rep.warnings) > 0:
+		set_status("instruments: %d from files (%s)", n, rep.warnings[0])
+	case !first:
+		set_status("instruments reloaded: %d from files in instruments/", n)
+	}
 }

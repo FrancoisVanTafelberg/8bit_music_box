@@ -37,6 +37,25 @@ main :: proc() {
 		out_path = strings.concatenate({base, ".wav"})
 	}
 
+	// The instruments, from the .inst files - here, or beside the song's folder
+	// (songs/x.song -> instruments/), whichever exists.
+	reg: music.Registry
+	music.registry_init(&reg)
+	music.registry_bind(&reg)
+	{
+		dir := music.INST_DIR
+		if !os.is_dir(dir) {
+			d := "."
+			if i := strings.last_index_any(in_path, "/\\"); i >= 0 do d = in_path[:i]
+			dir = strings.concatenate({d, "/../", music.INST_DIR})
+		}
+		irep: music.Load_Report
+		n := music.registry_load_dir(&reg, dir, &irep)
+		for e in irep.errors do fmt.eprintln("instrument error:", e)
+		if music.registry_ensure(&reg) do fmt.eprintln("warning: no instruments found in", dir, "- using a plain square wave")
+		else do fmt.printfln("%d instruments from %s", n, dir)
+	}
+
 	song: music.Song
 	music.song_init(&song)
 	if strings.has_suffix(strings.to_lower(in_path, context.temp_allocator), ".mid") {

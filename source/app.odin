@@ -25,6 +25,11 @@ App :: struct {
 	// Where the song lives on disk; "" until it is first saved or loaded.
 	path:       string,
 	dirty:      bool,
+	// Came from the not-public-domain folder: saves go back there, never to
+	// songs/, so an import cannot leak into the repo by being saved.
+	private:    bool,
+	// Every instrument, from the .inst files in instruments/. See music/instruments.odin.
+	instruments: music.Registry,
 	base_dir:   string,
 	has_ffmpeg: bool,
 
@@ -89,10 +94,11 @@ game_init :: proc() {
 	g.length = .Quarter
 	g.selected = -1
 	files_init()
+	instruments_reload(true)
 	player_init(&g.player)
 	if !open_last_song() {
 		music.song_init(&g.song)
-		music.song_add_track(&g.song, .Violin)
+		music.song_add_track(&g.song, music.DEFAULT_KEY)
 	}
 }
 
@@ -110,6 +116,8 @@ game_update :: proc() -> bool {
 	}
 
 	if rl.IsKeyPressed(.F11) do rlu.toggle_fullscreen(&g.v)
+	// F7, as in Animal Kingdoms: reload the data files - here, the instruments.
+	if rl.IsKeyPressed(.F7) do instruments_reload(false)
 
 	ui_begin()
 	files_poll_dropped()
@@ -157,6 +165,8 @@ game_update :: proc() -> bool {
 game_shutdown :: proc() {
 	player_destroy(&g.player)
 	music.song_destroy(&g.song)
+	music.registry_bind(nil)
+	music.registry_destroy(&g.instruments)
 	undo_clear()
 	delete(g.undo)
 	delete(g.redo)
@@ -184,6 +194,9 @@ game_memory_size :: proc() -> int {
 @(export)
 game_hot_reloaded :: proc(mem: rawptr) {
 	g = (^App)(mem)
+	// The library's globals are fresh; point the music package back at the
+	// registry, which lives here in the memory block.
+	music.registry_bind(&g.instruments)
 	set_status("code reloaded")
 }
 

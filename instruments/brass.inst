@@ -1,0 +1,75 @@
+# 8-Bit Music Box instruments: brass
+#
+# Brass: pulses and saws that swell in. A small upward sweep at the start of a
+# note is the lip finding it (trumpet, trombone).
+#
+# The format is described in README.txt in this folder. Ranges are sounding
+# pitch (what you hear), not the written pitch of transposing instruments.
+
+define_instrument horn
+name "French Horn"
+family brass
+range A#1 F5
+wave pulse 0.5
+layer triangle 0.45 0
+envelope 0.07 0.15 0.85 0.12
+vibrato 4.5 0.05 0.3
+sweep 0 0
+breath 0
+tone 0.3
+metallic 0
+gain 0.6
+pan -0.3
+color 240 200 70
+end
+
+define_instrument trumpet
+name "Trumpet"
+family brass
+range E3 C6
+wave pulse 0.25
+layer none
+envelope 0.015 0.08 0.85 0.05
+vibrato 5.5 0.07 0.25
+sweep -0.6 0.02
+breath 0
+tone 0.7
+metallic 0
+gain 0.45
+pan 0.25
+color 255 222 90
+end
+
+define_instrument trombone
+name "Trombone"
+family brass
+range E2 C5
+wave saw
+layer none
+envelope 0.03 0.1 0.85 0.08
+vibrato 0 0 0
+sweep -0.8 0.03
+breath 0
+tone 0.4
+metallic 0
+gain 0.5
+pan 0.35
+color 220 170 50
+end
+
+define_instrument tuba
+name "Tuba"
+family brass
+range D1 F4
+wave pulse 0.5
+layer triangle 0.5 0
+envelope 0.04 0.12 0.85 0.1
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 0.22
+metallic 0
+gain 0.7
+pan 0.45
+color 190 140 40
+end

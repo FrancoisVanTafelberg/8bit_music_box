@@ -1,0 +1,75 @@
+# 8-Bit Music Box instruments: keyboards
+#
+# Keyboards: struck and plucked strings (piano, harpsichord), bells (celesta),
+# and the organ - two pulses an octave apart, no envelope to speak of.
+#
+# The format is described in README.txt in this folder. Ranges are sounding
+# pitch (what you hear), not the written pitch of transposing instruments.
+
+define_instrument piano
+name "Piano"
+family keyboards
+range A0 C8
+wave pulse 0.25
+layer triangle 0.4 0
+envelope 0.002 1.4 0.15 0.25
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 0.55
+metallic 0
+gain 0.6
+pan 0
+color 110 170 250
+end
+
+define_instrument harpsichord
+name "Harpsichord"
+family keyboards
+range F1 F6
+wave pulse 0.125
+layer pulse 0.3 12
+envelope 0.001 0.8 0 0.15
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 0.8
+metallic 0
+gain 0.8
+pan 0
+color 140 190 240
+end
+
+define_instrument celesta
+name "Celesta"
+family keyboards
+range C4 C8
+wave sine
+layer triangle 0.25 12
+envelope 0.002 0.9 0 0.3
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 1
+metallic 0
+gain 0.9
+pan 0.2
+color 160 210 255
+end
+
+define_instrument organ
+name "Organ"
+family keyboards
+range C1 C7
+wave pulse 0.5
+layer pulse 0.45 12
+envelope 0.01 0.01 1 0.05
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 0.45
+metallic 0
+gain 0.4
+pan 0
+color 80 140 230
+end

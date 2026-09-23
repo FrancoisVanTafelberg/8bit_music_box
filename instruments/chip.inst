@@ -1,0 +1,57 @@
+# 8-Bit Music Box instruments: chip
+#
+# Chip: the NES channels as they were - two pulse leads and the triangle bass.
+#
+# The format is described in README.txt in this folder. Ranges are sounding
+# pitch (what you hear), not the written pitch of transposing instruments.
+
+define_instrument pulse_lead
+name "Pulse Lead"
+family chip
+range C2 C7
+wave pulse 0.25
+layer none
+envelope 0.002 0.1 0.75 0.03
+vibrato 6 0.1 0.25
+sweep 0 0
+breath 0
+tone 1
+metallic 0
+gain 0.4
+pan 0
+color 90 230 230
+end
+
+define_instrument square_lead
+name "Square Lead"
+family chip
+range C2 C7
+wave pulse 0.5
+layer none
+envelope 0.002 0.1 0.75 0.03
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 1
+metallic 0
+gain 0.4
+pan 0
+color 70 200 210
+end
+
+define_instrument triangle_bass
+name "Triangle Bass"
+family chip
+range A0 C5
+wave triangle
+layer none
+envelope 0.002 0.05 1 0.02
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 1
+metallic 0
+gain 0.6
+pan 0
+color 60 170 190
+end

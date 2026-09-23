@@ -1,0 +1,23 @@
+# 8-Bit Music Box instruments: voices
+#
+# Voices.
+#
+# The format is described in README.txt in this folder. Ranges are sounding
+# pitch (what you hear), not the written pitch of transposing instruments.
+
+define_instrument choir
+name "Choir"
+family voices
+range E2 A5
+wave pulse 0.5
+layer triangle 0.5 0.08
+envelope 0.12 0.2 0.85 0.2
+vibrato 5 0.18 0.15
+sweep 0 0
+breath 0.03
+tone 0.3
+metallic 0
+gain 0.5
+pan 0
+color 240 140 200
+end

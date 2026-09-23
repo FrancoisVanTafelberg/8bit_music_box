@@ -69,10 +69,30 @@ everything *around* the waveform:
   quantises every envelope to 16 steps by default ("crush"), which is a lot of the
   authentic grit.
 
-That is exactly what `source/music/instruments.odin` records per instrument. The whole
+That is exactly what an instrument definition records (`instruments/<family>.inst`). The whole
 orchestra is built from five oscillators: pulse, triangle, saw, sine, noise.
 
-### The orchestra (sounding ranges, MIDI numbers)
+### Where instruments come from
+
+**No instrument is defined in code.** Two places, the second winning:
+
+1. **Instrument files:** every `.inst` file in `instruments/`, read at startup and on **F7**,
+   so a sound can be changed and heard without a rebuild. The orchestra is split by family
+   (`strings.inst`, `woodwinds.inst`, …) plus `field_music.inst` for the fife-and-drum extras.
+   `based_on` works across files in any order; a block with an existing key changes just the
+   lines it gives, so a later file can tweak an earlier one (`define_instrument violin` /
+   `gain 0.4` / `end`). Files starting with `_` are skipped. With no files at all the app
+   still runs, on a plain square wave, and says so. `instruments/README.txt` documents every
+   line.
+2. **Inside a song:** the same `define_instrument` blocks in a `.song`, so the song carries
+   its instruments and plays the same on any copy of the app. The **embed** button in the
+   instrument panel copies the active layer's instrument into the song.
+
+A track stores an instrument id that points at the registry (1) or at the song's own
+definitions (2). Files only ever store the key, so ids can change between runs; F7 replaces
+definitions in place, so they don't change within one.
+
+### The orchestra (sounding ranges, MIDI numbers) - as shipped in `instruments/`
 
 | family | instrument | range | recipe |
 |---|---|---|---|
@@ -82,6 +102,7 @@ orchestra is built from five oscillators: pulse, triangle, saw, sine, noise.
 | | Contrabass | E1–G4 (28–67) | 50 % pulse, very dark |
 | | Harp | C1–G7 (24–103) | triangle pluck, long ring |
 | Woodwinds | Piccolo | D5–C8 (74–108) | triangle + breath |
+| | Fife | D5–D7 (74–98) | 25 % pulse + triangle + breath, no vibrato: the fife-and-drum corps |
 | | Flute | C4–C7 (60–96) | triangle + breath + vibrato |
 | | Oboe | B♭3–G6 (58–91) | 12.5 % pulse, nasal |
 | | English Horn | E3–C6 (52–84) | 12.5 % pulse, darker |
@@ -98,6 +119,7 @@ orchestra is built from five oscillators: pulse, triangle, saw, sine, noise.
 | | Xylophone | F4–C8 (65–108) | triangle, very short |
 | | Tubular Bells | C4–F5 (60–77) | sine + inharmonic layer |
 | | Snare Drum | row = brightness | noise burst |
+| | Field Drum | row = brightness | darker, longer noise + low triangle: the colonial rope drum |
 | | Bass Drum | row = weight | triangle, big pitch drop |
 | | Cymbals | row = brightness | metallic ("short") noise |
 | Keyboards | Piano | A0–C8 (21–108) | 25 % pulse, struck decay |
@@ -304,11 +326,17 @@ get exact notes without reverse-engineering them:
 
 This beats any audio transcription and should be tried first.
 
+**But a capture is the game's arrangement, which is copyrighted even where the tune under it
+is not.** Captures go in `songs_that_cannot_be_used_for_legal_reasons/`, for study. What we
+publish is our own arrangement of the public-domain tune from a period source. Which tunes
+those are, and where to get them, is in `.design/COLONIZATION_MUSIC.md`.
+
 ## 10. Milestones
 
 | # | what | state |
 |---|---|---|
 | v0 | window + scaling, sheet with 4-bar pages, all instrument layers with real ranges, note placing / moving / deleting, accidentals and key signature, undo, chip synth, play mode with highlight and page-follow, `.song` save/load, WAV export, ffmpeg export, MIDI import, drag-and-drop | **this build** |
 | v1 | velocity lane (MB-4), copy/paste of bar ranges, loop a page range, per-layer instrument editing (duty, envelope) saved in the song | |
-| v2 | tempo map (MB-2), ties (MB-3), chip-strict voice limit (MB-1), song-embedded custom instruments | |
+| v2 | tempo map (MB-2), ties (MB-3), chip-strict voice limit (MB-1) | |
+| — | instrument files (`instruments/*.inst`, F7 reload) and song-embedded instruments | **done** |
 | v3 | audio → notes draft transcription (§8) | |
