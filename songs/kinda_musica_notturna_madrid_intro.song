@@ -1,0 +1,323 @@
+# 8-Bit Music Box song
+# An IMPRESSION of the "Ritirata" (retreat of the night watch) from Boccherini's
+# La musica notturna delle strade di Madrid, Op. 30 No. 6 - written from memory,
+# NOT a transcription: march character, oom-pah accompaniment and the slow
+# crescendo of the approaching watch are Boccherini's idea; these notes are not his.
+format 1
+title "Musica notturna di Madrid - Ritirata (impression)"
+tempo 96
+time 4/4
+key 0
+bars 24
+
+track "Violin"
+instrument violin
+volume 0.85
+pan -0.4
+mute 0
+solo 0
+note 192 24 C5 60
+note 216 18 C5 60
+note 234 6 D5 60
+note 240 24 E5 60
+note 264 24 C5 60
+note 288 24 D5 63
+note 312 18 D5 63
+note 330 6 E5 63
+note 336 24 F5 63
+note 360 24 D5 63
+note 384 18 E5 67
+note 402 6 F5 67
+note 408 12 G5 67
+note 420 12 E5 67
+note 432 24 C5 67
+note 456 18 E5 67
+note 474 6 D5 67
+note 480 48 D5 70
+note 528 24 G4 70
+note 576 24 C5 74
+note 600 18 C5 74
+note 618 6 D5 74
+note 624 24 E5 74
+note 648 24 C5 74
+note 672 24 F5 78
+note 696 18 F5 78
+note 714 6 E5 78
+note 720 24 D5 78
+note 744 24 B4 78
+note 768 18 C5 80
+note 786 6 D5 80
+note 792 12 E5 80
+note 804 12 D5 80
+note 816 24 C5 80
+note 840 24 B4 80
+note 864 72 C5 83
+note 960 24 G5 86
+note 984 18 G5 86
+note 1002 6 F5 86
+note 1008 24 E5 86
+note 1032 24 G5 86
+note 1056 24 F5 89
+note 1080 18 F5 89
+note 1098 6 E5 89
+note 1104 48 D5 89
+note 1152 24 E5 92
+note 1176 18 E5 92
+note 1194 6 D5 92
+note 1200 24 C5 92
+note 1224 24 E5 92
+note 1248 18 D5 95
+note 1266 6 C5 95
+note 1272 12 B4 95
+note 1284 12 A4 95
+note 1296 48 G4 95
+note 1344 24 A4 98
+note 1368 24 B4 98
+note 1392 24 C5 98
+note 1416 24 D5 98
+note 1440 24 E5 101
+note 1464 24 F#5 101
+note 1488 48 G5 101
+note 1536 18 A5 104
+note 1554 6 G5 104
+note 1560 12 F5 104
+note 1572 12 E5 104
+note 1584 24 D5 104
+note 1608 24 G5 104
+note 1632 24 G5 107
+note 1656 24 F5 107
+note 1680 24 E5 107
+note 1704 24 D5 107
+note 1728 24 C5 120
+note 1752 18 C5 120
+note 1770 6 D5 120
+note 1776 24 E5 120
+note 1800 24 C5 120
+note 1824 24 D5 120
+note 1848 18 D5 120
+note 1866 6 E5 120
+note 1872 24 F5 120
+note 1896 24 D5 120
+note 1920 18 E5 120
+note 1938 6 F5 120
+note 1944 12 G5 120
+note 1956 12 E5 120
+note 1968 24 C5 120
+note 1992 18 E5 120
+note 2010 6 D5 120
+note 2016 24 D5 120
+note 2040 24 G5 120
+note 2064 24 B4 120
+note 2088 24 D5 120
+note 2112 18 C5 120
+note 2130 6 D5 120
+note 2136 12 E5 120
+note 2148 12 D5 120
+note 2160 24 C5 120
+note 2184 24 B4 120
+note 2208 48 C5 120
+note 2256 24 G4 120
+note 2280 24 C5 120
+end
+
+track "Viola"
+instrument viola
+volume 0.7
+pan 0.1
+mute 0
+solo 0
+note 108 10 E4 36
+note 132 10 E4 36
+note 156 10 E4 36
+note 180 10 E4 36
+note 204 10 E4 40
+note 228 10 E4 40
+note 252 10 E4 40
+note 276 10 E4 40
+note 300 10 D4 43
+note 324 10 D4 43
+note 348 10 D4 43
+note 372 10 D4 43
+note 396 10 E4 47
+note 420 10 E4 47
+note 444 10 E4 47
+note 468 10 E4 47
+note 492 10 D4 50
+note 516 10 D4 50
+note 540 10 D4 50
+note 564 10 D4 50
+note 588 10 E4 54
+note 612 10 E4 54
+note 636 10 E4 54
+note 660 10 E4 54
+note 684 10 F4 58
+note 708 10 F4 58
+note 732 10 D4 58
+note 756 10 D4 58
+note 780 10 E4 60
+note 804 10 E4 60
+note 828 10 D4 60
+note 852 10 D4 60
+note 876 10 E4 63
+note 900 10 E4 63
+note 924 10 E4 63
+note 948 10 E4 63
+note 972 10 E4 66
+note 996 10 E4 66
+note 1020 10 E4 66
+note 1044 10 E4 66
+note 1068 10 D4 69
+note 1092 10 D4 69
+note 1116 10 D4 69
+note 1140 10 D4 69
+note 1164 10 E4 72
+note 1188 10 E4 72
+note 1212 10 E4 72
+note 1236 10 E4 72
+note 1260 10 D4 75
+note 1284 10 D4 75
+note 1308 10 D4 75
+note 1332 10 D4 75
+note 1356 10 F4 78
+note 1380 10 F4 78
+note 1404 10 D4 78
+note 1428 10 D4 78
+note 1452 10 E4 81
+note 1476 10 E4 81
+note 1500 10 F#4 81
+note 1524 10 F#4 81
+note 1548 10 D4 84
+note 1572 10 D4 84
+note 1596 10 D4 84
+note 1620 10 D4 84
+note 1644 10 D4 87
+note 1668 10 D4 87
+note 1692 10 D4 87
+note 1716 10 D4 87
+note 1740 10 E4 100
+note 1764 10 E4 100
+note 1788 10 E4 100
+note 1812 10 E4 100
+note 1836 10 D4 100
+note 1860 10 D4 100
+note 1884 10 D4 100
+note 1908 10 D4 100
+note 1932 10 E4 100
+note 1956 10 E4 100
+note 1980 10 E4 100
+note 2004 10 E4 100
+note 2028 10 D4 100
+note 2052 10 D4 100
+note 2076 10 D4 100
+note 2100 10 D4 100
+note 2124 10 E4 100
+note 2148 10 E4 100
+note 2172 10 D4 100
+note 2196 10 D4 100
+note 2220 10 E4 100
+note 2244 10 E4 100
+note 2256 48 E4 110
+end
+
+track "Cello"
+instrument cello
+volume 0.85
+pan 0.4
+mute 0
+solo 0
+note 0 12 C3 45
+note 24 12 G2 37
+note 48 12 C3 45
+note 72 12 G2 37
+note 96 12 C3 48
+note 120 12 G2 40
+note 144 12 C3 48
+note 168 12 G2 40
+note 192 12 C3 52
+note 216 12 G2 44
+note 240 12 C3 52
+note 264 12 G2 44
+note 288 12 G2 55
+note 312 12 D3 47
+note 336 12 G2 55
+note 360 12 D3 47
+note 384 12 C3 59
+note 408 12 G2 51
+note 432 12 C3 59
+note 456 12 G2 51
+note 480 12 G2 62
+note 504 12 D3 54
+note 528 12 G2 62
+note 552 12 D3 54
+note 576 12 C3 66
+note 600 12 G2 58
+note 624 12 C3 66
+note 648 12 G2 58
+note 672 12 F2 70
+note 696 12 C3 62
+note 720 12 G2 70
+note 744 12 D3 62
+note 768 12 C3 72
+note 792 12 G2 64
+note 816 12 G2 72
+note 840 12 D3 64
+note 864 12 C3 75
+note 888 12 G2 67
+note 912 12 C3 75
+note 936 12 G2 67
+note 960 12 C3 78
+note 984 12 G2 70
+note 1008 12 C3 78
+note 1032 12 G2 70
+note 1056 12 G2 81
+note 1080 12 D3 73
+note 1104 12 G2 81
+note 1128 12 D3 73
+note 1152 12 C3 84
+note 1176 12 G2 76
+note 1200 12 C3 84
+note 1224 12 G2 76
+note 1248 12 G2 87
+note 1272 12 D3 79
+note 1296 12 G2 87
+note 1320 12 D3 79
+note 1344 12 F2 90
+note 1368 12 C3 82
+note 1392 12 G2 90
+note 1416 12 D3 82
+note 1440 12 C3 93
+note 1464 12 G2 85
+note 1488 12 D3 93
+note 1512 12 A2 85
+note 1536 12 G2 96
+note 1560 12 D3 88
+note 1584 12 G2 96
+note 1608 12 D3 88
+note 1632 12 G2 99
+note 1656 12 D3 91
+note 1680 12 G2 99
+note 1704 12 D3 91
+note 1728 12 C3 112
+note 1752 12 G2 104
+note 1776 12 C3 112
+note 1800 12 G2 104
+note 1824 12 G2 112
+note 1848 12 D3 104
+note 1872 12 G2 112
+note 1896 12 D3 104
+note 1920 12 C3 112
+note 1944 12 G2 104
+note 1968 12 C3 112
+note 1992 12 G2 104
+note 2016 12 G2 112
+note 2040 12 D3 104
+note 2064 12 G2 112
+note 2088 12 D3 104
+note 2112 12 C3 112
+note 2136 12 G2 104
+note 2160 12 G2 112
+note 2184 12 D3 104
+note 2208 12 C3 112
+note 2232 12 G2 104
+note 2256 48 C3 120
+end

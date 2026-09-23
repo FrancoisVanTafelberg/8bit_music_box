@@ -128,13 +128,20 @@ game_update :: proc() -> bool {
 		// With an overlay up, nothing underneath it may take the mouse: the
 		// frame's input is set aside, the page drawn deaf, and the input
 		// handed to the overlay alone.
+		//
+		// `was_open` is decided BEFORE the panels run. A panel button that
+		// opens an overlay (Add instrument, Open) does so with this frame's
+		// click; if the check came after, that same click would be handed to
+		// the brand-new overlay, land outside its box, and close it again -
+		// the overlay would flash for one frame and vanish.
+		was_open := !overlay_none()
 		held := g.ui
-		if !overlay_none() do ui_take_all()
+		if was_open do ui_take_all()
 		sheet_draw()
 		panel_draw()
 		topbar_draw()
 		statusbar_draw()
-		if !overlay_none() do g.ui = held
+		if was_open do g.ui = held
 		overlay_draw()
 		// The sheet reads the mouse last, after everything drawn over it
 		// has had its chance to claim the click.
