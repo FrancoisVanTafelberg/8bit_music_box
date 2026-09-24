@@ -211,6 +211,21 @@ at 1440p, and the two-step "sharp" upscale in between (1.5× at 1080p). That is 
 virtual-resolution code from Animal Kingdoms (`source/rlu`), with the canvas raised from
 960 × 540. The default raylib font is a pixel font, which suits it.
 
+**Key lines** (the "lines" toggle, on by default). The sheet has a row per letter, so every
+row is already in the key: a click on an F row in G major places F♯. What the toggle shows
+instead is what is easy to lose track of: the rows the signature changes (sharp rows tinted
+warm, flat rows cool, named F♯ / B♭ in the gutter) and the rows of the key's home chord
+(the major triad on the tonic: tonic brightest, 3rd and 5th fainter). A minor key shares
+its signature with the relative major, whose chord is the one marked.
+
+With key lines on, the gutter also shows each row's **frequency ratio** to a reference note,
+as the whole-number ratio the interval is heard as (5-limit just intonation: octave 2:1,
+fifth 3:2, fourth 4:3, major third 5:4, major sixth 5:3, second 9:8, seventh 15:8, and
+their octaves - with C5 as 1:1, C6 is 2:1, G4 3:4, C4 1:2). The reference is the key's
+tonic at or just below the first note of the layer being edited; right-click a row name to
+pick another, again to go back to automatic. Rows more than three octaves away show none.
+The gutter is 72 px wide to hold them.
+
 ### 3.4 Layers
 
 A layer is a **track**: an instrument, its notes, volume, pan, mute and solo. Normally

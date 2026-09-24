@@ -36,6 +36,12 @@ App :: struct {
 	fb_filter:  bool,
 	fb_key:     i8,
 	fb_hand:    i8, // index into HAND_POSITIONS
+	// The "lines" button: tint the key signature's rows and mark the rows
+	// of the key's home chord (sheet.odin, key_lines_draw).
+	key_lines:  bool,
+	// The row ratios count from (sheet.odin, key_ratio); -1 = the tonic,
+	// found automatically.
+	ratio_ref:  i16,
 	// All the sound: the instruments (from instruments/), the playing song,
 	// the note previews. The same Mixer a game would use; see music/mixer.odin.
 	audio:      music.Mixer,
@@ -105,6 +111,8 @@ game_init :: proc() {
 	g.length = .Quarter
 	g.selected = -1
 	g.fb_hand = HAND_DEFAULT
+	g.key_lines = true
+	g.ratio_ref = -1
 	files_init()
 	music.mixer_init(&g.audio)
 	instruments_reload(true)

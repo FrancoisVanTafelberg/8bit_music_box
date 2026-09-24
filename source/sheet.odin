@@ -23,11 +23,13 @@ import rl "vendor:raylib"
 TOP_H :: 32
 STATUS_H :: 20
 PANEL_W :: 208
-GUTTER_W :: 44
+// Clef marks, the frequency ratios of the key lines (key_ratio), note names.
+GUTTER_W :: 72
+GUTTER_NAME_X :: GUTTER_W - 24 // where the note names start
 BARS_X :: PANEL_W + GUTTER_W
 // In the Cello Helper the sheet is half as wide (two bars) and the Cello
 // Fingerboard takes the rest.
-BARS_W :: 500 when CELLO else 1280 - BARS_X - 8
+BARS_W :: 472 when CELLO else 1280 - BARS_X - 8
 SHEET_R :: BARS_X + BARS_W + 8 // the sheet's right edge
 BAR_NUM_Y :: TOP_H + 2
 ROWS_Y :: TOP_H + 18
@@ -165,6 +167,8 @@ sheet_draw :: proc() {
 			}
 		}
 	}
+
+	if g.key_lines do key_lines_draw()
 
 	// The hovered row, faintly, all the way across.
 	hov := sheet_hover()
@@ -315,13 +319,41 @@ gutter_draw :: proc(hov: Hover) {
 		name := music.pitch_name_temp({i8(step), 0})
 		is_c := letter == 0
 		c := is_c ? COL_TEXT : COL_FAINT
+		// With key lines on, the rows the key signature changes are named
+		// as they sound (F#, Bb), and the home chord's rows are coloured.
+		alter := music.key_alter(int(g.song.key), step)
+		if g.key_lines {
+			if alter != 0 {
+				name = music.pitch_name_temp({i8(step), alter})
+				c = alter > 0 ? KEY_SHARP_TEXT : KEY_FLAT_TEXT
+			}
+			switch (letter - key_tonic_letter() + 7) % 7 {
+			case 0:
+				c = COL_ACCENT
+			case 2, 4:
+				c = lighten(with_alpha(COL_ACCENT, 255), 0.4)
+			}
+		}
+		acc_name := g.key_lines && alter != 0
 		if hov.ok && hov.step == step do c = COL_ACCENT
 		if is_c || (hov.ok && hov.step == step) {
-			text(name, x + 20, y + 1, c)
+			text(name, x + GUTTER_NAME_X, y + 1, c)
+		} else if acc_name {
+			text(name[:2], x + GUTTER_NAME_X, y + 1, c) // "F#", no octave
 		} else {
-			text(name[:1], x + 20, y + 1, c)
+			text(name[:1], x + GUTTER_NAME_X, y + 1, c)
 		}
-		if is_c do rl.DrawLineEx({x + 18, y + ROW_H}, {x + GUTTER_W, y + ROW_H}, 1, COL_EDGE)
+		if is_c do rl.DrawLineEx({x + GUTTER_NAME_X - 2, y + ROW_H}, {x + GUTTER_W, y + ROW_H}, 1, COL_EDGE)
+
+		// The row's frequency ratio to the reference note (key lines on).
+		if g.key_lines {
+			if rt, octave, ok := key_ratio(step); ok {
+				rc := COL_FAINT
+				if octave do rc = COL_DIM
+				if step == ratio_ref_step() do rc = COL_ACCENT
+				text(rt, x + GUTTER_NAME_X - 3 - text_width(rt), y + 1, rc)
+			}
+		}
 	}
 	// Clef marks where each clef's own line is: G on G4, C on C4, F on F3.
 	clef :: proc(step: int, s: string) {
@@ -388,11 +420,22 @@ sheet_input :: proc() {
 		return
 	}
 
-	// The piano gutter: click to hear a row.
+	// The piano gutter: click to hear a row; right-click makes it the
+	// reference note the ratios count from (again: back to automatic).
 	gut := rect(PANEL_W, ROWS_Y, GUTTER_W, ROWS_H)
 	if ui_take_click(gut) {
 		step := music.STEP_HI - int((g.ui.mouse.y - ROWS_Y) / ROW_H)
 		player_preview(&g.player, t.inst, placed_pitch(step))
+	}
+	if ui_take_right(gut) {
+		step := music.STEP_HI - int((g.ui.mouse.y - ROWS_Y) / ROW_H)
+		if int(g.ratio_ref) == step {
+			g.ratio_ref = -1
+			set_status("ratios count from the key's tonic again (%s)", music.pitch_name_temp(key_pitch(ratio_ref_step())))
+		} else {
+			g.ratio_ref = i16(step)
+			set_status("ratios now count from %s = 1:1  (right-click it again for automatic)", music.pitch_name_temp(key_pitch(step)))
+		}
 	}
 
 	if !hov.ok do return
@@ -400,7 +443,13 @@ sheet_input :: proc() {
 	under := music.track_note_at(t, hov.step, hov.raw_tick)
 
 	if ui_take_click(area) {
-		if under >= 0 {
+		ctrl := rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL)
+		shift := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
+		if under >= 0 && (ctrl || shift) {
+			// Ctrl+click: a copy an octave lower; Shift+click: an octave
+			// higher. Same place, same length, same layer.
+			octave_copy(t, under, ctrl ? -1 : 1)
+		} else if under >= 0 {
 			// Grab it: select, hear it, and be ready to drag.
 			g.selected = under
 			n := t.notes[under]
@@ -542,4 +591,127 @@ delete_selected :: proc() {
 
 midi_name :: proc(m: int) -> string {
 	return music.pitch_name_temp(music.pitch_from_midi(m, 0))
+}
+
+// Copy note `i` of `t` an octave down (dir -1) or up (+1), at the same tick
+// and length, spelled the same (F#4 -> F#3). The copy is selected; the
+// original stays as it was.
+octave_copy :: proc(t: ^music.Track, i: int, dir: int) {
+	n := t.notes[i]
+	step := int(n.pitch.step) + 7 * dir
+	p := music.Pitch{i8(step), n.pitch.alter}
+	where_ := dir < 0 ? "lower" : "higher"
+	if step < music.STEP_LO || step > music.STEP_HI || !in_range(t.inst, p) {
+		ins := inst_of(t)
+		set_error("%s an octave %s is %s: outside the %s's range (%s - %s)", music.pitch_name_temp(n.pitch), where_, music.pitch_name_temp(p), ins.name, midi_name(int(ins.lo)), midi_name(int(ins.hi)))
+		return
+	}
+	undo_push()
+	c := n
+	c.pitch = p
+	g.selected = music.track_put(t, c)
+	music.song_fit_bars(&g.song, BARS_PER_PAGE)
+	g.dirty = true
+	player_preview(&g.player, t.inst, p)
+	set_status("copied %s an octave %s: %s", music.pitch_name_temp(n.pitch), where_, music.pitch_name_temp(p))
+}
+
+// ---------------------------------------------------------------------------
+// Key lines (the "lines" button)
+//
+// Every row of the sheet is already in the key - it is one row per letter,
+// and a click on an F row in G major places F#. So this shows the two things
+// that are easy to lose track of instead:
+//
+//   * the rows the key signature changes: sharp rows tinted warm, flat rows
+//     cool, and named F# / Bb in the gutter;
+//   * the rows of the key's home chord, the major triad on its tonic: the
+//     tonic brightest (every G in G major), the 3rd and 5th (B, D) fainter.
+//     A minor key shares its signature with a major one (E minor with G
+//     major); this marks the major key's chord.
+// ---------------------------------------------------------------------------
+
+KEY_SHARP_ROW :: rl.Color{255, 150, 90, 16}
+KEY_FLAT_ROW :: rl.Color{110, 160, 255, 16}
+KEY_SHARP_TEXT :: rl.Color{255, 170, 120, 255}
+KEY_FLAT_TEXT :: rl.Color{140, 180, 255, 255}
+
+// The letter of the key's tonic (major), C = 0 .. B = 6: each sharp is a
+// fifth up (four letters), each flat a fifth down.
+key_tonic_letter :: proc() -> int {
+	return ((4 * int(g.song.key)) % 7 + 7) % 7
+}
+
+@(private = "file")
+key_lines_draw :: proc() {
+	tonic := key_tonic_letter()
+	for step in music.STEP_LO ..= music.STEP_HI {
+		r := rect(BARS_X, row_y(step), BARS_W, ROW_H)
+		switch music.key_alter(int(g.song.key), step) {
+		case 1:
+			fill(r, KEY_SHARP_ROW)
+		case -1:
+			fill(r, KEY_FLAT_ROW)
+		}
+		switch (step % 7 - tonic + 7) % 7 {
+		case 0:
+			fill(r, with_alpha(COL_ACCENT, 30))
+			rl.DrawLineEx({r.x, r.y + 0.5}, {r.x + r.width, r.y + 0.5}, 1, with_alpha(COL_ACCENT, 50))
+			rl.DrawLineEx({r.x, r.y + r.height - 0.5}, {r.x + r.width, r.y + r.height - 0.5}, 1, with_alpha(COL_ACCENT, 50))
+		case 2, 4:
+			fill(r, with_alpha(COL_ACCENT, 13))
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Ratios (with key lines on): each row's frequency against a reference note,
+// as the small whole-number ratio the interval is heard as - the octave 2:1,
+// the fifth 3:2, the major third 5:4 (just intonation, 5-limit). With C5 as
+// the reference, C6 reads 2:1, G5 3:2, E5 5:4, G4 3:4, C4 1:2.
+//
+// The reference is the key's tonic at or just below the first note of the
+// layer being edited (C4's octave for an empty layer); right-click a row in
+// the gutter to pick another, right-click it again to go back to automatic.
+// ---------------------------------------------------------------------------
+
+// The pitch a row plays in this key.
+key_pitch :: proc(step: int) -> music.Pitch {
+	return {i8(step), music.key_alter(int(g.song.key), step)}
+}
+
+ratio_ref_step :: proc() -> int {
+	if g.ratio_ref >= 0 do return int(g.ratio_ref)
+	tonic := key_tonic_letter()
+	top := 28 + 6 // B4: the tonic in middle C's octave if the layer is empty
+	if t := active_track(); t != nil && len(t.notes) > 0 {
+		top = int(t.notes[0].pitch.step)
+	}
+	step := top
+	for step > music.STEP_LO && step % 7 != tonic do step -= 1
+	if step % 7 != tonic do step += 7
+	return step
+}
+
+// Just intonation for each semitone above the reference.
+@(private = "file")
+JUST := [12][2]int {
+	{1, 1}, {16, 15}, {9, 8}, {6, 5}, {5, 4}, {4, 3},
+	{45, 32}, {3, 2}, {8, 5}, {5, 3}, {9, 5}, {15, 8},
+}
+
+// "3:2" for the fifth above the reference. `octave`: a whole number of
+// octaves (1:1, 2:1, 1:2...). Rows more than three octaves away get none.
+key_ratio :: proc(step: int) -> (s: string, octave: bool, ok: bool) {
+	ref := music.pitch_midi(key_pitch(ratio_ref_step()))
+	semis := music.pitch_midi(key_pitch(step)) - ref
+	oct := semis >= 0 ? semis / 12 : -((-semis + 11) / 12)
+	within := semis - oct * 12
+	if oct > 3 || oct < -3 do return "", false, false
+	num, den := JUST[within][0], JUST[within][1]
+	if oct >= 0 do num <<= uint(oct)
+	else do den <<= uint(-oct)
+	a, b := num, den
+	for b != 0 do a, b = b, a % b
+	return fmt.tprintf("%d:%d", num / a, den / a), within == 0, true
 }

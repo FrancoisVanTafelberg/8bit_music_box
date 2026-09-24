@@ -82,7 +82,12 @@ topbar_draw :: proc() {
 	key_label := g.song.key == 0 ? "C major" : fmt.tprintf("%s %d%s", music.key_name(int(g.song.key)), abs(g.song.key), g.song.key > 0 ? "#" : "b")
 	text_centered(key_label, rect(x + 18, y, 92, h))
 	if button(rect(x + 110, y, 18, h), "+") && g.song.key < 7 {g.song.key += 1; g.dirty = true}
-	x += 138
+	x += 132
+	if button(rect(x, y, 34, h), "lines", g.key_lines) {
+		g.key_lines = !g.key_lines
+		set_status(g.key_lines ? "key lines on: sharp/flat rows tinted, the home chord's rows marked" : "key lines off")
+	}
+	x += 42
 
 	// Transport.
 	if button(rect(x, y, 56, h), g.player.playing ? "Stop" : "Play", g.player.playing) do toggle_play(rl.IsKeyDown(.LEFT_SHIFT))
@@ -330,8 +335,8 @@ statusbar_draw :: proc() {
 			COL_TEXT,
 		)
 	}
-	hint := "click place   drag move   right-click delete   wheel sharp/flat   Space play   PgUp/PgDn page   Ctrl+Z undo"
-	when CELLO do hint = "click place   right-click delete   wheel sharp/flat   Space play   click the fingerboard to hear"
+	hint := "click place   drag move   right-click delete   wheel sharp/flat   Ctrl/Shift+click note: octave copy down/up   Space play   Ctrl+Z undo"
+	when CELLO do hint = "click place   right-click delete   Ctrl/Shift+click note: octave copy down/up   Space play   click the board to hear"
 	text(hint, 1280 - text_width(hint) - 8, y + 5, COL_FAINT)
 }
 
