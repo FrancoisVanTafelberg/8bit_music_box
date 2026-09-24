@@ -65,9 +65,23 @@ everything *around* the waveform:
   for breath.
 * **Tone** — a gentle low-pass filter. Real chips did not have one (the SID did); we use it
   lightly so a cello's sawtooth is darker than a violin's.
-* **4-bit volume** — NES channels had 16 volume levels, so fades are staircases. The synth
-  quantises every envelope to 16 steps by default ("crush"), which is a lot of the
-  authentic grit.
+* **Sound mode** — one button in the top bar (click: next, right-click: back), for the
+  whole app and for the engine (`Mixer.mode`, `render -- -4/-8/-16/-32`). The instruments
+  are the same in every mode; what changes is how they are rendered:
+
+  | mode | what you hear |
+  |---|---|
+  | **4-bit** | NES channels had 16 volume levels, so fades are staircases: every envelope is quantised to 16 steps. The grittiest |
+  | **8-bit** (default) | the chip oscillators with smooth volume |
+  | **16-bit** | 8-bit plus a player's touch: each note a few cents off, vibrato a little faster or slower and wider or narrower note to note, a slow wander under it, a burst of bow scratch or breath chiff at the start (instruments with `breath`), and a smooth triangle instead of the 16-step one. All seeded from the note, so a song sounds the same every play |
+  | **32-bit** | 16-bit plus physical models and bodies (`source/music/bowed.odin`). `model bowed`: violin, viola, cello and contrabass play a simulated bowed string — two delay lines either side of the bow, a stick-slip friction curve, a lossy bridge (McIntyre/Schumacher/Woodhouse as in STK's Bowed) — instead of a saw wave. `resonance` lines (Hz, Q, dB; up to 4): peaking filters for the wooden body's main modes and the bridge, heard in 32-bit only |
+
+  Tuning the bowed model: drawn gently (bow speed 0.08) it settles into clean Helmholtz
+  motion (a sawtooth, harmonics falling 6 dB then 9.5 dB) across the range; faster, it
+  squeaks into octave modes. High up, the bridge side of the string is kept at least ~4
+  samples (a player bows nearer the bridge up there) or it stops speaking; the loop's
+  extra delay (1.6 samples, 1.4 above 2.4 kHz) is allowed for so it is in tune, within the
+  ± few cents of 16-bit's deliberate detuning.
 
 That is exactly what an instrument definition records (`instruments/<family>.inst`). The whole
 orchestra is built from five oscillators: pulse, triangle, saw, sine, noise.

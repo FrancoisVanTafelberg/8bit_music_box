@@ -20,6 +20,8 @@ package music
         gain 0.5
         pan 0.2                          # -1 left .. +1 right
         color 255 200 80
+        model bowed 0.5 0.13             # 32-bit only: a simulated bowed string (bowed.odin)
+        resonance 190 4 4                # 32-bit only: a body resonance, Hz Q dB (up to 4)
         end
 
     Every line after the first is optional. A block starts from, in order: its
@@ -53,6 +55,8 @@ DEFAULT_INSTRUMENT :: Instrument {
 	tone    = 1,
 	gain    = 0.5,
 	color   = {200, 200, 200, 255},
+	bow_pressure = 0.5,
+	bow_position = 0.127,
 }
 
 WAVE_NAME := [Wave]string {
@@ -169,6 +173,25 @@ inst_block_build :: proc(
 			if !num(a, 0, &ins.pan) do bad(rep, where_, l.no, "pan needs a number")
 		case "metallic":
 			ins.metallic = len(a) > 0 && a[0] == "1"
+		case "model":
+			if len(a) < 1 || a[0] == "none" {ins.model = .None; continue}
+			if a[0] != "bowed" {bad(rep, where_, l.no, "model: bowed [pressure 0..1] [bow position 0..0.5], or model none"); continue}
+			ins.model = .Bowed
+			num(a, 1, &ins.bow_pressure)
+			num(a, 2, &ins.bow_position)
+		case "resonance":
+			if len(a) >= 1 && a[0] == "none" {ins.n_resonances = 0; continue}
+			r: Resonance
+			if !(num(a, 0, &r.freq) && num(a, 1, &r.q) && num(a, 2, &r.gain_db)) {
+				bad(rep, where_, l.no, "resonance: <Hz> <Q> <dB>, or resonance none")
+				continue
+			}
+			if int(ins.n_resonances) >= MAX_RESONANCES {
+				bad(rep, where_, l.no, "at most 4 resonance lines")
+				continue
+			}
+			ins.resonances[ins.n_resonances] = r
+			ins.n_resonances += 1
 		case "color", "colour":
 			if len(a) < 3 {bad(rep, where_, l.no, "color: r g b"); continue}
 			for k in 0 ..< 3 {
@@ -223,6 +246,8 @@ inst_write :: proc(w: ^strings.Builder, ins: ^Instrument) {
 	fmt.sbprintfln(w, "gain %v", ins.gain)
 	fmt.sbprintfln(w, "pan %v", ins.pan)
 	fmt.sbprintfln(w, "color %d %d %d", ins.color[0], ins.color[1], ins.color[2])
+	if ins.model == .Bowed do fmt.sbprintfln(w, "model bowed %v %v", ins.bow_pressure, ins.bow_position)
+	for r in ins.resonances[:ins.n_resonances] do fmt.sbprintfln(w, "resonance %v %v %v", r.freq, r.q, r.gain_db)
 	fmt.sbprintln(w, "end")
 }
 

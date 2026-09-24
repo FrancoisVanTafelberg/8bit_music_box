@@ -57,7 +57,7 @@ App :: struct {
 
 	player:     Player,
 	follow:     bool,
-	crush:      bool,
+	mode:       music.Sound_Mode, // 4-bit .. 32-bit
 
 	// Panels
 	overlay:      Overlay,
@@ -101,7 +101,7 @@ game_init_window :: proc() {
 @(export)
 game_init :: proc() {
 	g.follow = true
-	g.crush = true
+	g.mode = music.DEFAULT_MODE
 	g.length = .Quarter
 	g.selected = -1
 	g.fb_hand = HAND_DEFAULT
@@ -135,7 +135,7 @@ game_update :: proc() -> bool {
 
 	ui_begin()
 	files_poll_dropped()
-	g.audio.crush = g.crush
+	g.audio.mode = g.mode
 	player_update(&g.player, &g.song)
 	if g.player.playing && g.follow {
 		per_page := music.bar_ticks(&g.song) * BARS_PER_PAGE

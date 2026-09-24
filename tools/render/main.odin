@@ -5,7 +5,7 @@ package render
 
         odin run tools/render -- songs/ode_to_joy.song
         odin run tools/render -- imports/fugue.mid exports/fugue.wav
-        odin run tools/render -- songs/x.song out.wav -clean     (no 4-bit volume)
+        odin run tools/render -- songs/x.song out.wav -32        (sound mode: -4 -8 -16 -32; default -8)
         odin run tools/render -- sfx cannon                      (a sound effect -> exports/cannon.wav)
         odin run tools/render -- sfx all                         (every sound effect in sounds/)
 
@@ -23,8 +23,8 @@ import music "../../source/music"
 main :: proc() {
 	args := os.args[1:]
 	if len(args) < 1 {
-		fmt.eprintln("usage: render <song.song|file.mid> [out.wav] [-clean]")
-		fmt.eprintln("       render sfx <key|all> [out_dir] [-clean]")
+		fmt.eprintln("usage: render <song.song|file.mid> [out.wav] [-4|-8|-16|-32]")
+		fmt.eprintln("       render sfx <key|all> [out_dir] [-4|-8|-16|-32]")
 		os.exit(2)
 	}
 	if args[0] == "sfx" {
@@ -33,9 +33,9 @@ main :: proc() {
 	}
 	in_path := args[0]
 	out_path := ""
-	crush := true
+	mode := music.DEFAULT_MODE
 	for a in args[1:] {
-		if a == "-clean" do crush = false
+		if m, ok := parse_mode(a); ok do mode = m
 		else do out_path = a
 	}
 	if out_path == "" {
@@ -92,7 +92,7 @@ main :: proc() {
 	}
 
 	t0 := time.now()
-	samples := music.render_song(&song, crush)
+	samples := music.render_song(&song, mode)
 	music.normalize(samples)
 	secs := f64(len(samples) / 2) / music.SAMPLE_RATE
 	fmt.printfln(
@@ -113,10 +113,10 @@ main :: proc() {
 render_sound_effects :: proc(args: []string) {
 	which := "all"
 	out_dir := "exports"
-	crush := true
+	mode := music.DEFAULT_MODE
 	n := 0
 	for a in args {
-		if a == "-clean" do crush = false
+		if m, ok := parse_mode(a); ok do mode = m
 		else if n == 0 {which = a; n += 1} else do out_dir = a
 	}
 	root := "."
@@ -137,7 +137,7 @@ render_sound_effects :: proc(args: []string) {
 	for &fx in m.sounds.list {
 		if which != "all" && fx.key != which do continue
 		found = true
-		samples := music.render_sfx(&fx, crush)
+		samples := music.render_sfx(&fx, mode)
 		defer delete(samples)
 		path := strings.concatenate({out_dir, "/", fx.key, ".wav"}, context.temp_allocator)
 		if !music.write_wav(path, samples) {
@@ -150,4 +150,19 @@ render_sound_effects :: proc(args: []string) {
 		fmt.eprintln("no sound effect called", which)
 		os.exit(1)
 	}
+}
+
+// -4 -8 -16 -32: the sound mode (music.Sound_Mode).
+parse_mode :: proc(a: string) -> (music.Sound_Mode, bool) {
+	switch a {
+	case "-4":
+		return .Bit4, true
+	case "-8":
+		return .Bit8, true
+	case "-16":
+		return .Bit16, true
+	case "-32":
+		return .Bit32, true
+	}
+	return .Bit8, false
 }

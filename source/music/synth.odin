@@ -53,6 +53,35 @@ CONTROL_FRAMES :: 32
 // playing at once do not simply clip.
 MASTER :: f32(0.32)
 
+// How the orchestra is rendered. The instruments are the same in every mode;
+// what changes is how much of the old hardware's roughness is kept, and from
+// 16-bit up, how much of a real player's is added.
+//
+//   4-bit    volume in 16 steps, as the NES did: the grittiest
+//   8-bit    the chip oscillators, smooth volume (the default)
+//   16-bit   8-bit plus what a player adds: every note a few cents off,
+//            vibrato that is never quite regular, a scratch of bow or a
+//            chiff of breath at the start (instruments with breath), and a
+//            smooth triangle instead of the NES's 16-step one
+//   32-bit   16-bit plus physical models where an instrument has one
+//            (`model bowed`: a bowed string, simulated) and the body's
+//            resonances (`resonance` lines: the wooden box around it)
+Sound_Mode :: enum u8 {
+	Bit4,
+	Bit8,
+	Bit16,
+	Bit32,
+}
+
+SOUND_MODE_NAME := [Sound_Mode]string {
+	.Bit4  = "4-bit",
+	.Bit8  = "8-bit",
+	.Bit16 = "16-bit",
+	.Bit32 = "32-bit",
+}
+
+DEFAULT_MODE :: Sound_Mode.Bit8
+
 Event :: struct {
 	start:   int, // frame the note begins
 	gate:    int, // frames it is held
@@ -90,6 +119,13 @@ Voice :: struct {
 	f_now:     f32,
 	gl, gr:    f32,
 	release_from: f32,
+	mode:      Sound_Mode,
+	// 16-bit and up: this note's own small imperfections.
+	vib_k:     [2]f32, // rate and depth, scaled
+	wander:    [2]f32, // phases of a slow, irregular pitch drift
+	// 32-bit: the bowed string (bowed.odin) and the body filters.
+	bow:       Bowed,
+	body:      [MAX_RESONANCES]Biquad,
 }
 
 Engine :: struct {
@@ -103,7 +139,7 @@ Engine :: struct {
 	next:   int,
 	voices: [dynamic]Voice,
 	frame:  int,
-	crush:  bool, // quantise volume to 16 levels, as the NES did
+	mode:   Sound_Mode,
 	// Looping: after `loop_len` frames the events start over. `loop_base` is
 	// the frame the current pass began at. loop_len is the song's length
 	// rounded up to a whole bar, so the beat carries on across the seam.
@@ -114,9 +150,9 @@ Engine :: struct {
 
 // Flatten `song` from `from_tick` onwards. Notes already sounding at
 // `from_tick` are started, shortened, so starting mid-phrase is not silent.
-engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, crush := true) {
+engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, mode := DEFAULT_MODE) {
 	engine_destroy(e)
-	e.crush = crush
+	e.mode = mode
 	spt := tick_seconds(song)
 	for &t, ti in song.tracks {
 		append(&e.insts, inst_get(song, t.inst)^)
@@ -224,7 +260,7 @@ engine_render_add :: proc(e: ^Engine, out: []f32) -> bool {
 		}
 		ev := e.events[e.next]
 		if ev.start + e.loop_base >= block_end do break
-		v := voice_make(ev, e.insts[ev.inst]) // seeded from the pass-relative start
+		v := voice_make(ev, e.insts[ev.inst], e.mode) // seeded from the pass-relative start
 		v.ev.start += e.loop_base
 		append(&e.voices, v)
 		e.next += 1
@@ -241,7 +277,7 @@ engine_render_add :: proc(e: ^Engine, out: []f32) -> bool {
 			v.age += frames - offset
 			done = v.age >= v.life
 		} else {
-			done = voice_render(v, out[offset * 2:], e.crush, g0, g1, frames, offset)
+			done = voice_render(v, out[offset * 2:], g0, g1, frames, offset)
 		}
 		if done do unordered_remove(&e.voices, i)
 	}
@@ -251,9 +287,9 @@ engine_render_add :: proc(e: ^Engine, out: []f32) -> bool {
 }
 
 // Render a whole song into one buffer: export and the render tool.
-render_song :: proc(song: ^Song, crush := true, allocator := context.allocator) -> []f32 {
+render_song :: proc(song: ^Song, mode := DEFAULT_MODE, allocator := context.allocator) -> []f32 {
 	e: Engine
-	engine_start(&e, song, 0, crush)
+	engine_start(&e, song, 0, mode)
 	defer engine_destroy(&e)
 	out := make([dynamic]f32, allocator)
 	block: [2048 * 2]f32
@@ -265,16 +301,16 @@ render_song :: proc(song: ^Song, crush := true, allocator := context.allocator) 
 }
 
 // One note on its own, for the click you hear when placing it.
-render_preview :: proc(ins: Instrument, p: Pitch, seconds: f32 = 0.35, allocator := context.allocator) -> []f32 {
+render_preview :: proc(ins: Instrument, p: Pitch, seconds: f32 = 0.35, mode := DEFAULT_MODE, allocator := context.allocator) -> []f32 {
 	ev := Event {
 		gate = int(seconds * RATE),
 		midi = f32(pitch_midi(p)),
 		amp  = 0.8 * ins.gain,
 		pan  = 0,
 	}
-	v := voice_make(ev, ins)
+	v := voice_make(ev, ins, mode)
 	out := make([]f32, v.life * 2, allocator)
-	voice_render(&v, out, true, 1, 1, 1, 0)
+	voice_render(&v, out, 1, 1, 1, 0)
 	for &s in out do s = clamp(s * MASTER * 1.6, -1, 1)
 	return out
 }
@@ -292,7 +328,7 @@ normalize :: proc(s: []f32, peak: f32 = 0.9) {
 // ---------------------------------------------------------------------------
 
 @(private)
-voice_make :: proc(ev: Event, ins: Instrument) -> Voice {
+voice_make :: proc(ev: Event, ins: Instrument, mode: Sound_Mode) -> Voice {
 	v := Voice {
 		ev    = ev,
 		ins   = ins,
@@ -311,6 +347,32 @@ voice_make :: proc(ev: Event, ins: Instrument) -> Voice {
 	// A struck or plucked note rings for its decay whatever its written
 	// length, as a harp string does.
 	if ins.sustain <= 0 do v.life = max(v.life, int((ins.attack + ins.decay) * RATE))
+	v.mode = mode
+
+	if mode >= .Bit16 {
+		// A player is never exactly in tune, and never quite regular: a few
+		// cents either way, and vibrato a little faster or slower, wider or
+		// narrower, note to note. Seeded from the note, so it is the same
+		// every time the song is played.
+		h := hash_u32(v.white)
+		detune := (unit(h) * 2 - 1) * 4 // cents
+		v.freq *= math.pow(2, detune / 1200)
+		h = hash_u32(h)
+		v.vib_k[0] = 1 + (unit(h) * 2 - 1) * 0.08
+		h = hash_u32(h)
+		v.vib_k[1] = 1 + (unit(h) * 2 - 1) * 0.2
+		h = hash_u32(h)
+		v.wander = {unit(h) * TAU, unit(hash_u32(h)) * TAU}
+	}
+	if mode == .Bit32 {
+		if ins.model == .Bowed {
+			bowed_init(&v.bow, &v.ins, v.freq)
+			// A bowed string rings on after the bow leaves it: give it time
+			// to die away instead of being cut off.
+			v.life = ev.gate + int(max(ins.release * 3, 0.3) * RATE)
+		}
+		for k in 0 ..< int(ins.n_resonances) do v.body[k] = biquad_peak(ins.resonances[k])
+	}
 	// Constant-power pan.
 	a := (v.ev.pan + 1) * math.PI / 4
 	v.gl, v.gr = math.cos(a), math.sin(a)
@@ -358,7 +420,7 @@ fract :: #force_inline proc(x: f32) -> f32 {
 }
 
 @(private)
-osc :: #force_inline proc(w: Wave, ph, dt, duty: f32, noise_out: f32) -> f32 {
+osc :: #force_inline proc(w: Wave, ph, dt, duty: f32, noise_out: f32, smooth := false) -> f32 {
 	switch w {
 	case .Pulse:
 		v: f32 = ph < duty ? 1 : -1
@@ -369,6 +431,7 @@ osc :: #force_inline proc(w: Wave, ph, dt, duty: f32, noise_out: f32) -> f32 {
 		return v - (2 * duty - 1)
 	case .Triangle:
 		tri := 4 * abs(ph - 0.5) - 1 // -1..1
+		if smooth do return tri
 		return math.floor((tri + 1) * 7.5 + 0.5) / 7.5 - 1 // 16 steps
 	case .Saw:
 		return 2 * ph - 1 - blep(ph, dt)
@@ -396,7 +459,7 @@ lfsr_step :: #force_inline proc(r: ^u32, metallic: bool) -> f32 {
 @(private)
 // `g0`..`g1` is the track's gain ramp across the block; this voice starts
 // `ramp_at` frames into a block of `ramp_len`.
-voice_render :: proc(v: ^Voice, out: []f32, crush: bool, g0, g1: f32, ramp_len, ramp_at: int) -> bool {
+voice_render :: proc(v: ^Voice, out: []f32, g0, g1: f32, ramp_len, ramp_at: int) -> bool {
 	ins := &v.ins
 	frames := len(out) / 2
 	gate := f32(v.ev.gate) / RATE
@@ -409,9 +472,17 @@ voice_render :: proc(v: ^Voice, out: []f32, crush: bool, g0, g1: f32, ramp_len, 
 
 		if v.age % CONTROL_FRAMES == 0 {
 			semis: f32 = 0
+			human := v.mode >= .Bit16
 			if ins.vib_depth > 0 && t > ins.vib_delay {
 				fade_in := min((t - ins.vib_delay) / 0.25, 1)
-				semis += ins.vib_depth * fade_in * math.sin(TAU * ins.vib_rate * (t - ins.vib_delay))
+				rate, depth := ins.vib_rate, ins.vib_depth
+				if human {rate *= v.vib_k[0]; depth *= v.vib_k[1]}
+				semis += depth * fade_in * math.sin(TAU * rate * (t - ins.vib_delay))
+			}
+			if human && ins.vib_depth > 0 {
+				// A slow wander under the vibrato: two slow sines that never
+				// line up, a few cents deep.
+				semis += 0.03 * math.sin(TAU * 0.73 * t + v.wander[0]) + 0.02 * math.sin(TAU * 1.91 * t + v.wander[1])
 			}
 			if ins.sweep != 0 do semis += ins.sweep * math.exp(-t / max(ins.sweep_time, 1e-3))
 			f = v.freq * math.pow(2, semis / 12)
@@ -421,35 +492,62 @@ voice_render :: proc(v: ^Voice, out: []f32, crush: bool, g0, g1: f32, ramp_len, 
 		dt2 := dt * ratio2
 
 		// Noise is clocked by the pitch: higher rows, brighter hiss.
-		if ins.wave == .Noise {
-			v.nclock += dt * 8
-			for v.nclock >= 1 {v.nclock -= 1; v.nout = lfsr_step(&v.lfsr, ins.metallic)}
-		}
-		if ins.mix2 > 0 && ins.wave2 == .Noise {
-			v.nclock2 += dt2 * 8
-			for v.nclock2 >= 1 {v.nclock2 -= 1; v.nout2 = lfsr_step(&v.lfsr2, ins.metallic)}
-		}
-
-		s := osc(ins.wave, v.phase, dt, ins.duty, v.nout)
-		if ins.mix2 > 0 {
-			s = s * (1 - ins.mix2) + osc(ins.wave2, v.phase2, dt2, ins.duty, v.nout2) * ins.mix2
-		}
+		bowed := v.mode == .Bit32 && ins.model == .Bowed
+		noise: f32 = 0
 		if ins.breath > 0 {
 			v.white ~= v.white << 13
 			v.white ~= v.white >> 17
 			v.white ~= v.white << 5
-			s += ins.breath * (f32(v.white) / f32(max(u32)) * 2 - 1)
+			noise = f32(v.white) / f32(max(u32)) * 2 - 1
+		}
+		env := envelope(ins, t, gate)
+		if v.mode == .Bit4 do env = math.round(env * 15) / 15
+
+		x: f32
+		if bowed {
+			if v.age % CONTROL_FRAMES == 0 do bowed_tune(&v.bow, f)
+			// The envelope is the bow: how fast it is drawn. The string
+			// makes the sound, and rings on for a moment after the bow lifts;
+			// that ring is faded out by the end of the voice's life.
+			x = bowed_tick(&v.bow, env, noise * ins.breath)
+			if t > gate {
+				tail := max(ins.release * 3, 0.3)
+				x *= max(1 - (t - gate) / tail, 0)
+			}
+		} else {
+			// Noise is clocked by the pitch: higher rows, brighter hiss.
+			if ins.wave == .Noise {
+				v.nclock += dt * 8
+				for v.nclock >= 1 {v.nclock -= 1; v.nout = lfsr_step(&v.lfsr, ins.metallic)}
+			}
+			if ins.mix2 > 0 && ins.wave2 == .Noise {
+				v.nclock2 += dt2 * 8
+				for v.nclock2 >= 1 {v.nclock2 -= 1; v.nout2 = lfsr_step(&v.lfsr2, ins.metallic)}
+			}
+			smooth := v.mode >= .Bit16
+			sig := osc(ins.wave, v.phase, dt, ins.duty, v.nout, smooth)
+			if ins.mix2 > 0 {
+				sig = sig * (1 - ins.mix2) + osc(ins.wave2, v.phase2, dt2, ins.duty, v.nout2, smooth) * ins.mix2
+			}
+			if ins.breath > 0 {
+				// From 16-bit: a burst of it as the note starts - the scratch
+				// of the bow biting, the chiff of a flute - dying in ~35 ms.
+				chiff: f32 = smooth ? 1 + 6 * math.exp(-t / 0.035) : 1
+				sig += ins.breath * noise * chiff
+			}
+			v.phase = fract(v.phase + dt)
+			v.phase2 = fract(v.phase2 + dt2)
+
+			// The muffle from sounds_example: one pole, 1 = open.
+			v.lp += clamp(ins.tone, 0.01, 1) * (sig - v.lp)
+			x = v.lp * env
+		}
+		// 32-bit: the body the string (or reed, or pipe) sits in.
+		if v.mode == .Bit32 {
+			for k in 0 ..< int(ins.n_resonances) do x = biquad_tick(&v.body[k], x)
 		}
 
-		v.phase = fract(v.phase + dt)
-		v.phase2 = fract(v.phase2 + dt2)
-
-		// The muffle from sounds_example: one pole, 1 = open.
-		v.lp += clamp(ins.tone, 0.01, 1) * (s - v.lp)
-
-		env := envelope(ins, t, gate)
-		if crush do env = math.round(env * 15) / 15
-		a := v.lp * env * v.ev.amp
+		a := x * v.ev.amp
 		if g0 == g1 {
 			a *= g0
 		} else {

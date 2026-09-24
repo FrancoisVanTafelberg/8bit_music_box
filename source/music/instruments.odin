@@ -84,6 +84,13 @@ Instrument :: struct {
 	gain:       f32,
 	pan:        f32, // -1 left .. +1 right: orchestral seating
 	color:      [4]u8,
+	// 32-bit mode only (bowed.odin): a physical model instead of the
+	// oscillators, and the body's resonances.
+	model:        Model,
+	bow_pressure: f32,
+	bow_position: f32,
+	resonances:   [MAX_RESONANCES]Resonance,
+	n_resonances: u8,
 	// Where this definition came from - shown in the panel, and what decides
 	// whether its strings belong to someone to free.
 	origin:     Origin,

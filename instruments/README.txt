@@ -36,6 +36,10 @@ The format, one block per instrument:
   gain 0.5
   pan 0.2                          # -1 left .. +1 right
   color 255 200 80                 # its colour on the sheet
+  model bowed 0.5 0.12             # 32-bit mode only: a simulated bowed string
+                                   #   (bow pressure 0..1, bow position 0..0.5 from the bridge)
+  resonance 200 3 4                # 32-bit mode only: a body resonance, Hz Q dB (up to 4
+                                   #   lines; "resonance none" clears them)
   end
 
 Every line inside a block is optional. A block starts from:

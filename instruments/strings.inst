@@ -3,6 +3,11 @@
 # Strings: saw waves, a quick bow attack, vibrato arriving late. The contrabass
 # is a dark pulse with some saw in it; the harp is a plucked triangle.
 #
+# In 32-bit mode the four bowed strings play a simulated bowed string instead
+# (`model bowed`) through their body's resonances (`resonance`: Hz, Q, dB).
+# The resonances are rough, by ear and from published measurements of the
+# instruments' main body modes - adjust them freely.
+#
 # The format is described in README.txt in this folder. Ranges are sounding
 # pitch (what you hear), not the written pitch of transposing instruments.
 
@@ -21,6 +26,12 @@ metallic 0
 gain 0.55
 pan -0.45
 color 236 112 84
+# 32-bit mode: bowed-string model and body (see the cello).
+model bowed 0.5 0.12
+resonance 280 3 4
+resonance 480 3 4
+resonance 2500 1.2 4
+resonance 6500 0.7 -8
 end
 
 define_instrument viola
@@ -38,6 +49,12 @@ metallic 0
 gain 0.55
 pan 0.1
 color 232 146 70
+# 32-bit mode: bowed-string model and body (see the cello).
+model bowed 0.5 0.12
+resonance 230 3 4
+resonance 400 3 4
+resonance 2000 1.2 3
+resonance 5500 0.7 -8
 end
 
 # Range: the cello's full compass, C2 (open C string) to C6, two octaves above
@@ -58,6 +75,14 @@ metallic 0
 gain 0.6
 pan 0.35
 color 200 70 130
+# 32-bit mode: a simulated bowed string, and the body's main resonances -
+# the air in the box, the two main wood modes, the bridge - with the harsh
+# top of the bowed string taken down.
+model bowed 0.5 0.12
+resonance 105 3 5
+resonance 200 3 4
+resonance 2200 1.2 3
+resonance 5000 0.7 -9
 end
 
 define_instrument contrabass
@@ -75,6 +100,12 @@ metallic 0
 gain 0.7
 pan 0.55
 color 176 70 58
+# 32-bit mode: bowed-string model and body (see the cello).
+model bowed 0.5 0.13
+resonance 60 3 5
+resonance 110 3 4
+resonance 1200 1.2 3
+resonance 3500 0.7 -8
 end
 
 define_instrument harp

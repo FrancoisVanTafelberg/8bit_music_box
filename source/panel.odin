@@ -21,6 +21,13 @@ overlay_none :: proc() -> bool {
 	return g.overlay == .None
 }
 
+MODE_HINT := [music.Sound_Mode]string {
+	.Bit4  = "the chip's 16-step volume, grittiest",
+	.Bit8  = "the chip oscillators, smooth volume (default)",
+	.Bit16 = "8-bit with a player's touch: tuning, vibrato and bow/breath vary note to note",
+	.Bit32 = "16-bit plus modelled bowed strings and instrument bodies",
+}
+
 TIME_SIGS := [?][2]i32{{4, 4}, {3, 4}, {2, 4}, {2, 2}, {6, 8}, {9, 8}, {12, 8}, {5, 4}}
 
 // ---------------------------------------------------------------------------
@@ -84,7 +91,18 @@ topbar_draw :: proc() {
 	x += 34
 	if button(rect(x, y, 50, h), "Follow", g.follow) do g.follow = !g.follow
 	x += 54
-	if button(rect(x, y, 50, h), "4-bit", g.crush) do g.crush = !g.crush
+	// Sound mode: click cycles 4-bit, 8-bit, 16-bit, 32-bit (right-click back).
+	{
+		r := rect(x, y, 50, h)
+		if button(r, music.SOUND_MODE_NAME[g.mode], g.mode != music.DEFAULT_MODE) {
+			g.mode = music.Sound_Mode((int(g.mode) + 1) % len(music.Sound_Mode))
+			set_status("sound: %s - %s", music.SOUND_MODE_NAME[g.mode], MODE_HINT[g.mode])
+		}
+		if ui_take_right(r) {
+			g.mode = music.Sound_Mode((int(g.mode) + len(music.Sound_Mode) - 1) % len(music.Sound_Mode))
+			set_status("sound: %s - %s", music.SOUND_MODE_NAME[g.mode], MODE_HINT[g.mode])
+		}
+	}
 	x += 64
 
 	// File.

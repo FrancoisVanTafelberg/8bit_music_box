@@ -58,7 +58,7 @@ layer becomes a cello, and Save puts the result in `cello_songs\`, never over th
 | **Files** | `Ctrl+S` save, `Ctrl+O` open, `Ctrl+N` new, `Ctrl+E` export WAV |
 | **Import** | put `.mid` files in `imports\` and Open them, or drag a `.mid` / `.song` onto the window |
 | **Export** | WAV built in; MP3 / OGG / FLAC light up when `ffmpeg` is on PATH |
-| **4-bit** | toggles NES-style 16-step volume (on = grittier, off = smoother) |
+| **Sound mode** | the 8-bit button: click cycles **4-bit** (NES 16-step volume, grittiest), **8-bit** (default), **16-bit** (a player's touch: tuning, vibrato and bow scratch vary note to note), **32-bit** (modelled bowed strings and wooden bodies); right-click goes back. Export uses it too |
 | `F7` | reload the instrument and sound effect files |
 | `F11` | fullscreen |
 
@@ -72,7 +72,7 @@ Rows the active instrument cannot play are shaded and refuse clicks.
 | `source/music/` | package `music`, no raylib: theory, song model, `.song` format, instruments, synth, sound effects, the Mixer, WAV, MIDI import |
 | `source/music_rl/` | the Mixer's sound out through raylib |
 | `source/rlu/` | virtual resolution (1280 × 720 canvas), from Animal Kingdoms |
-| `tools/render/` | `odin run tools/render -- songs/ode_to_joy.song` renders to WAV with no window; `-- sfx all` renders every sound effect |
+| `tools/render/` | `odin run tools/render -- songs/ode_to_joy.song` renders to WAV with no window (`-4` `-8` `-16` `-32` pick the sound mode); `-- sfx all` renders every sound effect |
 | `examples/battle_demo/` | the engine in another program: `odin run examples/battle_demo` |
 | `instruments/` | every instrument, as text files (`.inst`): add or change them without a rebuild, F7 reloads. See `instruments/README.txt` |
 | `sounds/` | sound effects that are not music (cannon, musket, sword clash...), as text files (`.sfx`). See `sounds/README.txt` |

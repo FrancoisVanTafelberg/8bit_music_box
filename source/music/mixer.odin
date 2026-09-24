@@ -61,9 +61,9 @@ Mixer :: struct {
 	master:       f32,
 	music_volume: f32,
 	sfx_volume:   f32,
-	// NES-style 16-step volume. Used by songs and sounds started after it is
-	// changed.
-	crush:        bool,
+	// 4-bit .. 32-bit (synth.odin). Used by songs and sounds started after it
+	// is changed.
+	mode:         Sound_Mode,
 	frame:        int, // frames rendered so far
 	next_handle:  u32,
 	rng:          u32,
@@ -109,7 +109,7 @@ mixer_init :: proc(m: ^Mixer) {
 	m.master = 1
 	m.music_volume = 1
 	m.sfx_volume = 1
-	m.crush = true
+	m.mode = DEFAULT_MODE
 	m.rng = 0x2545F491
 	registry_bind(&m.reg)
 }
@@ -192,7 +192,7 @@ mixer_play_song :: proc(
 	from_tick: i32 = 0,
 ) -> Song_Handle {
 	slot := slot_take(m)
-	engine_start(&slot.engine, song, from_tick, m.crush)
+	engine_start(&slot.engine, song, from_tick, m.mode)
 	engine_set_loop(&slot.engine, loop)
 	slot.title = strings.clone(song.title)
 	for &t in song.tracks {
@@ -370,7 +370,7 @@ mixer_play_sfx :: proc(m: ^Mixer, key: string, volume: f32 = 1, pan: f32 = 0, pi
 	shift := pitch + (vary != 0 ? (rand_unit(m) * 2 - 1) * vary : 0)
 	for sv in fx.voices {
 		ev := sfx_event(sv, fx.volume * volume, pan, shift, m.frame)
-		sfx_add(m, voice_make(ev, sv.ins), h)
+		sfx_add(m, voice_make(ev, sv.ins, m.mode), h)
 	}
 	return h
 }
@@ -399,7 +399,7 @@ mixer_play_instrument :: proc(m: ^Mixer, ins: Instrument, midi: f32, seconds: f3
 		pan   = clamp(pan, -1, 1),
 		track = -1,
 	}
-	sfx_add(m, voice_make(ev, ins), h)
+	sfx_add(m, voice_make(ev, ins, m.mode), h)
 	return h
 }
 
@@ -459,7 +459,7 @@ mixer_render :: proc(m: ^Mixer, out: []f32) {
 		offset := max(s.voice.ev.start - m.frame, 0)
 		if s.step > 0 do s.level = max(s.level - s.step * f32(frames), 0)
 		g1 := s.level * m.sfx_volume
-		done := voice_render(&s.voice, out[offset * 2:], m.crush, s.applied, g1, frames, offset)
+		done := voice_render(&s.voice, out[offset * 2:], s.applied, g1, frames, offset)
 		s.applied = g1
 		if done || s.level <= 0 {
 			ordered_remove(&m.sfx, i)

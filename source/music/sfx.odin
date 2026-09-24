@@ -193,13 +193,13 @@ sfx_duration :: proc(fx: ^Sfx) -> f32 {
 }
 
 // Render one sound effect on its own, for the render tool and tests.
-render_sfx :: proc(fx: ^Sfx, crush := true, allocator := context.allocator) -> []f32 {
+render_sfx :: proc(fx: ^Sfx, mode := DEFAULT_MODE, allocator := context.allocator) -> []f32 {
 	frames := int(sfx_duration(fx) * RATE) + 256
 	out := make([]f32, frames * 2, allocator)
 	for sv in fx.voices {
 		ev := sfx_event(sv, fx.volume, 0, 0, 0)
-		v := voice_make(ev, sv.ins)
-		voice_render(&v, out[ev.start * 2:], crush, 1, 1, 1, 0)
+		v := voice_make(ev, sv.ins, mode)
+		voice_render(&v, out[ev.start * 2:], 1, 1, 1, 0)
 	}
 	for &s in out do s = clamp(s * MASTER, -1, 1)
 	return out

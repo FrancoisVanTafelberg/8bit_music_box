@@ -213,7 +213,7 @@ export_base :: proc() -> string {
 
 file_export :: proc(format: string) {
 	wav := strings.concatenate({export_base(), ".wav"}, context.temp_allocator)
-	samples := music.render_song(&g.song, g.crush)
+	samples := music.render_song(&g.song, g.mode)
 	defer delete(samples)
 	music.normalize(samples)
 	if !music.write_wav(wav, samples) {

@@ -50,7 +50,7 @@ player_destroy :: proc(p: ^Player) {
 player_play :: proc(p: ^Player, song: ^music.Song, from_tick: i32) {
 	if !g.out.open do return
 	player_stop(p)
-	g.audio.crush = g.crush
+	g.audio.mode = g.mode
 	p.song = music.mixer_play_song(&g.audio, song, loop = false, from_tick = from_tick)
 	p.from_tick = from_tick
 	p.base_sent = g.out.sent
@@ -102,7 +102,7 @@ player_tick :: proc(p: ^Player, song: ^music.Song) -> i32 {
 player_preview :: proc(p: ^Player, inst: music.Inst_Id, pitch: music.Pitch) {
 	if !g.out.open do return
 	music.mixer_stop_sfx(&g.audio, p.preview)
-	g.audio.crush = g.crush
+	g.audio.mode = g.mode
 	p.preview = music.mixer_play_instrument(&g.audio, music.inst_get(&g.song, inst)^, f32(music.pitch_midi(pitch)), 0.35, 1.3)
 }
 
