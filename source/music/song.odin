@@ -152,6 +152,13 @@ song_remove_track :: proc(s: ^Song, i: int) {
 	ordered_remove(&s.tracks, i)
 }
 
+// A layer by its name ("Bugle", "Fife 2"), or -1. For programs that play a
+// song and want to mute one of its parts: engine_set_track_gain takes this.
+song_track_index :: proc(s: ^Song, name: string) -> int {
+	for t, i in s.tracks do if t.name == name do return i
+	return -1
+}
+
 // Is anything soloed? Then only soloed tracks sound.
 song_any_solo :: proc(s: ^Song) -> bool {
 	for t in s.tracks do if t.solo do return true

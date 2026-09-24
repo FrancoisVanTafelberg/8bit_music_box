@@ -30,7 +30,7 @@ you are editing survives. `F5` forces a reload, `F6` restarts.
 | **Edit** | drag to move, right-click to delete, mouse wheel on a note = up/down a semitone |
 | **Selected note** | `↑`/`↓` a staff step, `Shift+↑/↓` a semitone, `←`/`→` a slot, `Del` removes it |
 | **Fine grid** | hold `Alt` to snap to 32nds |
-| **Layers** | `+ Add instrument`; click a layer to edit it; `M` mute, `S` solo; `Tab` next layer |
+| **Layers** | `+ Add instrument`; click a layer to edit it; `M` mute, `S` solo (live, even mid-song); `Tab` next layer |
 | **Play** | `Space` from this page, `Shift+Space` from the start. **Follow** turns pages with the playhead |
 | **Pages** | `PgUp`/`PgDn`, `[` `]`, `←`/`→` with nothing selected, or click the page strip |
 | **Undo** | `Ctrl+Z`, `Ctrl+Y` / `Ctrl+Shift+Z` |

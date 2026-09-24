@@ -1,15 +1,17 @@
 # 8-Bit Music Box song
-# The British Grenadiers - traditional march, on fifes, bugle and drums.
+# The British Grenadiers - traditional march: the TRUMPET version.
 # Tune: Kerr's Merry Melodies vol. 3 no. 380 (c. 1880s), via the Traditional Tune
-# Archive - public domain. Our arrangement: drum roll-off under a bugle call; the
-# tune AABB with the fifes in unison and the bugle marking the B strains; then
-# AABB again with the second fife in harmony and the bugle throughout; a held
-# chord over a roll and a final beat. Drum, bugle and harmony parts are ours.
-#
-# The standard marching line-up (see instruments/field_music.inst):
-#   Fife 1, Fife 2, Bugle, Side Drum, Bass Drum.
+# Archive - public domain. Same arrangement as british_grenadiers.song, with a
+# trumpet in place of the bugle. Unlike the bugle it can play every note, but it
+# is used sparingly - only on the tune's brightest moments:
+#   * the flourish that opens the B strain ("a>b a g | f>g a a"): once as a hint
+#     the first time through, then on both B strains the second time;
+#   * the close of the final strain, leading into the ending;
+#   * the held chord and the last beat.
+# Everywhere else it rests, so the fifes and drums carry the tune as before.
+# (A deliberate variation on the marching line-up, which has a bugle.)
 format 1
-title "The British Grenadiers (fifes, bugle & drums)"
+title "The British Grenadiers (fifes, trumpet & drums)"
 tempo 116
 time 2/4
 key 2
@@ -670,96 +672,52 @@ note 3216 12 F#5 112
 end
 
 
-track "Bugle"
-instrument bugle
-volume 0.75
+track "Trumpet"
+instrument trumpet
+volume 0.7
 pan 0.25
 mute 0
 solo 0
 # note  tick  length  pitch  velocity   (24 ticks = one quarter)
-note 0 10 A4 96
-note 12 10 D5 100
-note 24 20 F#5 104
-note 48 10 A4 96
-note 60 10 D5 100
-note 72 8 D5 100
-note 864 16 D5 92
-note 912 16 D5 92
-note 936 16 D5 80
-note 960 16 D5 92
-note 1008 16 A4 92
-note 1032 6 A4 80
-note 1038 6 A4 90
-note 1044 10 D5 96
-note 1056 16 D5 92
-note 1104 16 D5 92
-note 1128 16 D5 80
-note 1152 16 D5 92
-note 1200 34 D5 98
-note 1248 16 D5 92
-note 1296 16 D5 92
-note 1320 16 D5 80
-note 1344 16 D5 92
-note 1392 16 A4 92
-note 1416 6 A4 80
-note 1422 6 A4 90
-note 1428 10 D5 96
-note 1440 16 D5 92
-note 1488 16 D5 92
-note 1512 16 D5 80
-note 1536 16 D5 92
-note 1584 34 D5 98
-note 1632 16 D5 98
-note 1680 16 D5 98
-note 1704 16 A4 86
-note 1728 16 D5 98
-note 1776 16 D5 98
-note 1800 16 A4 86
-note 1824 16 D5 98
-note 1872 16 D5 98
-note 1896 16 A4 86
-note 1920 16 D5 98
-note 1968 34 D5 104
-note 2016 16 D5 98
-note 2064 16 D5 98
-note 2088 16 A4 86
-note 2112 16 D5 98
-note 2160 16 D5 98
-note 2184 16 A4 86
-note 2208 16 D5 98
-note 2256 16 D5 98
-note 2280 16 A4 86
-note 2304 16 D5 98
-note 2352 34 D5 104
-note 2400 16 F#5 98
-note 2448 16 F#5 98
-note 2472 16 F#5 86
-note 2496 16 D5 98
-note 2544 16 A5 98
-note 2568 6 A5 86
-note 2574 6 A4 100
-note 2580 10 D5 106
-note 2592 16 F#5 98
-note 2640 16 F#5 98
-note 2664 16 D5 86
-note 2688 16 F#5 98
-note 2736 34 F#5 104
-note 2784 16 F#5 98
-note 2832 16 F#5 98
-note 2856 16 F#5 86
-note 2880 16 D5 98
-note 2928 16 A5 98
-note 2952 6 A5 86
-note 2958 6 A4 100
-note 2964 10 D5 106
-note 2976 16 F#5 98
-note 3024 16 F#5 98
-note 3048 16 D5 86
-note 3072 16 F#5 98
-note 3120 34 F#5 104
-note 3168 44 A5 112
+note 1236 10 F#5 82
+note 1248 17 A5 98
+note 1266 5 B5 90
+note 1272 11 A5 90
+note 1284 11 G5 86
+note 1296 17 F#5 94
+note 1314 5 G5 90
+note 1320 11 A5 94
+note 1332 11 A5 98
+note 2388 10 F#5 92
+note 2400 17 A5 108
+note 2418 5 B5 100
+note 2424 11 A5 100
+note 2436 11 G5 96
+note 2448 17 F#5 104
+note 2466 5 G5 100
+note 2472 11 A5 104
+note 2484 11 A5 108
+note 2772 10 F#5 98
+note 2784 17 A5 114
+note 2802 5 B5 106
+note 2808 11 A5 106
+note 2820 11 G5 102
+note 2832 17 F#5 110
+note 2850 5 G5 106
+note 2856 11 A5 110
+note 2868 11 A5 114
+note 2976 10 D5 104
+note 3000 10 E5 104
+note 3024 10 F#5 106
+note 3048 10 G5 108
+note 3072 10 A5 112
+note 3084 10 F#5 104
+note 3096 22 A4 106
+note 3120 34 D5 114
+note 3168 44 F#5 110
 note 3216 12 D5 124
 end
+
 track "Side Drum"
 instrument side_drum
 volume 0.85

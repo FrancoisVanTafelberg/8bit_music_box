@@ -77,6 +77,9 @@ player_stop :: proc(p: ^Player) {
 
 player_update :: proc(p: ^Player, song: ^music.Song) {
 	if !p.playing do return
+	// Mute, solo and volume are live: whatever the layer panel says now is
+	// what the next block plays.
+	music.engine_sync_mix(&p.engine, song)
 	player_feed(p)
 
 	// Re-anchor the clock if it has wandered from the audio (a stalled frame,

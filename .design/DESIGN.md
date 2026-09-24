@@ -237,6 +237,19 @@ whole sound up front" into a **block engine** so playback starts instantly:
    callback, so a hot reload never swaps code out from under the audio thread).
    Export runs the same engine to the end into one buffer, normalises, writes WAV.
 
+**Live mix.** Every track's notes go into the engine, muted or not, and each track
+has a gain (0–1) applied as it plays. Mute, solo and volume changes are heard within one
+block (~46 ms), faded rather than cut; the editor simply calls `engine_sync_mix` every
+frame. A muted note keeps time without being synthesised, so unmuting mid-note brings the
+rest of it in. Breath noise is per voice, seeded from the note, so muting one track never
+changes how another sounds.
+
+**Playing songs from another program** (Animal Kingdoms, say): `source/music/` has no
+raylib in it. `registry_load_dir` → `song_load` → `engine_start`, then call
+`engine_render` for each block of stereo f32 and hand it to your audio output (the
+editor's `player.odin` is the example). `song_track_index(song, "Bugle")` finds a layer;
+`engine_set_track_gain(engine, i, 0 or 1)` mutes or brings it back mid-song.
+
 Pulse and saw are band-limited with PolyBLEP so high notes do not alias into a screech;
 the triangle is deliberately left as the NES's 16-step staircase. Pitch modulation
 (vibrato, sweep) is computed at control rate (every 32 samples).

@@ -1,14 +1,19 @@
 # Field music: the instruments of an 18th-century fife-and-drum corps that the
-# built-in orchestra does not already have. An example of the format - see
-# README.txt.
+# rest of the orchestra does not already have. Together with the fife and the
+# bass drum they make the standard line-up for every marching song in the
+# Colonization project:
+#
+#   Fife 1 (fife) - Fife 2 (fife_low) - Bugle (bugle) - Side Drum (side_drum)
+#   - Bass Drum (bass_drum)
 
 # The bugle: a valveless brass horn that can only play its natural harmonics,
-# which is why bugle calls use so few notes. Brighter and blunter than the
-# trumpet it is based on, with no vibrato.
+# which is why bugle calls use so few notes: in D, only D4 A4 D5 F#5 A5; in C,
+# C4 G4 C5 E5 G5. The range covers both. Brighter and blunter than the trumpet
+# it is based on, with no vibrato.
 define_instrument bugle
 based_on trumpet
 name "Bugle"
-range C4 G5
+range C4 B5
 wave pulse 0.5
 layer saw 0.35 0
 envelope 0.012 0.1 0.8 0.05
@@ -31,4 +36,16 @@ tone 0.7
 gain 0.42
 pan -0.1
 color 160 210 90
+end
+
+# The British side drum: a rope drum, a little brighter and tighter than the
+# colonial field drum it is based on. (First defined inside
+# british_grenadiers.song; moved here so every marching song can share it.)
+define_instrument side_drum
+based_on field_drum
+name "Side Drum"
+envelope 0.001 0.2 0 0.05
+tone 0.68
+gain 0.9
+color 200 90 80
 end

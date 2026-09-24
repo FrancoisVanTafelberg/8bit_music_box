@@ -19,6 +19,24 @@ package music
         the triangle keeps its staircase on purpose, that IS the NES bass.
 
     Output is stereo, interleaved (L R L R ...), f32 in -1..1.
+
+    LIVE MIX. Every track's notes are in the engine from the start, muted or
+    not, and each track has a gain (0..1) applied as it plays. So a track can be
+    muted, soloed or turned up mid-song and the change is heard within one
+    block, faded rather than cut:
+
+        engine_set_track_gain(&e, track, 0)    // this track, directly
+        engine_sync_mix(&e, &song)             // or: follow the song's own
+                                               // mute / solo / volume settings
+
+    A muted note keeps its place (it is counted, not synthesised), so unmuting
+    in the middle of a held note brings the rest of that note in.
+
+    USING THIS FROM ANOTHER PROGRAM. This package has no raylib in it. To play
+    a song in a game: registry_load_dir the instruments, song_load the song,
+    engine_start, then keep calling engine_render for blocks of stereo f32 and
+    hand them to your audio output (the editor's player.odin does exactly that
+    with a raylib AudioStream). song_track_index finds a layer by name.
 */
 
 import "core:math"
@@ -63,6 +81,9 @@ Voice :: struct {
 	nclock2:   f32,
 	nout:      f32,
 	nout2:     f32,
+	// The breath noise's own generator. Per voice, seeded from the note, so a
+	// note sounds the same whatever else is playing - or muted - around it.
+	white:     u32,
 	freq:      f32,
 	gl, gr:    f32,
 	release_from: f32,
@@ -72,11 +93,14 @@ Engine :: struct {
 	events: [dynamic]Event,
 	// The instrument of each track, copied when playback starts.
 	insts:  [dynamic]Instrument,
+	// Per track: the gain being played now, and the one it is heading for.
+	// A block ramps from one to the other, so changes fade instead of click.
+	gain:   [dynamic]f32,
+	target: [dynamic]f32,
 	next:   int,
 	voices: [dynamic]Voice,
 	frame:  int,
 	crush:  bool, // quantise volume to 16 levels, as the NES did
-	white:  u32,
 }
 
 // Flatten `song` from `from_tick` onwards. Notes already sounding at
@@ -84,11 +108,12 @@ Engine :: struct {
 engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, crush := true) {
 	engine_destroy(e)
 	e.crush = crush
-	e.white = 0x9E3779B9
 	spt := tick_seconds(song)
 	for &t, ti in song.tracks {
 		append(&e.insts, inst_get(song, t.inst)^)
-		if !track_audible(song, &t) do continue
+		g := track_audible(song, &t) ? t.volume : 0
+		append(&e.gain, g)
+		append(&e.target, g)
 		ins := e.insts[ti]
 		for n, ni in t.notes {
 			end := n.tick + n.len
@@ -103,7 +128,7 @@ engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, crush := true)
 				gate = max(int(secs * SAMPLE_RATE), 64),
 				inst = u16(ti),
 				midi = f32(pitch_midi(n.pitch)),
-				amp = f32(n.vel) / 127 * t.volume * ins.gain,
+				amp = f32(n.vel) / 127 * ins.gain, // the track's volume is its gain
 				pan = clamp(t.pan, -1, 1),
 				track = ti,
 				note = ni,
@@ -116,8 +141,27 @@ engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, crush := true)
 engine_destroy :: proc(e: ^Engine) {
 	delete(e.events)
 	delete(e.insts)
+	delete(e.gain)
+	delete(e.target)
 	delete(e.voices)
 	e^ = {}
+}
+
+// Turn one track up or down while it plays: 0 = silent, 1 = full. Heard from
+// the next block, faded in or out across it.
+engine_set_track_gain :: proc(e: ^Engine, track: int, gain: f32) {
+	if track < 0 || track >= len(e.target) do return
+	e.target[track] = max(gain, 0)
+}
+
+// Follow the song's mute, solo and volume settings, as they are right now.
+// Cheap: call it every frame. Tracks added after engine_start are not in the
+// engine (their notes were not collected) and are ignored.
+engine_sync_mix :: proc(e: ^Engine, song: ^Song) {
+	for &t, i in song.tracks {
+		if i >= len(e.target) do break
+		e.target[i] = track_audible(song, &t) ? t.volume : 0
+	}
 }
 
 // Is there anything left to play?
@@ -141,10 +185,19 @@ engine_render :: proc(e: ^Engine, out: []f32) -> bool {
 	for i := len(e.voices) - 1; i >= 0; i -= 1 {
 		v := &e.voices[i]
 		offset := max(v.ev.start - e.frame, 0)
-		if voice_render(v, out[offset * 2:], e.crush, &e.white) {
-			unordered_remove(&e.voices, i)
+		tr := int(v.ev.inst)
+		g0, g1 := e.gain[tr], e.target[tr]
+		done: bool
+		if g0 == 0 && g1 == 0 {
+			// Muted all block: keep time, skip the synthesis.
+			v.age += frames - offset
+			done = v.age >= v.life
+		} else {
+			done = voice_render(v, out[offset * 2:], e.crush, g0, g1, frames, offset)
 		}
+		if done do unordered_remove(&e.voices, i)
 	}
+	for &g, i in e.gain do g = e.target[i]
 
 	for &s in out do s = clamp(s * MASTER, -1, 1)
 	e.frame = block_end
@@ -175,8 +228,7 @@ render_preview :: proc(ins: Instrument, p: Pitch, seconds: f32 = 0.35, allocator
 	}
 	v := voice_make(ev, ins)
 	out := make([]f32, v.life * 2, allocator)
-	white: u32 = 0x9E3779B9
-	voice_render(&v, out, true, &white)
+	voice_render(&v, out, true, 1, 1, 1, 0)
 	for &s in out do s = clamp(s * MASTER * 1.6, -1, 1)
 	return out
 }
@@ -201,7 +253,9 @@ voice_make :: proc(ev: Event, ins: Instrument) -> Voice {
 		lfsr  = 1,
 		lfsr2 = 0x5A5A,
 		freq  = midi_freq(ev.midi),
+		white = 0x9E3779B9 ~ u32(ev.start) * 2654435761 ~ u32(ev.track) * 40503 ~ u32(ev.midi * 8),
 	}
+	if v.white == 0 do v.white = 1
 	v.life = ev.gate + int(max(ins.release, 0.005) * RATE)
 	// A struck or plucked note rings for its decay whatever its written
 	// length, as a harp string does.
@@ -287,7 +341,9 @@ lfsr_step :: #force_inline proc(r: ^u32, metallic: bool) -> f32 {
 
 // Render into `out` from its start. Returns true when the voice is finished.
 @(private)
-voice_render :: proc(v: ^Voice, out: []f32, crush: bool, white: ^u32) -> bool {
+// `g0`..`g1` is the track's gain ramp across the block; this voice starts
+// `ramp_at` frames into a block of `ramp_len`.
+voice_render :: proc(v: ^Voice, out: []f32, crush: bool, g0, g1: f32, ramp_len, ramp_at: int) -> bool {
 	ins := &v.ins
 	frames := len(out) / 2
 	gate := f32(v.ev.gate) / RATE
@@ -325,10 +381,10 @@ voice_render :: proc(v: ^Voice, out: []f32, crush: bool, white: ^u32) -> bool {
 			s = s * (1 - ins.mix2) + osc(ins.wave2, v.phase2, dt2, ins.duty, v.nout2) * ins.mix2
 		}
 		if ins.breath > 0 {
-			white^ ~= white^ << 13
-			white^ ~= white^ >> 17
-			white^ ~= white^ << 5
-			s += ins.breath * (f32(white^) / f32(max(u32)) * 2 - 1)
+			v.white ~= v.white << 13
+			v.white ~= v.white >> 17
+			v.white ~= v.white << 5
+			s += ins.breath * (f32(v.white) / f32(max(u32)) * 2 - 1)
 		}
 
 		v.phase = fract(v.phase + dt)
@@ -340,6 +396,11 @@ voice_render :: proc(v: ^Voice, out: []f32, crush: bool, white: ^u32) -> bool {
 		env := envelope(ins, t, gate)
 		if crush do env = math.round(env * 15) / 15
 		a := v.lp * env * v.ev.amp
+		if g0 == g1 {
+			a *= g0
+		} else {
+			a *= g0 + (g1 - g0) * min(f32(i + ramp_at) / f32(ramp_len), 1)
+		}
 		out[i * 2] += a * v.gl
 		out[i * 2 + 1] += a * v.gr
 		v.age += 1

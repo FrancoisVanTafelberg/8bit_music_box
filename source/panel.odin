@@ -171,6 +171,8 @@ panel_draw :: proc() {
 	y += 24
 	if button(rect(x, y, w, 20), "Remove layer", false, n > 0) {
 		if confirmed("remove-layer", fmt.tprintf("Remove the %s layer and its notes?", g.song.tracks[g.active].name)) {
+			// The engine counts layers by position: stop before they shift.
+			player_stop(&g.player)
 			music.song_remove_track(&g.song, g.active)
 			g.active = clamp(g.active, 0, len(g.song.tracks) - 1)
 			g.selected = -1
