@@ -308,7 +308,8 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32) {
 	}
 }
 
-// Note names down the left of the sheet, and the clef marks.
+// Note names down the left of the sheet (every row, with its octave), and
+// the clef marks.
 @(private = "file")
 gutter_draw :: proc(hov: Hover) {
 	x := f32(PANEL_W)
@@ -318,7 +319,7 @@ gutter_draw :: proc(hov: Hover) {
 		letter := step % 7
 		name := music.pitch_name_temp({i8(step), 0})
 		is_c := letter == 0
-		c := is_c ? COL_TEXT : COL_FAINT
+		c := is_c ? COL_TEXT : COL_DIM
 		// With key lines on, the rows the key signature changes are named
 		// as they sound (F#, Bb), and the home chord's rows are coloured.
 		alter := music.key_alter(int(g.song.key), step)
@@ -334,15 +335,9 @@ gutter_draw :: proc(hov: Hover) {
 				c = lighten(with_alpha(COL_ACCENT, 255), 0.4)
 			}
 		}
-		acc_name := g.key_lines && alter != 0
 		if hov.ok && hov.step == step do c = COL_ACCENT
-		if is_c || (hov.ok && hov.step == step) {
-			text(name, x + GUTTER_NAME_X, y + 1, c)
-		} else if acc_name {
-			text(name[:2], x + GUTTER_NAME_X, y + 1, c) // "F#", no octave
-		} else {
-			text(name[:1], x + GUTTER_NAME_X, y + 1, c)
-		}
+		// Every row by its full name, letter and octave: D3, F#3, C4.
+		text(name, x + GUTTER_NAME_X, y + 1, c)
 		if is_c do rl.DrawLineEx({x + GUTTER_NAME_X - 2, y + ROW_H}, {x + GUTTER_W, y + ROW_H}, 1, COL_EDGE)
 
 		// The row's frequency ratio to the reference note (key lines on).

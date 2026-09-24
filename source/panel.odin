@@ -216,7 +216,7 @@ panel_draw :: proc() {
 	y += 30
 
 	// Note length.
-	label("LENGTH  (1-6, . dotted, T triplet)", x, y)
+	label("LENGTH (1-6  . dotted  T triplet)", x, y)
 	y += 14
 	bw := (w - 8) / 3
 	for l, i in music.Length {
@@ -230,7 +230,7 @@ panel_draw :: proc() {
 	y += 30
 
 	// Accidental mode.
-	label("ACCIDENTAL  (or hold Shift # / Ctrl b)", x, y)
+	label("ACCIDENTAL  (Shift #  Ctrl b)", x, y)
 	y += 14
 	qw := (w - 12) / 4
 	names := [Acc_Mode]string{.Key = "key", .Sharp = "#", .Flat = "b", .Natural = "nat"}
