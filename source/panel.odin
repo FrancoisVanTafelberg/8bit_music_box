@@ -167,7 +167,17 @@ panel_draw :: proc() {
 	}
 	y += list.height + 14
 
-	if button(rect(x, y, w, 20), "+ Add instrument") do g.overlay = .Instruments
+	when CELLO {
+		// The Cello Helper has one instrument: another layer is another cello.
+		if button(rect(x, y, w, 20), "+ Add cello layer") {
+			i := music.song_add_track(&g.song, music.inst_or_default(&g.song, CELLO_KEY))
+			select_layer(i)
+			g.dirty = true
+			set_status("added %s", g.song.tracks[i].name)
+		}
+	} else {
+		if button(rect(x, y, w, 20), "+ Add instrument") do g.overlay = .Instruments
+	}
 	y += 24
 	if button(rect(x, y, w, 20), "Remove layer", false, n > 0) {
 		if confirmed("remove-layer", fmt.tprintf("Remove the %s layer and its notes?", g.song.tracks[g.active].name)) {
@@ -280,6 +290,12 @@ statusbar_draw :: proc() {
 
 	msg := status_text()
 	age := rl.GetTime() - g.status_time
+	fb_msg, on_board := "", false
+	when CELLO do fb_msg, on_board = fingerboard_status()
+	if on_board {
+		text(fb_msg, 8, y + 5, COL_TEXT)
+		return
+	}
 	if len(msg) > 0 && age < 6 {
 		text(msg, 8, y + 5, g.status_bad ? COL_BAD : COL_GOOD)
 	} else if hov := sheet_hover(); hov.ok {
@@ -297,6 +313,7 @@ statusbar_draw :: proc() {
 		)
 	}
 	hint := "click place   drag move   right-click delete   wheel sharp/flat   Space play   PgUp/PgDn page   Ctrl+Z undo"
+	when CELLO do hint = "click place   right-click delete   wheel sharp/flat   Space play   click the fingerboard to hear"
 	text(hint, 1280 - text_width(hint) - 8, y + 5, COL_FAINT)
 }
 
@@ -380,7 +397,11 @@ open_overlay_draw :: proc() {
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Open", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
-	text("Songs from songs/, MIDI from imports/, [private] = not public domain. Or drag a .song / .mid onto the window.", r.x + 12, r.y + 34, COL_DIM)
+	when CELLO {
+		text("[cello] = cello_songs/, where this saves. Songs from songs/ and MIDI open with every layer turned into a cello, and save to cello_songs/.", r.x + 12, r.y + 34, COL_DIM)
+	} else {
+		text("Songs from songs/, MIDI from imports/, [private] = not public domain. Or drag a .song / .mid onto the window.", r.x + 12, r.y + 34, COL_DIM)
+	}
 	if len(g.open_files) == 0 {
 		text("Nothing here yet. Save a song, or put a .mid file in imports/.", r.x + 12, r.y + 70, COL_TEXT)
 	}
@@ -396,6 +417,7 @@ open_overlay_draw :: proc() {
 		is_midi := !strings.has_suffix(name, music.SONG_EXT)
 		shown := is_midi ? fmt.tprintf("[midi] %s", name) : name
 		if strings.contains(f, PRIVATE_DIR) do shown = fmt.tprintf("[private] %s", shown)
+		when CELLO do if strings.contains(f, CELLO_DIR) do shown = fmt.tprintf("[cello] %s", shown)
 		if button(rect(cx, cy, colw - 8, 20), shown) {
 			if !g.dirty || confirmed(f, "Unsaved changes will be lost") {
 				g.overlay = .None

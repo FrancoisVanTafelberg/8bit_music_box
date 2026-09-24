@@ -102,7 +102,7 @@ top), and `tools/render` warns about any note that is out of range.
 |---|---|---|---|
 | Strings | Violin | G3–G7 (55–103) | saw, delayed vibrato, quick bow attack |
 | | Viola | C3–E6 (48–88) | saw, darker tone |
-| | Cello | C2–A5 (36–81) | saw, darker still, slower attack |
+| | Cello | C2–C6 (36–84); A5 is the usual orchestral limit | saw, darker still, slower attack |
 | | Contrabass | E1–G4 (28–67) | 50 % pulse, very dark |
 | | Harp | C1–G7 (24–103) | triangle pluck, long ring |
 | Woodwinds | Piccolo | D5–C8 (74–108) | triangle + breath |
@@ -220,6 +220,7 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `main_hot_reload/` | the hot-reload host, unchanged apart from names: owns the window, swaps `build/hot_reload/game.dll` |
 | `main_release/` | shipping entry point |
 | `source/` | package `app` — one package, one file per concern. All state in one `App` block (`g`) so hot reload keeps the song you are editing |
+| `source/mode.odin` | music box or Cello Helper: `-define:CELLO=true` (§4.3) |
 | `source/rlu/` | virtual resolution, vendored from Animal Kingdoms (canvas 1280 × 720) |
 | `source/music/` | package `music` — **no raylib**. Theory (pitches, keys, lengths), the song model, the `.song` format, the instrument table, the synth engine, sound effects, the Mixer, WAV writing and MIDI import. Headless, so `tools/render` can use it, and so can any other program (§4.2) |
 | `source/music_rl/` | package `music_rl`: the Mixer's sound out through a raylib `AudioStream`. The only raylib-facing piece of the engine |
@@ -311,6 +312,42 @@ instruments of their own that stay out of the editor's list (see `sounds/README.
 `sounds/battle.sfx` has a cannon (a falling triangle thump, dark noise, a bright crack and a
 long rumble), a distant cannon, a musket and a ragged volley, a sword clash (inharmonic
 sine partials over metallic noise), a sword being drawn, a ship's bell and a splash.
+
+### 4.3 The Cello Helper
+
+A second program, `cello_helper.exe`, built from the same `source/` package with
+`-define:CELLO=true` (`source/mode.odin`). Everything is shared — the sheet, layers, undo,
+files, the Mixer — and `when CELLO` switches the differences:
+
+* **Only the cello.** "+ Add cello layer" instead of the instrument picker; a song opened
+  here has every layer turned into a cello ("Cello (was Violin)"), out-of-range notes
+  shown red and counted. Saves go to `cello_songs/`, so an orchestral song in `songs/`
+  is never overwritten by its cello version.
+* **Two bars to a page** (`BARS_PER_PAGE`), the sheet 500 px wide.
+* **The Cello Fingerboard** (`source/fingerboard.odin`) in the space of the other two bars.
+  Player's view: nut at the top, strings C G D A left to right, 29 semitones per string
+  to the end of the fingerboard. Semitone *n* sits at `1 - 2^(-n/12)` of the string, so
+  positions crowd together down the board as they do under the hand; the octave (half
+  the string) and two octaves (three quarters) are marked. Lit: the note under the mouse
+  on the sheet — at every place it can be played — the active layer's sounding notes
+  while playing, the selected note, and the circle under the mouse here (its row is lit
+  on the sheet too). Click to hear. The key filter (All, 15 keys, Song) hides positions
+  whose note is not in the key's major scale (= its relative minor); lit notes always
+  show. Positions above the cello's range (C6) are drawn as empty rings.
+* **Hand positions.** Lines across the board where each finger stops the strings in the
+  chosen position, labelled f1–f4 (and T for the thumb) at the right-hand edge of the
+  screen; buttons pick the position (default 1st), the mouse wheel over the board steps
+  through them. Semitones above the open string, the same on every string
+  (`HAND_POSITIONS` in `fingerboard.odin`): half 1-2-3-4, 1st 2-3-4-5, 1st extended
+  2-4-5-6, lower 2nd 3-6, 2nd 4-7, 3rd 5-8, upper 3rd 6-9, 4th 7-10 (closed hand, a
+  semitone between fingers, so 1 to 4 spans a minor third); 5th, a three-finger position,
+  9-10-12 (F♯ G A on the A string); 1st thumb position, thumb on the octave (12) and
+  1-2-3 on 14-16-17 (B C♯ D). 6th and 7th are left out until checked against a method
+  book: sources disagree on where they sit.
+
+Its own hot-reload library (`build/hot_reload/cello.dll`, the host built with
+`-define:GAME_NAME=cello`) and its own `last_cello_song.txt`, so it can run beside the
+music box.
 
 ## 5. The `.song` format
 

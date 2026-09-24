@@ -20,14 +20,15 @@ import "core:fmt"
 import "music"
 import rl "vendor:raylib"
 
-BARS_PER_PAGE :: 4
-
 TOP_H :: 32
 STATUS_H :: 20
 PANEL_W :: 208
 GUTTER_W :: 44
 BARS_X :: PANEL_W + GUTTER_W
-BARS_W :: 1280 - BARS_X - 8
+// In the Cello Helper the sheet is half as wide (two bars) and the Cello
+// Fingerboard takes the rest.
+BARS_W :: 500 when CELLO else 1280 - BARS_X - 8
+SHEET_R :: BARS_X + BARS_W + 8 // the sheet's right edge
 BAR_NUM_Y :: TOP_H + 2
 ROWS_Y :: TOP_H + 18
 ROW_H :: 12
@@ -148,7 +149,7 @@ in_range :: proc(inst: music.Inst_Id, p: music.Pitch) -> bool {
 // ---------------------------------------------------------------------------
 
 sheet_draw :: proc() {
-	fill(rect(PANEL_W, TOP_H, 1280 - PANEL_W, 720 - TOP_H - STATUS_H), COL_SHEET)
+	fill(rect(PANEL_W, TOP_H, SHEET_R - PANEL_W, 720 - TOP_H - STATUS_H), COL_SHEET)
 	t := active_track()
 	bt := music.bar_ticks(&g.song)
 	ps := page_start()
@@ -167,7 +168,17 @@ sheet_draw :: proc() {
 
 	// The hovered row, faintly, all the way across.
 	hov := sheet_hover()
-	if hov.ok do fill(rect(PANEL_W, row_y(hov.step), 1280 - PANEL_W, ROW_H), {255, 255, 255, 10})
+	if hov.ok do fill(rect(PANEL_W, row_y(hov.step), SHEET_R - PANEL_W, ROW_H), {255, 255, 255, 10})
+	// ...and in the Cello Helper, the row of the fingerboard note under the
+	// mouse, so a position on the board can be found on the staff.
+	when CELLO {
+		if fh := fb_hover(); fh.ok && overlay_none() {
+			step := int(music.pitch_from_midi(fb_midi(fh), fb_spell_key()).step)
+			if step >= music.STEP_LO && step <= music.STEP_HI {
+				fill(rect(PANEL_W, row_y(step), SHEET_R - PANEL_W, ROW_H), with_alpha(COL_ACCENT, 40))
+			}
+		}
+	}
 
 	// Staff lines.
 	for step in music.STEP_LO ..= music.STEP_HI {
@@ -235,6 +246,7 @@ sheet_draw :: proc() {
 	}
 
 	strip_draw()
+	when CELLO do fingerboard_draw()
 }
 
 @(private = "file")

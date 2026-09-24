@@ -29,6 +29,13 @@ App :: struct {
 	// Came from the not-public-domain folder: saves go back there, never to
 	// songs/, so an import cannot leak into the repo by being saved.
 	private:    bool,
+	// Cello Helper: the song just opened had layers turned into cellos, and
+	// the status line says so (not overwritten by "opened ...").
+	cello_notice: bool,
+	// Cello Helper: the fingerboard's key filter. Off = every position.
+	fb_filter:  bool,
+	fb_key:     i8,
+	fb_hand:    i8, // index into HAND_POSITIONS
 	// All the sound: the instruments (from instruments/), the playing song,
 	// the note previews. The same Mixer a game would use; see music/mixer.odin.
 	audio:      music.Mixer,
@@ -84,7 +91,7 @@ game_init_window :: proc() {
 	g = new(App)
 	rlu.init(
 		&g.v,
-		"8-Bit Music Box",
+		APP_TITLE,
 		rlu.Wanted{mode = .Windowed, w = 1920, h = 1080, at = {rlu.WINDOW_UNPLACED, rlu.WINDOW_UNPLACED}},
 	)
 	rl.SetTargetFPS(120)
@@ -97,13 +104,15 @@ game_init :: proc() {
 	g.crush = true
 	g.length = .Quarter
 	g.selected = -1
+	g.fb_hand = HAND_DEFAULT
 	files_init()
 	music.mixer_init(&g.audio)
 	instruments_reload(true)
 	player_init(&g.player)
 	if !open_last_song() {
 		music.song_init(&g.song)
-		music.song_add_track(&g.song, music.DEFAULT_KEY)
+		music.song_add_track(&g.song, CELLO_KEY when CELLO else music.DEFAULT_KEY)
+		when CELLO do cello_only()
 	}
 }
 

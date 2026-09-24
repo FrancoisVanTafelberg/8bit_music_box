@@ -40,10 +40,13 @@ pan 0.1
 color 232 146 70
 end
 
+# Range: the cello's full compass, C2 (open C string) to C6, two octaves above
+# middle C. A5 - two octaves above the open A string - is the usual limit in
+# orchestral parts; solo music goes on up to C6.
 define_instrument cello
 name "Cello"
 family strings
-range C2 A5
+range C2 C6
 wave saw
 layer none
 envelope 0.05 0.12 0.85 0.12

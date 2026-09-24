@@ -26,7 +26,7 @@
          GitHub and the reason the folder exists, and .gitignore, which
          belongs to that repository.
       3. Copy .8bit_music_box\ over it, skipping what is generated, local or
-         huge - .temp, build, exports, last_song.txt - the not-public-domain
+         huge - .temp, build, exports, last_song.txt, last_cello_song.txt - the not-public-domain
          songs_that_cannot_be_used_for_legal_reasons\, and .gitignore, unless
          the target has none yet, in which case the source's is used to seed it.
 
@@ -83,7 +83,7 @@ Set-StrictMode -Version Latest
 # output arriving in a commit.
 # songs_that_cannot_be_used_for_legal_reasons holds arrangements of music that is NOT public domain:
 # fine to play with here, never to be published, so it never reaches the repo.
-$SkipTopLevel = @('.temp', 'build', 'exports', 'last_song.txt', '.git', '.gitignore', 'Claude outputs', 'songs_that_cannot_be_used_for_legal_reasons')
+$SkipTopLevel = @('.temp', 'build', 'exports', 'last_song.txt', 'last_cello_song.txt', '.git', '.gitignore', 'Claude outputs', 'songs_that_cannot_be_used_for_legal_reasons')
 
 # Kept in the target through step 2, for the reasons above.
 $KeepInTarget = @('.git', '.gitignore')

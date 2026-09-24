@@ -43,8 +43,13 @@ when ODIN_OS == .Windows {
 	DLL_EXT :: ".so"
 }
 
+// Which library this host runs: "game" for the 8-Bit Music Box, "cello" for
+// the Cello Helper (build_cello_hot_reload builds it with -define:GAME_NAME=cello).
+// Both are the same source/ package, compiled with and without -define:CELLO.
+GAME_NAME :: #config(GAME_NAME, "game")
+
 GAME_DLL_DIR :: "build/hot_reload/"
-GAME_DLL_PATH :: GAME_DLL_DIR + "game" + DLL_EXT
+GAME_DLL_PATH :: GAME_DLL_DIR + GAME_NAME + DLL_EXT
 
 Game_API :: struct {
 	// Bound automatically from exported symbols named game_<field>.
@@ -73,7 +78,7 @@ load_game_api :: proc(version: int) -> (api: Game_API, ok: bool) {
 	}
 
 	// Unique name per load so the old file can be replaced while in use.
-	copy_path := fmt.tprintf("%sgame_%i%s", GAME_DLL_DIR, version, DLL_EXT)
+	copy_path := fmt.tprintf("%s%s_%i%s", GAME_DLL_DIR, GAME_NAME, version, DLL_EXT)
 
 	// Copied by reading and writing it rather than by shelling out to copy/cp.
 	//
@@ -116,7 +121,7 @@ unload_game_api :: proc(api: ^Game_API) {
 	}
 	// Best effort: on Windows the file can still be locked for a moment after
 	// the unload, and a leftover copy costs nothing but a megabyte.
-	del := fmt.tprintf("%sgame_%i%s", GAME_DLL_DIR, api.version, DLL_EXT)
+	del := fmt.tprintf("%s%s_%i%s", GAME_DLL_DIR, GAME_NAME, api.version, DLL_EXT)
 	os.remove(del)
 }
 
@@ -124,7 +129,7 @@ main :: proc() {
 	version := 0
 	api, ok := load_game_api(version)
 	if !ok {
-		fmt.eprintfln("could not load %s — run build_hot_reload first", GAME_DLL_PATH)
+		fmt.eprintfln("could not load %s — run build_hot_reload (or build_cello_hot_reload) first", GAME_DLL_PATH)
 		os.exit(1)
 	}
 	version += 1

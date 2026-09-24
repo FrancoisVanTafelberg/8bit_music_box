@@ -21,6 +21,27 @@ you are editing survives. `F5` forces a reload, `F6` restarts.
     build_release.bat             (or ./build_release.sh)
     build\8bit_music_box.exe
 
+## Cello Helper
+
+A second program from the same code: the editor with only the cello (as many cello
+layers as you like), two bars to a page, and the **Cello Fingerboard** where the other
+two bars were.
+
+    run_cello_dev.bat               hot reload, like run_dev.bat
+    build_cello_release.bat         build\cello_helper.exe   (or ./build_cello_release.sh)
+
+The fingerboard is the player's view down the neck: nut at the top, C string on the
+left, every place a finger can stop a string from the open string to the end of the
+board, spaced as they really are (closer together further down). Point at a note on the
+sheet and every place it can be played lights up; while playing, the current layer's
+sounding notes light up; click a circle to hear it. The key buttons show only the notes
+of that key (**All** shows every position, **Song** picks the song's key). The position
+buttons (or the mouse wheel over the board) choose a hand position, 1st by default, and
+draw a line across the board for each finger, labelled f1–f4 at the right edge.
+
+It saves to `cello_songs\`. It can open anything in `songs\` or `imports\` too: every
+layer becomes a cello, and Save puts the result in `cello_songs\`, never over the original.
+
 ## Using it
 
 | | |
@@ -56,6 +77,7 @@ Rows the active instrument cannot play are shaded and refuse clicks.
 | `instruments/` | every instrument, as text files (`.inst`): add or change them without a rebuild, F7 reloads. See `instruments/README.txt` |
 | `sounds/` | sound effects that are not music (cannon, musket, sword clash...), as text files (`.sfx`). See `sounds/README.txt` |
 | `songs/` | saved songs (plain text, hand-editable) |
+| `cello_songs/` | the Cello Helper's songs |
 | `imports/` | MIDI files to open |
 | `exports/` | rendered audio |
 | `songs_that_cannot_be_used_for_legal_reasons/` | songs and MIDI of music that is **not** public domain: playable here, never copied to the repo or committed |
@@ -95,4 +117,4 @@ folder is where the work happens. To bring the repo up to date:
 
 It backs the repo folder up to `8bit_music_box.bak.YYYY-MM-DD-HH-MM` first, keeps its
 `.git` and `.gitignore`, and does not copy `.temp`, `build`, `exports`,
-`last_song.txt` or `songs_that_cannot_be_used_for_legal_reasons`. Nothing is written back here.
+`last_song.txt`, `last_cello_song.txt` or `songs_that_cannot_be_used_for_legal_reasons`. Nothing is written back here.
