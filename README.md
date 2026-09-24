@@ -38,7 +38,7 @@ you are editing survives. `F5` forces a reload, `F6` restarts.
 | **Import** | put `.mid` files in `imports\` and Open them, or drag a `.mid` / `.song` onto the window |
 | **Export** | WAV built in; MP3 / OGG / FLAC light up when `ffmpeg` is on PATH |
 | **4-bit** | toggles NES-style 16-step volume (on = grittier, off = smoother) |
-| `F7` | reload the instrument files |
+| `F7` | reload the instrument and sound effect files |
 | `F11` | fullscreen |
 
 Rows the active instrument cannot play are shaded and refuse clicks.
@@ -48,14 +48,41 @@ Rows the active instrument cannot play are shaded and refuse clicks.
 | | |
 |---|---|
 | `source/` | package `app`: the editor. All state in one block for hot reload |
-| `source/music/` | package `music`, no raylib: theory, song model, `.song` format, instruments, synth, WAV, MIDI import |
+| `source/music/` | package `music`, no raylib: theory, song model, `.song` format, instruments, synth, sound effects, the Mixer, WAV, MIDI import |
+| `source/music_rl/` | the Mixer's sound out through raylib |
 | `source/rlu/` | virtual resolution (1280 × 720 canvas), from Animal Kingdoms |
-| `tools/render/` | `odin run tools/render -- songs/ode_to_joy.song` renders to WAV with no window |
+| `tools/render/` | `odin run tools/render -- songs/ode_to_joy.song` renders to WAV with no window; `-- sfx all` renders every sound effect |
+| `examples/battle_demo/` | the engine in another program: `odin run examples/battle_demo` |
 | `instruments/` | every instrument, as text files (`.inst`): add or change them without a rebuild, F7 reloads. See `instruments/README.txt` |
+| `sounds/` | sound effects that are not music (cannon, musket, sword clash...), as text files (`.sfx`). See `sounds/README.txt` |
 | `songs/` | saved songs (plain text, hand-editable) |
 | `imports/` | MIDI files to open |
 | `exports/` | rendered audio |
 | `songs_that_cannot_be_used_for_legal_reasons/` | songs and MIDI of music that is **not** public domain: playable here, never copied to the repo or committed |
+
+## Using the engine in another program
+
+`source/music` (no raylib) plays songs, mutes and unmutes their layers by name while they
+play, loops and fades them, and plays sound effects on top; `source/music_rl` sends it to
+the speakers in a raylib program. Copy those two folders, plus `instruments/`, `sounds/`
+and your songs:
+
+    m: music.Mixer
+    music.mixer_init(&m)
+    music.mixer_load_instruments(&m, "instruments")
+    music.mixer_load_sounds(&m, "sounds")
+    out: music_rl.Output
+    music_rl.output_open(&out)                   // after rl.InitAudioDevice()
+
+    march := music.mixer_play_song_file(&m, "songs/british_grenadiers_trumpet.song", fade_in = 2)
+    music.mixer_set_layer(&m, march, "Trumpet 1", false)      // one layer, by its name
+    music.mixer_set_instrument(&m, march, "trumpet", false)   // every layer playing it
+    music.mixer_play_sfx(&m, "cannon")
+
+    music_rl.output_update(&out, &m)             // every frame
+
+The whole API is at the top of `source/music/mixer.odin` and in `.design/DESIGN.md` §4.2;
+`examples/battle_demo` is a working program.
 
 ## Copying to the GitHub repo
 

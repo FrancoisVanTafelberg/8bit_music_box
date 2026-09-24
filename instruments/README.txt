@@ -12,7 +12,7 @@ press F7, so you can change an instrument and hear it without a rebuild.
   keyboards.inst     piano, harpsichord, celesta, organ
   voices.inst        choir
   chip.inst          the NES channels: pulse lead, square lead, triangle bass
-  field_music.inst   extras for the fife-and-drum corps: bugle, a softer 2nd fife
+  field_music.inst   extras for the fife-and-drum corps: a softer 2nd fife, side drum, bugle
 
 Add your own files alongside. A file whose name starts with '_' is not loaded,
 which is an easy way to switch one off. If this folder is missing or empty,

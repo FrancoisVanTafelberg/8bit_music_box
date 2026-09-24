@@ -66,9 +66,15 @@ WAVE_NAME := [Wave]string {
 // Everything one block said, as its lines: the parser works on these after
 // the whole block is read, so `based_on` can come anywhere in it.
 Inst_Block :: struct {
+	kind:    Block_Kind,
 	key:     string,
 	line_no: int,
 	lines:   [dynamic]Inst_Line,
+}
+
+Block_Kind :: enum u8 {
+	Instrument, // define_instrument
+	Sfx,        // define_sfx: only in .sfx files, see sfx.odin
 }
 
 Inst_Line :: struct {
@@ -235,64 +241,94 @@ inst_write :: proc(w: ^strings.Builder, ins: ^Instrument) {
 // name order) with the same key - which is what lets a later file tweak an
 // earlier one (`define_instrument violin` / `gain 0.4` / `end`).
 registry_load_dir :: proc(r: ^Registry, dir: string, rep: ^Load_Report) -> int {
-	infos, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
-	if err != nil do return 0
-	names := make([dynamic]string, context.temp_allocator)
-	for fi in infos {
-		if strings.has_prefix(fi.name, INST_SKIP_PREFIX) do continue
-		if strings.has_suffix(strings.to_lower(fi.name, context.temp_allocator), INST_EXT) do append(&names, fi.name)
-	}
-	slice.sort(names[:])
-
-	Pending :: struct {
-		block: Inst_Block,
-		file:  string,
-		base:  string, // based_on, or ""
-		done:  bool,
-	}
-	all := make([dynamic]Pending, context.temp_allocator)
-	for n in names {
-		path := strings.concatenate({dir, "/", n}, context.temp_allocator)
+	all := make([dynamic]Pending_Block, context.temp_allocator)
+	for path in data_files(dir, INST_EXT) {
 		data, rerr := os.read_entire_file_from_path(path, context.temp_allocator)
 		if rerr != nil {
 			append(&rep.errors, fmt.aprintf("%s: could not read (%v)", path, rerr))
 			continue
 		}
 		blocks := make([dynamic]Inst_Block, context.temp_allocator)
-		inst_blocks_parse(string(data), &blocks, rep, n)
-		for b in blocks {
-			base := ""
-			for l in b.lines do if l.cmd == "based_on" && len(l.args) > 0 do base = l.args[0]
-			append(&all, Pending{block = b, file = n, base = base})
-		}
+		inst_blocks_parse(string(data), &blocks, rep, file_name(path))
+		for b in blocks do append(&all, pending_block(b, file_name(path)))
 	}
+	defer for &p in all do inst_block_destroy(&p.block)
+	return registry_build(r, nil, all[:], rep)
+}
 
+// The files in `dir` ending in `ext` (not those starting with "_"), sorted by
+// name, as full paths. Temp-allocated.
+data_files :: proc(dir, ext: string) -> []string {
+	infos, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+	if err != nil do return nil
+	names := make([dynamic]string, context.temp_allocator)
+	for fi in infos {
+		if strings.has_prefix(fi.name, INST_SKIP_PREFIX) do continue
+		if strings.has_suffix(strings.to_lower(fi.name, context.temp_allocator), ext) do append(&names, fi.name)
+	}
+	slice.sort(names[:])
+	for &n in names do n = strings.concatenate({dir, "/", n}, context.temp_allocator)
+	return names[:]
+}
+
+@(private)
+file_name :: proc(path: string) -> string {
+	i := strings.last_index_any(path, "/\\")
+	return path[i + 1:]
+}
+
+// A parsed define_instrument block waiting to be built.
+Pending_Block :: struct {
+	block: Inst_Block,
+	file:  string,
+	base:  string, // based_on, or ""
+	done:  bool,
+}
+
+pending_block :: proc(b: Inst_Block, file: string) -> Pending_Block {
+	base := ""
+	for l in b.lines do if l.cmd == "based_on" && len(l.args) > 0 do base = l.args[0]
+	return Pending_Block{block = b, file = file, base = base}
+}
+
+// Build parsed instrument blocks into `r`, each as soon as what it depends on
+// is built. `parent`, if given, is a second place to find `based_on`
+// instruments (the sound effects' own instruments can be based on the
+// orchestra's). Returns how many were built.
+registry_build :: proc(r: ^Registry, parent: ^Registry, all: []Pending_Block, rep: ^Load_Report) -> int {
 	// Is anything not yet built going to define `key`, before index `before`?
-	waiting_for :: proc(all: []Pending, key: string, before: int) -> bool {
+	waiting_for :: proc(all: []Pending_Block, key: string, before: int) -> bool {
 		for p, i in all {
 			if i >= before do break
 			if !p.done && p.block.key == key do return true
 		}
 		return false
 	}
+	Ctx :: struct {
+		r, parent: ^Registry,
+	}
 	lookup :: proc(ctx: rawptr, key: string) -> (Instrument, bool) {
-		r := (^Registry)(ctx)
-		if id, ok := registry_find(r, key); ok do return r.list[id], true
+		c := (^Ctx)(ctx)
+		if id, ok := registry_find(c.r, key); ok do return c.r.list[id], true
+		if c.parent != nil {
+			if id, ok := registry_find(c.parent, key); ok do return c.parent.list[id], true
+		}
 		return {}, false
 	}
+	ctx := Ctx{r, parent}
 
 	count := 0
 	for progress := true; progress; {
 		progress = false
 		for &p, i in all {
 			if p.done do continue
-			if waiting_for(all[:], p.block.key, i) do continue
+			if waiting_for(all, p.block.key, i) do continue
 			if p.base != "" {
 				// Built already, or never going to be: go ahead either way
 				// (the second case reports "no such instrument").
-				if waiting_for(all[:], p.base, len(all)) do continue
+				if waiting_for(all, p.base, len(all)) do continue
 			}
-			ins := inst_block_build(&p.block, lookup, r, rep, p.file)
+			ins := inst_block_build(&p.block, lookup, &ctx, rep, p.file)
 			ins.key = registry_own(r, ins.key)
 			ins.name = registry_own(r, ins.name)
 			ins.source = registry_own(r, p.file)
@@ -307,7 +343,6 @@ registry_load_dir :: proc(r: ^Registry, dir: string, rep: ^Load_Report) -> int {
 		if !p.done {
 			append(&rep.errors, fmt.aprintf("%s:%d: '%s' is based on '%s', which is based on it in turn", p.file, p.block.line_no, p.block.key, p.base))
 		}
-		inst_block_destroy(&p.block)
 	}
 	return count
 }
@@ -319,9 +354,10 @@ registry_own :: proc(r: ^Registry, s: string) -> string {
 	return c
 }
 
-// Split text into define_instrument ... end blocks. Anything outside a block
-// is an error (a .inst file holds nothing else).
-inst_blocks_parse :: proc(text: string, out: ^[dynamic]Inst_Block, rep: ^Load_Report, where_: string) {
+// Split text into define_instrument ... end blocks (and, with `allow_sfx`,
+// define_sfx ... end). Anything outside a block is an error (a .inst file
+// holds nothing else).
+inst_blocks_parse :: proc(text: string, out: ^[dynamic]Inst_Block, rep: ^Load_Report, where_: string, allow_sfx := false) {
 	cur: ^Inst_Block
 	lines := text
 	no := 0
@@ -330,14 +366,15 @@ inst_blocks_parse :: proc(text: string, out: ^[dynamic]Inst_Block, rep: ^Load_Re
 		f, nf := statement_fields(raw)
 		if nf == 0 do continue
 		switch {
-		case f[0] == "define_instrument":
-			if cur != nil do append(&rep.errors, fmt.aprintf("%s:%d: define_instrument inside another (missing 'end'?)", where_, no))
+		case f[0] == "define_instrument" || (allow_sfx && f[0] == "define_sfx"):
+			if cur != nil do append(&rep.errors, fmt.aprintf("%s:%d: %s inside another block (missing 'end'?)", where_, no, f[0]))
 			if nf < 2 {
-				append(&rep.errors, fmt.aprintf("%s:%d: define_instrument needs a key", where_, no))
+				append(&rep.errors, fmt.aprintf("%s:%d: %s needs a key", where_, no, f[0]))
 				cur = nil
 				continue
 			}
-			append(out, Inst_Block{key = strings.clone(f[1], context.temp_allocator), line_no = no})
+			kind: Block_Kind = f[0] == "define_sfx" ? .Sfx : .Instrument
+			append(out, Inst_Block{kind = kind, key = strings.clone(f[1], context.temp_allocator), line_no = no})
 			cur = &out[len(out) - 1]
 		case f[0] == "end":
 			cur = nil

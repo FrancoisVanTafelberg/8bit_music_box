@@ -16,6 +16,7 @@ package app
 
 import "core:fmt"
 import "music"
+import music_rl "music_rl"
 import "rlu"
 import rl "vendor:raylib"
 
@@ -28,8 +29,11 @@ App :: struct {
 	// Came from the not-public-domain folder: saves go back there, never to
 	// songs/, so an import cannot leak into the repo by being saved.
 	private:    bool,
-	// Every instrument, from the .inst files in instruments/. See music/instruments.odin.
-	instruments: music.Registry,
+	// All the sound: the instruments (from instruments/), the playing song,
+	// the note previews. The same Mixer a game would use; see music/mixer.odin.
+	audio:      music.Mixer,
+	// ...and its way out to the speakers.
+	out:        music_rl.Output,
 	base_dir:   string,
 	has_ffmpeg: bool,
 
@@ -94,6 +98,7 @@ game_init :: proc() {
 	g.length = .Quarter
 	g.selected = -1
 	files_init()
+	music.mixer_init(&g.audio)
 	instruments_reload(true)
 	player_init(&g.player)
 	if !open_last_song() {
@@ -121,6 +126,7 @@ game_update :: proc() -> bool {
 
 	ui_begin()
 	files_poll_dropped()
+	g.audio.crush = g.crush
 	player_update(&g.player, &g.song)
 	if g.player.playing && g.follow {
 		per_page := music.bar_ticks(&g.song) * BARS_PER_PAGE
@@ -166,7 +172,7 @@ game_shutdown :: proc() {
 	player_destroy(&g.player)
 	music.song_destroy(&g.song)
 	music.registry_bind(nil)
-	music.registry_destroy(&g.instruments)
+	music.mixer_destroy(&g.audio)
 	undo_clear()
 	delete(g.undo)
 	delete(g.redo)
@@ -196,7 +202,7 @@ game_hot_reloaded :: proc(mem: rawptr) {
 	g = (^App)(mem)
 	// The library's globals are fresh; point the music package back at the
 	// registry, which lives here in the memory block.
-	music.registry_bind(&g.instruments)
+	music.mixer_bind(&g.audio)
 	set_status("code reloaded")
 }
 

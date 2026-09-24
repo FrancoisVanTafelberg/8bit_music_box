@@ -1,15 +1,16 @@
 # Field music: the instruments of an 18th-century fife-and-drum corps that the
-# rest of the orchestra does not already have. Together with the fife and the
-# bass drum they make the standard line-up for every marching song in the
-# Colonization project:
+# rest of the orchestra does not already have. Together with the fife, the
+# trumpet and the bass drum they make the standard line-up for every marching
+# song in the Colonization project:
 #
-#   Fife 1 (fife) - Fife 2 (fife_low) - Bugle (bugle) - Side Drum (side_drum)
-#   - Bass Drum (bass_drum)
+#   Fife 1 (fife) - Fife 2 (fife_low) - Trumpet (trumpet, used sparingly)
+#   - Side Drum (side_drum) - Bass Drum (bass_drum)
 
 # The bugle: a valveless brass horn that can only play its natural harmonics,
 # which is why bugle calls use so few notes: in D, only D4 A4 D5 F#5 A5; in C,
 # C4 G4 C5 E5 G5. The range covers both. Brighter and blunter than the trumpet
-# it is based on, with no vibrato.
+# it is based on, with no vibrato. No longer in the line-up (the trumpet
+# replaced it), kept for the older bugle arrangements.
 define_instrument bugle
 based_on trumpet
 name "Bugle"

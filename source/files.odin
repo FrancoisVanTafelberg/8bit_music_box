@@ -28,7 +28,7 @@ files_init :: proc() {
 	base := "."
 	if !os.is_dir("songs") && os.is_dir("../songs") do base = ".."
 	g.base_dir = strings.clone(base)
-	for d in ([5]string{"songs", "imports", "exports", PRIVATE_DIR, music.INST_DIR}) {
+	for d in ([6]string{"songs", "imports", "exports", PRIVATE_DIR, music.INST_DIR, music.SFX_DIR}) {
 		p := join(d)
 		if !os.is_dir(p) do _ = os.make_directory(p)
 	}
@@ -276,25 +276,27 @@ open_last_song :: proc() -> bool {
 // Instrument files
 // ---------------------------------------------------------------------------
 
-// Read the .inst files in instruments/: the whole orchestra. At startup
-// (`first`) the registry is built from scratch; on F7 the files are read again
-// over what is there, so every instrument a track points at stays where it is.
+// Read the .inst files in instruments/: the whole orchestra, into the mixer.
+// At startup (`first`) and on F7 alike the files are read over what is there,
+// so every instrument a track points at stays where it is. The sound effects in
+// sounds/ are reloaded with them (the editor does not play them, but a broken
+// .sfx file shows up here).
 instruments_reload :: proc(first: bool) {
-	if first do music.registry_init(&g.instruments)
-	music.registry_bind(&g.instruments)
+	music.mixer_bind(&g.audio)
 	rep: music.Load_Report
 	defer music.report_destroy(&rep)
-	n := music.registry_load_dir(&g.instruments, join(music.INST_DIR), &rep)
-	if music.registry_ensure(&g.instruments) {
+	n := music.registry_load_dir(&g.audio.reg, join(music.INST_DIR), &rep)
+	if music.registry_ensure(&g.audio.reg) {
 		set_error("no instruments found in %s/ - playing everything as a square wave", join(music.INST_DIR))
 		return
 	}
+	fx := music.mixer_load_sounds(&g.audio, join(music.SFX_DIR), &rep)
 	switch {
 	case len(rep.errors) > 0:
 		set_error("instruments: %d problem(s) - %s", len(rep.errors), rep.errors[0])
 	case len(rep.warnings) > 0:
 		set_status("instruments: %d from files (%s)", n, rep.warnings[0])
 	case !first:
-		set_status("instruments reloaded: %d from files in instruments/", n)
+		set_status("reloaded: %d instruments from instruments/, %d sound effects from sounds/", n, fx)
 	}
 }

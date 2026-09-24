@@ -32,11 +32,11 @@ package music
     A muted note keeps its place (it is counted, not synthesised), so unmuting
     in the middle of a held note brings the rest of that note in.
 
-    USING THIS FROM ANOTHER PROGRAM. This package has no raylib in it. To play
-    a song in a game: registry_load_dir the instruments, song_load the song,
-    engine_start, then keep calling engine_render for blocks of stereo f32 and
-    hand them to your audio output (the editor's player.odin does exactly that
-    with a raylib AudioStream). song_track_index finds a layer by name.
+    USING THIS FROM ANOTHER PROGRAM. Use the Mixer (mixer.odin): it plays
+    songs (looping, fading, several at once), mutes layers by name, and plays
+    sound effects on top. The Engine below is the layer underneath it: one song,
+    rendered block by block.
+
 */
 
 import "core:math"
@@ -85,6 +85,9 @@ Voice :: struct {
 	// note sounds the same whatever else is playing - or muted - around it.
 	white:     u32,
 	freq:      f32,
+	// The frequency now, vibrato and sweep included: recomputed every
+	// CONTROL_FRAMES, and kept here so it carries across blocks.
+	f_now:     f32,
 	gl, gr:    f32,
 	release_from: f32,
 }
@@ -101,6 +104,12 @@ Engine :: struct {
 	voices: [dynamic]Voice,
 	frame:  int,
 	crush:  bool, // quantise volume to 16 levels, as the NES did
+	// Looping: after `loop_len` frames the events start over. `loop_base` is
+	// the frame the current pass began at. loop_len is the song's length
+	// rounded up to a whole bar, so the beat carries on across the seam.
+	loop:      bool,
+	loop_len:  int,
+	loop_base: int,
 }
 
 // Flatten `song` from `from_tick` onwards. Notes already sounding at
@@ -136,6 +145,17 @@ engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, crush := true)
 		}
 	}
 	slice.sort_by(e.events[:], proc(a, b: Event) -> bool {return a.start < b.start})
+
+	// One pass: from `from_tick` to the end of the last note's bar.
+	bt := bar_ticks(song)
+	end := (song_end_tick(song) + bt - 1) / bt * bt
+	e.loop_len = int(f64(max(end - from_tick, 0)) * spt * SAMPLE_RATE)
+}
+
+// Keep playing from the start (well: from `from_tick`) when the end is
+// reached. A song with no notes never loops.
+engine_set_loop :: proc(e: ^Engine, loop: bool) {
+	e.loop = loop && e.loop_len > 0 && len(e.events) > 0
 }
 
 engine_destroy :: proc(e: ^Engine) {
@@ -164,21 +184,49 @@ engine_sync_mix :: proc(e: ^Engine, song: ^Song) {
 	}
 }
 
-// Is there anything left to play?
+// Is there anything left to play? Never true while looping.
 engine_done :: proc(e: ^Engine) -> bool {
+	if e.loop do return false
 	return e.next >= len(e.events) && len(e.voices) == 0
 }
 
+// Where playback is, in seconds since engine_start (counting every pass of a
+// loop), and within the current pass.
+engine_time :: proc(e: ^Engine) -> (total, in_pass: f64) {
+	return f64(e.frame) / SAMPLE_RATE, f64(e.frame - e.loop_base) / SAMPLE_RATE
+}
+
 // Fill `out` (stereo, interleaved) with the next block. Returns false once the
-// song has completely finished ringing.
+// song has completely finished ringing. The finished mix: master level
+// applied and clamped, ready for a speaker.
 engine_render :: proc(e: ^Engine, out: []f32) -> bool {
 	slice.fill(out, 0)
+	more := engine_render_add(e, out)
+	for &s in out do s = clamp(s * MASTER, -1, 1)
+	return more
+}
+
+// The raw version for mixing: ADDS the next block into `out`, before the
+// master level and the clamp. The Mixer uses this to put several songs and the
+// sound effects together first.
+engine_render_add :: proc(e: ^Engine, out: []f32) -> bool {
 	frames := len(out) / 2
 	block_end := e.frame + frames
 
-	for e.next < len(e.events) && e.events[e.next].start < block_end {
+	for {
+		if e.next >= len(e.events) {
+			// End of a pass: start the next one, if looping and it begins in
+			// this block.
+			if !e.loop || e.loop_base + e.loop_len >= block_end do break
+			e.loop_base += e.loop_len
+			e.next = 0
+			continue
+		}
 		ev := e.events[e.next]
-		append(&e.voices, voice_make(ev, e.insts[ev.inst]))
+		if ev.start + e.loop_base >= block_end do break
+		v := voice_make(ev, e.insts[ev.inst]) // seeded from the pass-relative start
+		v.ev.start += e.loop_base
+		append(&e.voices, v)
 		e.next += 1
 	}
 
@@ -198,8 +246,6 @@ engine_render :: proc(e: ^Engine, out: []f32) -> bool {
 		if done do unordered_remove(&e.voices, i)
 	}
 	for &g, i in e.gain do g = e.target[i]
-
-	for &s in out do s = clamp(s * MASTER, -1, 1)
 	e.frame = block_end
 	return !engine_done(e)
 }
@@ -250,7 +296,12 @@ voice_make :: proc(ev: Event, ins: Instrument) -> Voice {
 	v := Voice {
 		ev    = ev,
 		ins   = ins,
-		lfsr  = 1,
+		// Not 1, as the NES powered up with: from 1 the register spends its
+		// first few hundred steps mostly low, and a short drum hit made of
+		// them is lopsided (a DC offset, a thump in the speaker). Both of
+		// these are well mixed, and in metallic mode sit on a balanced
+		// 93-step loop (seed 1 there loops on a very lopsided one).
+		lfsr  = LFSR_SEED,
 		lfsr2 = 0x5A5A,
 		freq  = midi_freq(ev.midi),
 		white = 0x9E3779B9 ~ u32(ev.start) * 2654435761 ~ u32(ev.track) * 40503 ~ u32(ev.midi * 8),
@@ -329,6 +380,8 @@ osc :: #force_inline proc(w: Wave, ph, dt, duty: f32, noise_out: f32) -> f32 {
 	return 0
 }
 
+LFSR_SEED :: 0x4A3B
+
 // The NES noise channel: a 15-bit shift register. Tap 1 is hiss; tap 6 (the
 // "short" mode) repeats every 93 steps and sounds metallic.
 @(private)
@@ -348,7 +401,8 @@ voice_render :: proc(v: ^Voice, out: []f32, crush: bool, g0, g1: f32, ramp_len, 
 	frames := len(out) / 2
 	gate := f32(v.ev.gate) / RATE
 	ratio2 := math.pow(2, ins.semis2 / 12)
-	f := v.freq
+	f := v.f_now if v.f_now > 0 else v.freq
+	defer v.f_now = f
 	for i in 0 ..< frames {
 		if v.age >= v.life do return true
 		t := f32(v.age) / RATE

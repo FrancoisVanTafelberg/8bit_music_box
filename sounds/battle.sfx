@@ -1,0 +1,174 @@
+# Battle sounds: cannon, muskets, swords - and a ship's bell.
+#
+# A sound effect is a handful of voices: an instrument at a pitch, starting
+# some seconds in and held for some seconds. The instruments defined here are
+# only for sound effects (they do not appear in the editor); a voice can also
+# use any orchestra instrument by its key (see ship_bell).
+#
+#   voice <instrument> <pitch> <start s> <length s> [volume] [pan -1..1]
+#
+# For a noise instrument the pitch is how bright the hiss is: C2 a low roar,
+# C7 a sharp crack. The format is in sounds/README.txt.
+
+# --- instruments ------------------------------------------------------------
+
+# The thump: a triangle that starts over an octave high and falls - the NES
+# kick drum, made huge.
+define_instrument boom
+family percussion
+wave triangle
+envelope 0.001 0.9 0 0.2
+sweep 14 0.07
+tone 0.6
+gain 1
+end
+
+# The body of an explosion: dark noise, quick to fade.
+define_instrument blast
+family percussion
+wave noise
+envelope 0.001 0.55 0 0.2
+tone 0.3
+gain 0.9
+end
+
+# The first instant of a gunshot: bright and very short.
+define_instrument crack
+family percussion
+wave noise
+envelope 0.001 0.07 0 0.02
+tone 1
+gain 0.8
+end
+
+# What rolls on after a big bang: very dark, slow to fade.
+define_instrument rumble
+family percussion
+wave noise
+envelope 0.04 1.6 0 0.4
+tone 0.08
+gain 1
+end
+
+# Steel on steel: a sine with an inharmonic partial 2.72 times higher (17.3
+# semitones), which is what makes it a blade and not a bell.
+define_instrument clang
+family percussion
+wave sine
+layer sine 0.45 17.3
+envelope 0.001 0.7 0 0.1
+gain 0.8
+end
+
+# The higher, quicker ring that sits on top of the clang.
+define_instrument clang_high
+based_on clang
+layer sine 0.4 13.1
+envelope 0.001 0.3 0 0.05
+end
+
+# The grind of the edges: the noise channel's metallic mode.
+define_instrument scrape
+family percussion
+wave noise
+metallic 1
+envelope 0.001 0.1 0 0.04
+tone 0.8
+gain 0.5
+end
+
+# A blade leaving its scabbard: metallic hiss that rises as it comes.
+define_instrument hiss
+family percussion
+wave noise
+metallic 1
+envelope 0.08 0.4 0 0.08
+sweep -9 0.2
+tone 0.55
+gain 0.9
+end
+
+# Water: soft noise, falling.
+define_instrument wash
+family percussion
+wave noise
+envelope 0.01 0.8 0 0.3
+sweep 10 0.25
+tone 0.35
+gain 0.8
+end
+
+# --- sound effects ----------------------------------------------------------
+
+define_sfx cannon
+name "Cannon"
+voice boom    A1  0     0.9  1
+voice blast   C3  0     0.6  0.9
+voice crack   C7  0     0.05 0.5
+voice rumble  C2  0.04  1.5  0.7
+end
+
+# Another ship's gun, far off: no crack, all thump and roll.
+define_sfx cannon_distant
+name "Cannon (distant)"
+volume 0.6
+voice boom    F1  0     1.0  0.8
+voice blast   G2  0     0.5  0.5
+voice rumble  A1  0     2.2  0.9
+end
+
+define_sfx musket
+name "Musket"
+voice crack   C7  0     0.04 0.9
+voice blast   G3  0     0.25 0.7
+voice boom    E2  0     0.2  0.35
+voice rumble  C3  0.02  0.5  0.3
+end
+
+# A line of muskets, not quite together, spread left to right.
+define_sfx musket_volley
+name "Musket volley"
+voice crack   C7  0      0.04 0.7  -0.6
+voice blast   G3  0      0.25 0.5  -0.6
+voice crack   B6  0.025  0.04 0.7   0.3
+voice blast   F#3 0.025  0.25 0.5   0.3
+voice crack   C#7 0.05   0.04 0.6  -0.2
+voice blast   A3  0.05   0.25 0.5  -0.2
+voice crack   C7  0.085  0.04 0.6   0.6
+voice blast   G3  0.085  0.25 0.5   0.6
+voice crack   A#6 0.12   0.04 0.5   0
+voice blast   E3  0.12   0.3  0.5   0
+voice boom    D2  0      0.3  0.4
+voice rumble  C3  0.03   0.9  0.6
+end
+
+define_sfx sword_clash
+name "Sword clash"
+voice crack       C7  0      0.02 0.35
+voice scrape      C8  0      0.06 0.7
+voice clang       D6  0      0.02 1     -0.1
+voice clang_high  E7  0      0.02 0.6    0.15
+voice clang       G#6 0.006  0.02 0.45   0.1
+end
+
+define_sfx sword_draw
+name "Sword drawn"
+voice hiss        E7  0      0.4  0.9
+voice clang_high  G7  0.4    0.02 0.35
+end
+
+# The orchestra's tubular bells, struck twice: two bells, as on a ship's watch.
+define_sfx ship_bell
+name "Ship's bell"
+volume 1.6
+voice tubular_bells  A5  0     0.8  1
+voice tubular_bells  A5  0.45  1.5  0.9
+end
+
+# A cannonball landing short.
+define_sfx splash
+name "Splash"
+voice wash    C5  0      0.7  1
+voice blast   C4  0      0.15 0.4
+voice wash    G5  0.08   0.5  0.5
+end

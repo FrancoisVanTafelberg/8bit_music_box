@@ -94,6 +94,10 @@ definitions in place, so they don't change within one.
 
 ### The orchestra (sounding ranges, MIDI numbers) - as shipped in `instruments/`
 
+**Songs stick to these ranges.** The sheet refuses notes outside them, songs written by
+hand or by script keep to them too (move a doubling part by octaves rather than past the
+top), and `tools/render` warns about any note that is out of range.
+
 | family | instrument | range | recipe |
 |---|---|---|---|
 | Strings | Violin | G3–G7 (55–103) | saw, delayed vibrato, quick bow attack |
@@ -217,8 +221,12 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `main_release/` | shipping entry point |
 | `source/` | package `app` — one package, one file per concern. All state in one `App` block (`g`) so hot reload keeps the song you are editing |
 | `source/rlu/` | virtual resolution, vendored from Animal Kingdoms (canvas 1280 × 720) |
-| `source/music/` | package `music` — **no raylib**. Theory (pitches, keys, lengths), the song model, the `.song` format, the instrument table, the synth engine, WAV writing and MIDI import. Headless, so `tools/render` can use it |
-| `tools/render/` | CLI: render a `.song` or `.mid` straight to WAV. `odin run tools/render -- songs/ode_to_joy.song` |
+| `source/music/` | package `music` — **no raylib**. Theory (pitches, keys, lengths), the song model, the `.song` format, the instrument table, the synth engine, sound effects, the Mixer, WAV writing and MIDI import. Headless, so `tools/render` can use it, and so can any other program (§4.2) |
+| `source/music_rl/` | package `music_rl`: the Mixer's sound out through a raylib `AudioStream`. The only raylib-facing piece of the engine |
+| `tools/render/` | CLI: render a `.song` or `.mid` straight to WAV, or sound effects (`-- sfx cannon`, `-- sfx all`) |
+| `examples/battle_demo/` | the engine inside another program: a march with layers toggled live, battle sounds on keys |
+| `instruments/` | the orchestra, `.inst` files |
+| `sounds/` | sound effects, `.sfx` files |
 | `songs/` | saved songs |
 | `imports/` | drop `.mid` files here (or drag them onto the window) |
 | `exports/` | rendered WAV / MP3 / OGG / FLAC |
@@ -244,15 +252,65 @@ frame. A muted note keeps time without being synthesised, so unmuting mid-note b
 rest of it in. Breath noise is per voice, seeded from the note, so muting one track never
 changes how another sounds.
 
-**Playing songs from another program** (Animal Kingdoms, say): `source/music/` has no
-raylib in it. `registry_load_dir` → `song_load` → `engine_start`, then call
-`engine_render` for each block of stereo f32 and hand it to your audio output (the
-editor's `player.odin` is the example). `song_track_index(song, "Bugle")` finds a layer;
-`engine_set_track_gain(engine, i, 0 or 1)` mutes or brings it back mid-song.
+**Playing songs from another program**: see §4.2, the Mixer.
 
 Pulse and saw are band-limited with PolyBLEP so high notes do not alias into a screech;
 the triangle is deliberately left as the NES's 16-step staircase. Pitch modulation
 (vibrato, sweep) is computed at control rate (every 32 samples).
+
+### 4.2 The engine for other programs: the Mixer
+
+The editor is one user of the engine; a game is another. Everything a program needs is one
+struct, `music.Mixer` (`source/music/mixer.odin`), and the editor itself plays through it,
+so what the editor does is what a game gets.
+
+```odin
+import music "music"          // copy source/music into your project
+import music_rl "music_rl"    // and source/music_rl, for raylib output
+
+m: music.Mixer
+music.mixer_init(&m)
+music.mixer_load_instruments(&m, "instruments")   // the .inst files
+music.mixer_load_sounds(&m, "sounds")             // the .sfx files
+
+out: music_rl.Output
+music_rl.output_open(&out)                        // after rl.InitAudioDevice()
+
+march := music.mixer_play_song_file(&m, "songs/british_grenadiers_trumpet.song", loop = true, fade_in = 2)
+music.mixer_set_layer(&m, march, "Trumpet 1", false)     // one layer, by its name
+music.mixer_set_instrument(&m, march, "trumpet", false)  // every layer playing the trumpet
+music.mixer_solo_layer(&m, march, "Trumpet 2")           // only this layer
+music.mixer_set_all_layers(&m, march, true)              // everything back
+music.mixer_play_sfx(&m, "cannon", pan = -0.4, vary = 1)
+music.mixer_stop_song(&m, march, fade_out = 3)
+
+// every frame:
+music_rl.output_update(&out, &m)
+```
+
+| | |
+|---|---|
+| **Songs** | `mixer_play_song_file` / `mixer_play_song` (a `Song` already in memory) → a `Song_Handle`. Up to 4 at once (the music, a fanfare over it). Loop, fade in, `mixer_stop_song` with a fade out, `mixer_set_song_volume` over time, `mixer_song_playing`, `mixer_song_time` |
+| **Layers** | by layer name ("Trumpet 1"): `mixer_set_layer`, `mixer_set_layer_gain`, `mixer_solo_layer`, `mixer_layer_on`. By instrument key, reaching every layer that plays it ("trumpet"): `mixer_set_instrument`, `mixer_set_instrument_gain`, `mixer_solo_instrument`, `mixer_instrument_on`. `mixer_set_all_layers` for everything. Names ignore case; setters return how many layers they changed. `mixer_layer_count` / `mixer_layer_name` list them for a menu |
+| **Sound effects** | `mixer_play_sfx(key, volume, pan, pitch, vary)` → a `Sfx_Handle`; `vary` shifts each shot by a random amount so ten muskets are not one musket ten times; `mixer_stop_sfx`. `mixer_play_note(inst_key, midi)` plays a single orchestra note (a UI blip, a stinger) |
+| **Levels** | `master`, `music_volume`, `sfx_volume`: plain fields, the options-menu sliders |
+| **Output** | `mixer_render(&m, block)` fills any block of stereo f32 at 44.1 kHz. `music_rl` does it for raylib; any other audio API works the same way |
+
+Rules that keep it simple: handles are safe after their sound has ended (calls on them do
+nothing); every change ramps over one block, so nothing clicks; not thread-safe, so feed
+the output from the game loop (as `music_rl` does) rather than an audio callback, or guard
+it with a mutex; one mixer per program (songs find instruments through the package's bound
+registry — `mixer_bind` after a hot reload).
+
+Loop length is the song rounded up to a whole bar, so the beat carries across the seam, and
+notes ringing at the end ring on into the next pass.
+
+**Sound effects** are text too: `.sfx` files in `sounds/` hold `define_sfx` blocks, each a
+handful of voices (instrument, pitch, start, length, volume, pan), and can define
+instruments of their own that stay out of the editor's list (see `sounds/README.txt`).
+`sounds/battle.sfx` has a cannon (a falling triangle thump, dark noise, a bright crack and a
+long rumble), a distant cannon, a musket and a ragged volley, a sword clash (inharmonic
+sine partials over metallic noise), a sword being drawn, a ship's bell and a splash.
 
 ## 5. The `.song` format
 
@@ -352,4 +410,5 @@ those are, and where to get them, is in `.design/COLONIZATION_MUSIC.md`.
 | v1 | velocity lane (MB-4), copy/paste of bar ranges, loop a page range, per-layer instrument editing (duty, envelope) saved in the song | |
 | v2 | tempo map (MB-2), ties (MB-3), chip-strict voice limit (MB-1) | |
 | — | instrument files (`instruments/*.inst`, F7 reload) and song-embedded instruments | **done** |
+| — | the Mixer: an engine for other programs (songs, live layer muting, looping, fades, sound effects in `sounds/*.sfx`) | **done** |
 | v3 | audio → notes draft transcription (§8) | |
