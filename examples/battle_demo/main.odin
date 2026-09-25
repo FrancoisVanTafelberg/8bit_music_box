@@ -14,6 +14,7 @@ package battle_demo
     L            loop on / off
     C  V  M      cannon, distant cannon, musket
     B            musket volley
+    Shift+M      100 muskets over 2 seconds, bunched on a bell curve (a burst)
     S  D         sword clash, sword drawn
     E  W         ship's bell, splash
     Up / Down    music volume        Left / Right   sound effect volume
@@ -107,7 +108,13 @@ main :: proc() {
 		if rl.IsKeyPressed(.A) do music.mixer_set_all_layers(&mixer, march, true)
 		// Sound effects: a little random pitch so repeats differ, panned a
 		// little at random too.
+		shift := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
+		if shift && rl.IsKeyPressed(.M) {
+			music.mixer_play_sfx_burst(&mixer, "musket", 100, 2)
+			last = "100 muskets over 2 s"
+		}
 		for k in keys {
+			if shift && k.key == .M do continue
 			if rl.IsKeyPressed(k.key) {
 				pan := f32(rl.GetRandomValue(-40, 40)) / 100
 				music.mixer_play_sfx(&mixer, k.sfx, pan = pan, vary = 0.7)
@@ -141,7 +148,7 @@ main :: proc() {
 		y += 10
 		line(&y, fmt.tprintf("music %.0f%%   effects %.0f%%   (arrow keys)", mixer.music_volume * 100, mixer.sfx_volume * 100))
 		line(&y, "Space play/stop   1-6 layers   T trumpets   Y only Trumpet 2   A all   L loop")
-		line(&y, "C cannon  V distant cannon  M musket  B volley  S sword clash  D sword drawn  E bell  W splash")
+		line(&y, "C cannon  V distant cannon  M musket  Shift+M 100 muskets  B volley  S sword clash  D sword drawn  E bell  W splash")
 		if last != "" do line(&y, fmt.tprintf("last: %s", last), {240, 200, 120, 255})
 		rl.EndDrawing()
 		free_all(context.temp_allocator)

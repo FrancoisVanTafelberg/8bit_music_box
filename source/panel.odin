@@ -15,6 +15,7 @@ Overlay :: enum {
 	None,
 	Instruments,
 	Open,
+	Sounds, // the sound effect tester (sound_test.odin)
 }
 
 overlay_none :: proc() -> bool {
@@ -124,6 +125,10 @@ topbar_draw :: proc() {
 	for fmt_name in ([3]string{"mp3", "ogg", "flac"}) {
 		if button(rect(x, y, 36, h), strings.to_upper(fmt_name, context.temp_allocator), false, g.has_ffmpeg) do file_export(fmt_name)
 		x += 40
+	}
+	when !CELLO {
+		x += 8
+		if button(rect(x, y, 40, h), "SFX") do g.overlay = .Sounds
 	}
 }
 
@@ -352,6 +357,8 @@ overlay_draw :: proc() {
 		instruments_overlay()
 	case .Open:
 		open_overlay_draw()
+	case .Sounds:
+		sound_test_draw()
 	}
 	// Whatever the overlay did not take, nobody underneath gets.
 	if g.ui.clicked || g.ui.right {

@@ -44,10 +44,11 @@ package music
     hot-reloads this package calls mixer_bind(&m) afterwards.
 */
 
+import "core:math"
 import "core:strings"
 
 MAX_SONGS :: 4 // playing at once: e.g. the music, and a fanfare over it
-MAX_SFX_VOICES :: 96 // sound effect voices at once; the oldest gives way
+MAX_SFX_VOICES :: 640 // sound effect voices at once (a 100-shot volley of a 4-voice musket is 400); the oldest gives way
 
 Song_Handle :: distinct u32
 Sfx_Handle :: distinct u32
@@ -375,6 +376,63 @@ mixer_play_sfx :: proc(m: ^Mixer, key: string, volume: f32 = 1, pan: f32 = 0, pi
 	return h
 }
 
+// Many of the same sound effect at once: `count` shots spread over
+// `seconds`, clustered along a bell curve - a shot or two alone at first,
+// most of them together in the middle, a few stragglers at the end. A line of
+// muskets firing a ragged volley, a broadside, a crowd.
+//
+// Each shot gets its own small differences: pitch (up to `vary` semitones
+// either way), loudness (as if some are further away), and place in the
+// stereo field (up to `pan_spread` either side). The shots are scaled down as
+// a group so a hundred of them do not simply clip: `volume` 1 is about as loud
+// as the thickest moment should be. All of them share one handle, so
+// mixer_stop_sfx stops the whole burst. `times`, if given, is filled with each
+// shot's start in seconds (for drawing them). Returns 0 for an unknown key.
+mixer_play_sfx_burst :: proc(
+	m: ^Mixer,
+	key: string,
+	count: int,
+	seconds: f32,
+	volume: f32 = 1,
+	pan_spread: f32 = 0.8,
+	vary: f32 = 1,
+	times: []f32 = nil,
+) -> Sfx_Handle {
+	fx, ok := sfx_find(&m.sounds, key)
+	if !ok || count <= 0 do return 0
+	h := sfx_handle(m)
+	span := max(seconds, 0.001)
+	// The bell: a normal distribution centred on the middle, 99.7% of it
+	// (three standard deviations each way) inside the span; the rare shot
+	// outside is drawn again.
+	sigma := span / 6
+	// How many shots land in the busiest 50 ms, roughly: what they are
+	// scaled for.
+	peak := f32(count) * 0.05 / (sigma * math.sqrt(f32(2 * math.PI)))
+	group := volume / math.sqrt(max(peak, 1))
+	for k in 0 ..< count {
+		t: f32
+		for {
+			// Box-Muller.
+			u1 := max(rand_unit(m), 1e-6)
+			u2 := rand_unit(m)
+			z := math.sqrt(-2 * math.ln(u1)) * math.cos(2 * math.PI * u2)
+			t = span / 2 + z * sigma
+			if t >= 0 && t <= span do break
+		}
+		if k < len(times) do times[k] = t
+		at := m.frame + int(t * RATE)
+		shift := (rand_unit(m) * 2 - 1) * vary
+		loud := group * (0.55 + 0.45 * rand_unit(m))
+		pan := (rand_unit(m) * 2 - 1) * pan_spread
+		for sv in fx.voices {
+			ev := sfx_event(sv, fx.volume * loud, pan, shift, at)
+			sfx_add(m, voice_make(ev, sv.ins, m.mode), h)
+		}
+	}
+	return h
+}
+
 // Play one note on an instrument of the orchestra (or of the sound effects),
 // by key: a stinger, a bell, a UI blip. `midi` 60 = middle C.
 mixer_play_note :: proc(m: ^Mixer, inst_key: string, midi: f32, seconds: f32 = 0.5, volume: f32 = 1, pan: f32 = 0) -> Sfx_Handle {
@@ -455,14 +513,20 @@ mixer_render :: proc(m: ^Mixer, out: []f32) {
 	block_end := m.frame + frames
 	for i := 0; i < len(m.sfx); {
 		s := &m.sfx[i]
-		if s.voice.ev.start >= block_end {i += 1; continue} // not started yet
+		if s.voice.ev.start >= block_end {
+			// Not started yet (a burst schedules its shots ahead). Stopped
+			// before it began: never heard at all.
+			if s.step > 0 do unordered_remove(&m.sfx, i)
+			else do i += 1
+			continue
+		}
 		offset := max(s.voice.ev.start - m.frame, 0)
 		if s.step > 0 do s.level = max(s.level - s.step * f32(frames), 0)
 		g1 := s.level * m.sfx_volume
 		done := voice_render(&s.voice, out[offset * 2:], s.applied, g1, frames, offset)
 		s.applied = g1
 		if done || s.level <= 0 {
-			ordered_remove(&m.sfx, i)
+			unordered_remove(&m.sfx, i) // order does not matter: it is a sum
 		} else {
 			i += 1
 		}
@@ -590,7 +654,17 @@ sfx_add :: proc(m: ^Mixer, v: Voice, h: Sfx_Handle) {
 		voice.lfsr = (rand_u32(m) & 0x7FFF) | 1
 		voice.lfsr2 = (rand_u32(m) & 0x7FFF) | 1
 	}
-	if len(m.sfx) >= MAX_SFX_VOICES do ordered_remove(&m.sfx, 0)
+	if len(m.sfx) >= MAX_SFX_VOICES {
+		// Full: the voice that started longest ago gives way. If none has
+		// started yet, the new one is dropped.
+		oldest := -1
+		for o, i in m.sfx {
+			if o.voice.ev.start > m.frame do continue
+			if oldest < 0 || o.voice.ev.start < m.sfx[oldest].voice.ev.start do oldest = i
+		}
+		if oldest < 0 do return
+		unordered_remove(&m.sfx, oldest)
+	}
 	append(&m.sfx, Sfx_Live{voice = voice, handle = h, level = 1, applied = m.sfx_volume})
 }
 

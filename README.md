@@ -50,6 +50,7 @@ layer becomes a cello, and Save puts the result in `cello_songs\`, never over th
 | **Sharps / flats** | the key signature decides; hold `Shift` for ♯, `Ctrl` for ♭, or use the accidental buttons |
 | **Edit** | drag to move, right-click to delete, mouse wheel on a note = up/down a semitone |
 | **Key lines** | the **lines** button next to the key: rows the key signature sharpens or flattens are tinted and named (F#, Bb) in the note column, and the rows of the key's home chord are marked - tonic brightest, 3rd and 5th fainter. Each row also shows its frequency ratio to a reference note (the tonic at or below the layer's first note): with C5 as 1:1, C6 is 2:1, G5 3:2, E5 5:4, C4 1:2. Right-click a row's name to make it the reference; right-click it again for automatic. On by default |
+| **Sound effects** | the **SFX** button (top right): every sound effect in `sounds/`, click to hear; "many at once" fires N of one over a few seconds, bunched on a bell curve (e.g. 100 muskets in 2 s), with a chart of when each fell |
 | **Octave copy** | `Ctrl`+click a note: a copy of it an octave lower, same place and length; `Shift`+click: an octave higher |
 | **Selected note** | `↑`/`↓` a staff step, `Shift+↑/↓` a semitone, `←`/`→` a slot, `Del` removes it |
 | **Fine grid** | hold `Alt` to snap to 32nds |

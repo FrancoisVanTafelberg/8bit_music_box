@@ -42,6 +42,8 @@ App :: struct {
 	// The row ratios count from (sheet.odin, key_ratio); -1 = the tonic,
 	// found automatically.
 	ratio_ref:  i16,
+	// The sound effect tester (sound_test.odin).
+	sfx_test:   Sound_Test,
 	// All the sound: the instruments (from instruments/), the playing song,
 	// the note previews. The same Mixer a game would use; see music/mixer.odin.
 	audio:      music.Mixer,
@@ -113,6 +115,7 @@ game_init :: proc() {
 	g.fb_hand = HAND_DEFAULT
 	g.key_lines = true
 	g.ratio_ref = -1
+	g.sfx_test = {count = 100, seconds = 2, volume = 1, spread = true}
 	files_init()
 	music.mixer_init(&g.audio)
 	instruments_reload(true)

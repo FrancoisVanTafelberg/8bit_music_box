@@ -19,6 +19,10 @@ Play them from a program:
   music.mixer_play_sfx(&mixer, "cannon")
   music.mixer_play_sfx(&mixer, "musket", pan = -0.5, vary = 1)   (vary: random
                                   pitch shift up to 1 semitone, so repeats differ)
+  music.mixer_play_sfx_burst(&mixer, "musket", 100, 2)
+                                 (100 shots over 2 s, bunched on a bell curve:
+                                  a ragged volley. The editor's SFX button
+                                  tries this out.)
 
 The format
 ----------
