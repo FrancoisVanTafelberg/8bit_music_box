@@ -24,8 +24,9 @@ you are editing survives. `F5` forces a reload, `F6` restarts.
 ## Cello Helper
 
 A second program from the same code: the editor with only the cello (as many cello
-layers as you like), a half-width side panel, four bars to a page, and the **Cello
-Fingerboard** down the right-hand side.
+layers as you like), a half-width side panel, four bars to a page showing only the cello's
+compass by default (C2 to C6, in taller rows; the **inst** / **piano** button switches), and
+the **Cello Fingerboard** down the right-hand side.
 
     run_cello_dev.bat               hot reload, like run_dev.bat
     build_cello_release.bat         build\cello_helper.exe   (or ./build_cello_release.sh)
@@ -45,8 +46,8 @@ when stopped - each filled in its own colour, with the way between them drawn: a
 string, colouring the string and the circles on the way and blending from one note's
 colour to the next, or as an arrow straight across the board to another string. Three
 modes: **Same string** stays on the string while it can play the note; **Nearest** goes to
-whichever place is physically closest on a real cello; **Best** always takes the place
-nearest the nut (the open string when there is one). Notes played together - double stops,
+whichever place is physically closest on a real cello; **Best** (the default) always takes
+the place nearest the nut (the open string when there is one). Notes played together - double stops,
 chords, strums (starting within 6 ticks, while the first still sounds) - go on different
 strings and each gets its own line: voice by voice from a chord of the same size, otherwise
 from the nearest note before.
@@ -67,14 +68,17 @@ layer becomes a cello, and Save puts the result in `cello_songs\`, never over th
 | **Place a note** | pick a length on the left (`1`–`6`, `.` dotted, `T` triplet), click a slot |
 | **Sharps / flats** | the key signature decides; hold `Shift` for ♯, `Ctrl` for ♭, or use the accidental buttons |
 | **Edit** | drag to move, right-click to delete, mouse wheel on a note = up/down a semitone |
+| **Range** | the **piano** / **inst** button next to the key: the whole piano range, or only the selected layer's instrument (taller rows). The music box starts on piano, the Cello Helper on inst. Notes outside the range are red on the piano range and counted at the sheet's edge on inst - switch to piano to move or delete them |
 | **Key lines** | the **lines** button next to the key: rows the key signature sharpens or flattens are tinted and named (F#, Bb) in the note column, and the rows of the key's home chord are marked - tonic brightest, 3rd and 5th fainter. Each row also shows its frequency ratio to a reference note (the tonic at or below the layer's first note): with C5 as 1:1, C6 is 2:1, G5 3:2, E5 5:4, C4 1:2. Right-click a row's name to make it the reference; right-click it again for automatic. On by default |
 | **Sound effects** | the **SFX** button (top right): every sound effect in `sounds/`, click to hear; "many at once" fires N of one over a few seconds (the -/+ take Shift for 10 and Ctrl for 100 at a time, the wheel works too, right-click resets), bunched on a bell curve (e.g. 100 muskets in 2 s), with a chart of when each fell |
 | **Octave copy** | `Ctrl`+click a note: a copy of it an octave lower, same place and length; `Shift`+click: an octave higher |
-| **Selected note** | `↑`/`↓` a staff step, `Shift+↑/↓` a semitone, `←`/`→` a slot, `Del` removes it |
+| **Selected note** | `Alt+↑/↓` a staff step, `Alt+Shift+↑/↓` a semitone, `Alt+←/→` a slot, `Del` removes it |
+| **Bars** | `←` back to the start of the bar (at its start already: the bar before), `→` the start of the next bar - while playing it jumps there; stopped, it moves the bar cursor (the gold marker) that Play starts from |
+| **Volume** | `↑` / `↓` the overall volume, 5% a press (`Shift`: 20%) |
 | **Fine grid** | hold `Alt` to snap to 32nds |
 | **Layers** | `+ Add instrument`; click a layer to edit it; `M` mute, `S` solo (live, even mid-song); `Tab` next layer; **Set colour** picks the selected layer's colour on the sheet (saved in the song) |
-| **Play** | `Space` from this page, `Shift+Space` from the start. **Follow** turns pages with the playhead |
-| **Pages** | `PgUp`/`PgDn`, `[` `]`, `←`/`→` with nothing selected, or click the page strip |
+| **Play** | `Space` from the bar cursor (or this page's start, if the cursor is on another page), `Shift+Space` from the start. **Follow** turns pages with the playhead |
+| **Pages** | `PgUp`/`PgDn`, `[` `]`, or click the page strip |
 | **Undo** | `Ctrl+Z`, `Ctrl+Y` / `Ctrl+Shift+Z` |
 | **Files** | `Ctrl+S` save, `Ctrl+O` open, `Ctrl+N` new, `Ctrl+E` export WAV |
 | **Import** | put `.mid` files in `imports\` and Open them, or drag a `.mid` / `.song` onto the window |

@@ -51,6 +51,14 @@ App :: struct {
 	sfx_test:   Sound_Test,
 	perf:       Perf, // perf.odin: the FPS counter and F3 monitor
 	colour_y:   f32, // where the Set colour button is, for its palette
+	// The sheet's rows (sheet.odin, sheet_range_update): the whole piano, or
+	// with fit_range the active instrument's compass.
+	fit_range:  bool,
+	// The bar Play starts from (left/right arrows; player.odin, bar_step).
+	cursor_tick: i32,
+	sheet_lo:   int,
+	sheet_hi:   int,
+	row_h:      int,
 	// All the sound: the instruments (from instruments/), the playing song,
 	// the note previews. The same Mixer a game would use; see music/mixer.odin.
 	audio:      music.Mixer,
@@ -122,6 +130,9 @@ game_init :: proc() {
 	g.fb_hand = HAND_DEFAULT
 	g.fb_track = true
 	g.fb_track_n = TRACK_DEFAULT_N
+	g.fb_track_mode = .Best
+	g.fit_range = CELLO // the Cello Helper starts on the cello's rows
+	sheet_range_update()
 	g.key_lines = true
 	g.ratio_ref = -1
 	g.sfx_test = {count = 100, seconds = 2, volume = 1, spread = true}
@@ -155,6 +166,7 @@ game_update :: proc() -> bool {
 	if rl.IsKeyPressed(.F7) do instruments_reload(false)
 
 	ui_begin()
+	sheet_range_update()
 	files_poll_dropped()
 	g.audio.mode = g.mode
 	perf_mark(.Logic)

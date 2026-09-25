@@ -353,6 +353,13 @@ files, the Mixer — and `when CELLO` switches the differences:
   here has every layer turned into a cello ("Cello (was Violin)"), out-of-range notes
   shown red and counted. Saves go to `cello_songs/`, so an orchestral song in `songs/`
   is never overwritten by its cello version.
+* **Only the cello's rows, by default:** the range button (in both apps: "piano" / "inst",
+  `g.fit_range`, `sheet_range_update`) shows either the piano's 52 rows of 12 px or only
+  the active instrument's compass, the rows as tall as fit (up to 36 px) with bigger note
+  heads - C2 to C6 in 29 rows of 21 px for the cello. The music box starts on piano, the
+  Cello Helper on inst. Notes outside the instrument's range are drawn red (piano range)
+  or counted at the sheet's top and bottom edge (inst range); they cannot be added, but can
+  be deleted, dragged into range, or octave-copied into range.
 * **Four bars to a page**, as in the music box: the left panel is half as wide (104 px,
   laid out compact - stacked rows, short labels) and the sheet runs to the fingerboard
   (748 px).
@@ -391,7 +398,7 @@ are worked out once into a table. The last N notes up to the playhead (or the se
 note) are drawn: each note filled in a colour cycled note by note (eight colours; older
 notes fainter, the newest ringed), and between them either the string and its circles
 coloured in, blending from one colour to the next, or a blended arrow straight across.
-*Best* (a third mode) always takes the place nearest the nut - the open string if there is
+*Best* (a third mode, and the default) always takes the place nearest the nut - the open string if there is
 one ([C string, F2] → G2 is the open G string). **Steps:** notes that start within 6 ticks
 of each other while the first still sounds (double stops, chords, strums) are one step;
 their places are chosen together, on different strings, at the least total cost (every

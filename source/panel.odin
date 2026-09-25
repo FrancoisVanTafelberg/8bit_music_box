@@ -89,12 +89,18 @@ topbar_draw :: proc() {
 		g.key_lines = !g.key_lines
 		set_status(g.key_lines ? "key lines on: sharp/flat rows tinted, the home chord's rows marked" : "key lines off")
 	}
-	x += 42
+	x += 38
+	// The sheet's rows: the whole piano, or only the active instrument's.
+	if button(rect(x, y, 40, h), g.fit_range ? "inst" : "piano", g.fit_range) {
+		g.fit_range = !g.fit_range
+		set_status(g.fit_range ? "rows: only the instrument's range (notes outside it are counted at the sheet's edges)" : "rows: the whole piano range")
+	}
+	x += 46
 
 	// Transport.
 	if button(rect(x, y, 56, h), g.player.playing ? "Stop" : "Play", g.player.playing) do toggle_play(rl.IsKeyDown(.LEFT_SHIFT))
 	x += 60
-	if button(rect(x, y, 30, h), "|<") {player_stop(&g.player); g.page = 0}
+	if button(rect(x, y, 30, h), "|<") {player_stop(&g.player); g.page = 0; g.cursor_tick = 0}
 	x += 34
 	if button(rect(x, y, 50, h), "Follow", g.follow) do g.follow = !g.follow
 	x += 54
@@ -556,18 +562,23 @@ keys_update :: proc() {
 	if rl.IsKeyPressed(.HOME) do g.page = 0
 	if rl.IsKeyPressed(.END) do g.page = page_count() - 1
 
-	// The selected note, or the page when nothing is selected.
+	// The arrows: bars (left/right) and the volume (up/down). With Alt held
+	// they move the selected note instead: a staff step up or down (with
+	// Shift, a semitone), a slot left or right.
 	pressed :: proc(k: rl.KeyboardKey) -> bool {return rl.IsKeyPressed(k) || rl.IsKeyPressedRepeat(k)}
-	if g.selected >= 0 {
+	alt := rl.IsKeyDown(.LEFT_ALT) || rl.IsKeyDown(.RIGHT_ALT)
+	if alt && g.selected >= 0 {
 		if pressed(.UP) {if shift do nudge_selected(1); else do move_selected(1, 0)}
 		if pressed(.DOWN) {if shift do nudge_selected(-1); else do move_selected(-1, 0)}
 		if pressed(.LEFT) do move_selected(0, -1)
 		if pressed(.RIGHT) do move_selected(0, 1)
-		if rl.IsKeyPressed(.DELETE) || rl.IsKeyPressed(.BACKSPACE) do delete_selected()
-	} else {
-		if pressed(.RIGHT) do g.page = min(g.page + 1, page_count() - 1)
-		if pressed(.LEFT) do g.page = max(g.page - 1, 0)
+	} else if !alt {
+		if pressed(.LEFT) do bar_step(-1)
+		if pressed(.RIGHT) do bar_step(1)
+		if pressed(.UP) do volume_step(shift ? 4 : 1)
+		if pressed(.DOWN) do volume_step(shift ? -4 : -1)
 	}
+	if g.selected >= 0 && (rl.IsKeyPressed(.DELETE) || rl.IsKeyPressed(.BACKSPACE)) do delete_selected()
 }
 
 // ---------------------------------------------------------------------------

@@ -115,6 +115,42 @@ toggle_play :: proc(from_start: bool) {
 		player_stop(&g.player)
 		return
 	}
-	from := from_start ? 0 : g.page * music.bar_ticks(&g.song) * BARS_PER_PAGE
-	player_play(&g.player, &g.song, from)
+	player_play(&g.player, &g.song, from_start ? 0 : play_from())
+}
+
+// Where Play starts: the bar cursor (set by the left and right arrows) if it
+// is on the page being shown, otherwise the start of that page.
+play_from :: proc() -> i32 {
+	ps := g.page * music.bar_ticks(&g.song) * BARS_PER_PAGE
+	pe := ps + music.bar_ticks(&g.song) * BARS_PER_PAGE
+	if g.cursor_tick >= ps && g.cursor_tick < pe do return g.cursor_tick
+	return ps
+}
+
+// Left and right arrows: -1 goes back to the start of the bar we are in -
+// or, already at its start, to the bar before; +1 to the start of the next
+// bar. While playing, playback jumps there; stopped, the bar cursor moves
+// (Play starts from it). The page follows.
+bar_step :: proc(dir: int) {
+	bt := music.bar_ticks(&g.song)
+	pos := g.player.playing ? player_tick(&g.player, &g.song) : play_from()
+	start := pos / bt * bt
+	target := start + bt
+	if dir < 0 {
+		// "Already at the start": while playing, within half a beat of it.
+		near := g.player.playing ? music.beat_ticks(&g.song) / 2 : 0
+		target = pos - start <= near ? start - bt : start
+	}
+	last := max(music.song_end_tick(&g.song) / bt, g.song.bars - 1)
+	target = clamp(target, 0, last * bt)
+	g.cursor_tick = target
+	g.page = clamp(target / (bt * BARS_PER_PAGE), 0, page_count() - 1)
+	if g.player.playing do player_play(&g.player, &g.song, target)
+}
+
+// Up and down arrows: the overall volume, 5% a press (Shift: 20%).
+volume_step :: proc(steps: int) {
+	v := clamp(f32(int(g.audio.master * 20 + 0.5) + steps) / 20, 0, 2)
+	g.audio.master = v
+	set_status("volume %d%%", int(v * 100 + 0.5))
 }

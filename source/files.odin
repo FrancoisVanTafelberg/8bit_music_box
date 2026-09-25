@@ -138,6 +138,7 @@ file_open :: proc(path: string) {
 after_load :: proc() {
 	g.cello_notice = false
 	g.ratio_ref = -1
+	g.cursor_tick = 0
 	when CELLO do cello_only()
 	music.song_fit_bars(&g.song, BARS_PER_PAGE)
 	g.active = 0

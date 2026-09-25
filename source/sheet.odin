@@ -33,9 +33,38 @@ BARS_W :: FB_X_CELLO - 8 - BARS_X when CELLO else 1280 - BARS_X - 8
 SHEET_R :: BARS_X + BARS_W + 8 // the sheet's right edge
 BAR_NUM_Y :: TOP_H + 2
 ROWS_Y :: TOP_H + 18
-ROW_H :: 12
-ROWS_H :: music.STEP_COUNT * ROW_H
-STRIP_Y :: ROWS_Y + ROWS_H + 4
+// The rows the sheet shows (sheet_range_update, every frame): the whole
+// piano, or - with the range button on - only the active layer's instrument's
+// compass, each row taller for it. The music box starts on the piano, the
+// Cello Helper on the instrument.
+PIANO_ROWS_H :: music.STEP_COUNT * 12 // the space the rows have
+ROW_H_MAX :: 36
+STRIP_Y :: ROWS_Y + PIANO_ROWS_H + 4
+
+sheet_lo :: #force_inline proc() -> int {return g.sheet_lo}
+sheet_hi :: #force_inline proc() -> int {return g.sheet_hi}
+row_h :: #force_inline proc() -> f32 {return f32(g.row_h)}
+rows_h :: #force_inline proc() -> f32 {return f32((g.sheet_hi - g.sheet_lo + 1) * g.row_h)}
+// A note's head and body, half-heights: bigger on taller rows.
+note_half :: proc() -> f32 {return g.row_h >= 18 ? 7 : 5}
+body_half :: proc() -> f32 {return g.row_h >= 18 ? 4 : 3}
+
+sheet_range_update :: proc() {
+	lo, hi := music.STEP_LO, music.STEP_HI
+	if g.fit_range {
+		if t := active_track(); t != nil {
+			ins := inst_of(t)
+			// The lowest note spelled as low a letter as it goes, the highest
+			// as high: C#2 is on the C row, Db6 on the D row.
+			lo = max(int(music.pitch_from_midi(int(ins.lo), 7).step), music.STEP_LO)
+			hi = min(int(music.pitch_from_midi(int(ins.hi), -7).step), music.STEP_HI)
+		}
+	}
+	if hi < lo do lo, hi = music.STEP_LO, music.STEP_HI
+	g.sheet_lo, g.sheet_hi = lo, hi
+	g.row_h = clamp(PIANO_ROWS_H / (hi - lo + 1), 12, ROW_H_MAX)
+}
+
 STRIP_H :: 18
 
 Acc_Mode :: enum {
@@ -61,11 +90,11 @@ Hover :: struct {
 }
 
 row_y :: proc(step: int) -> f32 {
-	return f32(ROWS_Y + (music.STEP_HI - step) * ROW_H)
+	return f32(ROWS_Y) + f32(sheet_hi() - step) * row_h()
 }
 
 row_center :: proc(step: int) -> f32 {
-	return row_y(step) + ROW_H / 2
+	return row_y(step) + row_h() / 2
 }
 
 page_ticks :: proc() -> i32 {
@@ -109,10 +138,10 @@ snap_tick :: proc(tick: i32) -> i32 {
 
 sheet_hover :: proc() -> Hover {
 	m := g.ui.mouse
-	if m.x < BARS_X || m.x >= BARS_X + BARS_W || m.y < ROWS_Y || m.y >= ROWS_Y + ROWS_H do return {}
+	if m.x < BARS_X || m.x >= BARS_X + BARS_W || m.y < ROWS_Y || m.y >= ROWS_Y + rows_h() do return {}
 	h: Hover
 	h.ok = true
-	h.step = music.STEP_HI - int((m.y - ROWS_Y) / ROW_H)
+	h.step = sheet_hi() - int((m.y - ROWS_Y) / row_h())
 	h.raw_tick = page_start() + i32((m.x - BARS_X) / px_per_tick())
 	h.tick = snap_tick(h.raw_tick)
 	return h
@@ -167,10 +196,10 @@ sheet_draw :: proc() {
 	// Rows the active instrument cannot play: shaded, so the playable band
 	// stands out as the lit part of the page.
 	if t != nil {
-		for step in music.STEP_LO ..= music.STEP_HI {
+		for step in sheet_lo() ..= sheet_hi() {
 			p := music.Pitch{i8(step), music.key_alter(int(g.song.key), step)}
 			if !in_range(t.inst, p) {
-				fill(rect(BARS_X, row_y(step), BARS_W, ROW_H), {8, 9, 16, 255})
+				fill(rect(BARS_X, row_y(step), BARS_W, row_h()), {8, 9, 16, 255})
 			}
 		}
 	}
@@ -179,20 +208,20 @@ sheet_draw :: proc() {
 
 	// The hovered row, faintly, all the way across.
 	hov := sheet_hover()
-	if hov.ok do fill(rect(PANEL_W, row_y(hov.step), SHEET_R - PANEL_W, ROW_H), {255, 255, 255, 10})
+	if hov.ok do fill(rect(PANEL_W, row_y(hov.step), SHEET_R - PANEL_W, row_h()), {255, 255, 255, 10})
 	// ...and in the Cello Helper, the row of the fingerboard note under the
 	// mouse, so a position on the board can be found on the staff.
 	when CELLO {
 		if fh := fb_hover(); fh.ok && overlay_none() {
 			step := int(music.pitch_from_midi(fb_midi(fh), fb_spell_key()).step)
-			if step >= music.STEP_LO && step <= music.STEP_HI {
-				fill(rect(PANEL_W, row_y(step), SHEET_R - PANEL_W, ROW_H), with_alpha(COL_ACCENT, 40))
+			if step >= sheet_lo() && step <= sheet_hi() {
+				fill(rect(PANEL_W, row_y(step), SHEET_R - PANEL_W, row_h()), with_alpha(COL_ACCENT, 40))
 			}
 		}
 	}
 
 	// Staff lines.
-	for step in music.STEP_LO ..= music.STEP_HI {
+	for step in sheet_lo() ..= sheet_hi() {
 		if !music.step_is_line(step) do continue
 		y := row_center(step)
 		switch {
@@ -207,7 +236,7 @@ sheet_draw :: proc() {
 	}
 
 	// Bar, beat and slot lines.
-	top, bottom := f32(ROWS_Y), f32(ROWS_Y + ROWS_H)
+	top, bottom := f32(ROWS_Y), f32(ROWS_Y + rows_h())
 	sn := current_snap()
 	beat := music.beat_ticks(&g.song)
 	for b in 0 ..< BARS_PER_PAGE {
@@ -250,8 +279,18 @@ sheet_draw :: proc() {
 			if !in_range(t.inst, p) do col = COL_BAD
 			x0 := tick_x(hov.tick)
 			w := f32(music.note_ticks(g.length, g.mod)) * px_per_tick()
-			fill(rect(x0, row_center(hov.step) - 5, max(w - 1, 3), 10), with_alpha(col, 70))
-			outline(rect(x0, row_center(hov.step) - 5, max(w - 1, 3), 10), with_alpha(col, 160))
+			fill(rect(x0, row_center(hov.step) - note_half(), max(w - 1, 3), 2 * note_half()), with_alpha(col, 70))
+			outline(rect(x0, row_center(hov.step) - note_half(), max(w - 1, 3), 2 * note_half()), with_alpha(col, 160))
+		}
+	}
+
+	// The bar cursor, where Play will start (left/right arrows).
+	if !g.player.playing {
+		c := play_from()
+		if c >= ps && c < ps + page_ticks() {
+			x := tick_x(c)
+			rl.DrawLineEx({x, top}, {x, bottom}, 2, with_alpha(COL_ACCENT, 110))
+			rl.DrawTriangle({x - 6, top - 8}, {x, top}, {x + 6, top - 8}, COL_ACCENT)
 		}
 	}
 
@@ -259,6 +298,19 @@ sheet_draw :: proc() {
 	if g.player.playing && playing_tick >= ps && playing_tick < ps + page_ticks() {
 		x := tick_x(playing_tick)
 		rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, COL_ACCENT)
+	}
+
+	// Instrument rows only: say how many notes of this layer are out of
+	// sight above or below (switch to the piano range to edit them).
+	if g.fit_range && t != nil {
+		above, below := 0, 0
+		for n in t.notes {
+			st := int(n.pitch.step)
+			if st > sheet_hi() do above += 1
+			if st < sheet_lo() do below += 1
+		}
+		if above > 0 do text(fmt.tprintf("^ %d note%s above - piano range to edit", above, above == 1 ? "" : "s"), BARS_X + 4, ROWS_Y + 2, COL_BAD)
+		if below > 0 do text(fmt.tprintf("v %d note%s below - piano range to edit", below, below == 1 ? "" : "s"), BARS_X + 4, ROWS_Y + rows_h() - 12, COL_BAD)
 	}
 
 	strip_draw()
@@ -277,7 +329,7 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tr
 		if n.tick >= pe do break
 		if n.tick + n.len <= ps do continue
 		step := int(n.pitch.step)
-		if step < music.STEP_LO || step > music.STEP_HI do continue
+		if step < sheet_lo() || step > sheet_hi() do continue
 		x0 := max(tick_x(n.tick), left)
 		x1 := min(tick_x(n.tick + n.len), right)
 		yc := row_center(step)
@@ -295,17 +347,20 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tr
 			break
 		}
 		if sounding && !in_trail do col = lighten(base, 0.55)
+		// Outside the instrument's range (from a file, or another instrument's
+		// part): red, so it can be found and moved or deleted.
+		if active && !in_range(t.inst, n.pitch) do col = COL_BAD
 
 		// The body: how long it lasts. The head: where it starts, a square
 		// pixel block, because this is an 8-bit music box.
-		fill(rect(x0 + 1, yc - 3, max(x1 - x0 - 2, 1), 6), col)
+		fill(rect(x0 + 1, yc - body_half(), max(x1 - x0 - 2, 1), 2 * body_half()), col)
 		if tick_x(n.tick) >= left {
-			head := rect(x0, yc - 5, min(10, max(x1 - x0, 4)), 10)
+			head := rect(x0, yc - note_half(), min(2 * note_half(), max(x1 - x0, 4)), 2 * note_half())
 			fill(head, active || sounding ? lighten(col, 0.2) : col)
 			if active do outline(head, {0, 0, 0, 120})
 		}
-		if sounding do outline(rect(x0 - 1, yc - 6, x1 - x0 + 2, 12), rl.WHITE)
-		if active && i == g.selected do outline(rect(x0 - 2, yc - 7, x1 - x0 + 4, 14), COL_ACCENT)
+		if sounding do outline(rect(x0 - 1, yc - note_half() - 1, x1 - x0 + 2, 2 * note_half() + 2), rl.WHITE)
+		if active && i == g.selected do outline(rect(x0 - 2, yc - note_half() - 2, x1 - x0 + 4, 2 * note_half() + 4), COL_ACCENT)
 
 		// Accidentals, only where the key signature does not already say so.
 		if active && tick_x(n.tick) - 8 >= left {
@@ -332,8 +387,8 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tr
 @(private = "file")
 gutter_draw :: proc(hov: Hover) {
 	x := f32(PANEL_W)
-	fill(rect(x, ROWS_Y, GUTTER_W, ROWS_H), COL_PANEL)
-	for step in music.STEP_LO ..= music.STEP_HI {
+	fill(rect(x, ROWS_Y, GUTTER_W, rows_h()), COL_PANEL)
+	for step in sheet_lo() ..= sheet_hi() {
 		y := row_y(step)
 		letter := step % 7
 		name := music.pitch_name_temp({i8(step), 0})
@@ -356,8 +411,8 @@ gutter_draw :: proc(hov: Hover) {
 		}
 		if hov.ok && hov.step == step do c = COL_ACCENT
 		// Every row by its full name, letter and octave: D3, F#3, C4.
-		text(name, x + GUTTER_NAME_X, y + 1, c)
-		if is_c do rl.DrawLineEx({x + GUTTER_NAME_X - 2, y + ROW_H}, {x + GUTTER_W, y + ROW_H}, 1, COL_EDGE)
+		text(name, x + GUTTER_NAME_X, y + (row_h() - 10) / 2, c)
+		if is_c do rl.DrawLineEx({x + GUTTER_NAME_X - 2, y + row_h()}, {x + GUTTER_W, y + row_h()}, 1, COL_EDGE)
 
 		// The row's frequency ratio to the reference note (key lines on).
 		if g.key_lines {
@@ -365,12 +420,13 @@ gutter_draw :: proc(hov: Hover) {
 				rc := COL_FAINT
 				if octave do rc = COL_DIM
 				if step == ratio_ref_step() do rc = COL_ACCENT
-				text(rt, x + GUTTER_NAME_X - 3 - text_width(rt), y + 1, rc)
+				text(rt, x + GUTTER_NAME_X - 3 - text_width(rt), y + (row_h() - 10) / 2, rc)
 			}
 		}
 	}
 	// Clef marks where each clef's own line is: G on G4, C on C4, F on F3.
 	clef :: proc(step: int, s: string) {
+		if step < sheet_lo() || step > sheet_hi() do return // not on the rows shown
 		y := row_center(step)
 		fill(rect(PANEL_W + 3, y - 6, 12, 12), COL_ACCENT)
 		text(s, PANEL_W + 6, y - 4, COL_BG)
@@ -436,13 +492,13 @@ sheet_input :: proc() {
 
 	// The piano gutter: click to hear a row; right-click makes it the
 	// reference note the ratios count from (again: back to automatic).
-	gut := rect(PANEL_W, ROWS_Y, GUTTER_W, ROWS_H)
+	gut := rect(PANEL_W, ROWS_Y, GUTTER_W, rows_h())
 	if ui_take_click(gut) {
-		step := music.STEP_HI - int((g.ui.mouse.y - ROWS_Y) / ROW_H)
+		step := sheet_hi() - int((g.ui.mouse.y - ROWS_Y) / row_h())
 		player_preview(&g.player, t.inst, placed_pitch(step))
 	}
 	if ui_take_right(gut) {
-		step := music.STEP_HI - int((g.ui.mouse.y - ROWS_Y) / ROW_H)
+		step := sheet_hi() - int((g.ui.mouse.y - ROWS_Y) / row_h())
 		if int(g.ratio_ref) == step {
 			g.ratio_ref = -1
 			set_status("ratios count from the key's tonic again (%s)", music.pitch_name_temp(key_pitch(ratio_ref_step())))
@@ -453,7 +509,7 @@ sheet_input :: proc() {
 	}
 
 	if !hov.ok do return
-	area := rect(BARS_X, ROWS_Y, BARS_W, ROWS_H)
+	area := rect(BARS_X, ROWS_Y, BARS_W, rows_h())
 	under := music.track_note_at(t, hov.step, hov.raw_tick)
 
 	if ui_take_click(area) {
@@ -577,7 +633,7 @@ move_selected :: proc(dstep: int, dslots: i32) {
 	t := active_track()
 	if t == nil || g.selected < 0 || g.selected >= len(t.notes) do return
 	n := t.notes[g.selected]
-	step := clamp(int(n.pitch.step) + dstep, music.STEP_LO, music.STEP_HI)
+	step := clamp(int(n.pitch.step) + dstep, sheet_lo(), sheet_hi())
 	p := n.pitch
 	if dstep != 0 do p = music.Pitch{i8(step), music.key_alter(int(g.song.key), step)}
 	tick := max(n.tick + dslots * current_snap(), 0)
@@ -615,7 +671,7 @@ octave_copy :: proc(t: ^music.Track, i: int, dir: int) {
 	step := int(n.pitch.step) + 7 * dir
 	p := music.Pitch{i8(step), n.pitch.alter}
 	where_ := dir < 0 ? "lower" : "higher"
-	if step < music.STEP_LO || step > music.STEP_HI || !in_range(t.inst, p) {
+	if step < sheet_lo() || step > sheet_hi() || !in_range(t.inst, p) {
 		ins := inst_of(t)
 		set_error("%s an octave %s is %s: outside the %s's range (%s - %s)", music.pitch_name_temp(n.pitch), where_, music.pitch_name_temp(p), ins.name, midi_name(int(ins.lo)), midi_name(int(ins.hi)))
 		return
@@ -659,8 +715,8 @@ key_tonic_letter :: proc() -> int {
 @(private = "file")
 key_lines_draw :: proc() {
 	tonic := key_tonic_letter()
-	for step in music.STEP_LO ..= music.STEP_HI {
-		r := rect(BARS_X, row_y(step), BARS_W, ROW_H)
+	for step in sheet_lo() ..= sheet_hi() {
+		r := rect(BARS_X, row_y(step), BARS_W, row_h())
 		switch music.key_alter(int(g.song.key), step) {
 		case 1:
 			fill(r, KEY_SHARP_ROW)
@@ -702,7 +758,7 @@ ratio_ref_step :: proc() -> int {
 		top = int(t.notes[0].pitch.step)
 	}
 	step := top
-	for step > music.STEP_LO && step % 7 != tonic do step -= 1
+	for step > sheet_lo() && step % 7 != tonic do step -= 1
 	if step % 7 != tonic do step += 7
 	return step
 }
