@@ -236,7 +236,7 @@ sheet_draw :: proc() {
 	playing_tick := g.player.playing ? player_tick(&g.player, &g.song) : -1
 	// Cello Helper, tracking on: the active layer's notes in the trail take
 	// the fingerboard's colours, fading back to the layer's as it moves on.
-	trail: [TRACK_MAX]Tracked
+	trail: [TRACK_MAX * 4]Tracked
 	n_trail := 0
 	when CELLO do n_trail = fb_current_trail(trail[:])
 	for &tr, i in g.song.tracks do if i != g.active do notes_draw(&tr, false, playing_tick)
@@ -287,9 +287,10 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tr
 		if !active do col = with_alpha(base, muted ? 40 : 95)
 		if active && muted do col = with_alpha(base, 150)
 		in_trail := false
-		for tr, k in trail {
+		for tr in trail {
 			if tr.index != i do continue
-			col = colour_mix(base, track_colour(i), trail_weight(k, len(trail)))
+			first := trail[0].step
+			col = colour_mix(base, track_colour(tr.step), trail_weight(tr.step - first, trail[len(trail) - 1].step - first + 1))
 			in_trail = true
 			break
 		}

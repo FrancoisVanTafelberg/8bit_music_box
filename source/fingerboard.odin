@@ -94,10 +94,35 @@ fb_midi :: proc(p: Fb_Pos) -> int {
 	return FB_OPEN[p.string] + p.semis
 }
 
-// Where semitone `n` is stopped, as a fraction of the way down the board.
+// HOW MUCH OF THE BOARD IS SHOWN follows the hand position: from the nut to
+// a little past the last finger (g.fb_view, in semitones, gliding to the new
+// length when the position changes), so 1st position fills the panel and the
+// notes are big. Never further than the thumb position's reach: past that,
+// a player does not need this app.
+FB_VIEW_MAX :: 20
+FB_VIEW_MIN :: 7
+
+fb_view_target :: proc() -> f32 {
+	hand := &HAND_POSITIONS[clamp(int(g.fb_hand), 0, len(HAND_POSITIONS) - 1)]
+	far := int(hand.thumb)
+	for f in hand.fingers do far = max(far, int(f))
+	return f32(clamp(far + 3, FB_VIEW_MIN, FB_VIEW_MAX))
+}
+
+fb_in_view :: proc(n: int) -> bool {
+	return f32(n) <= g.fb_view + 0.01
+}
+
+// How far down the string semitone n is, 0 at the nut, 1 at the bridge.
+@(private = "file")
+fb_phys :: proc(n: f32) -> f32 {
+	return 1 - math.pow(2, -n / 12)
+}
+
+// Where semitone `n` is stopped, as a fraction of the way down what is shown.
 @(private = "file")
 fb_frac :: proc(n: int) -> f32 {
-	return (1 - math.pow(2, -f32(n) / 12)) / (1 - math.pow(2, -f32(FB_SEMIS) / 12))
+	return fb_phys(f32(n)) / fb_phys(max(g.fb_view, 1))
 }
 
 fb_y :: proc(n: int) -> f32 {
@@ -111,7 +136,9 @@ fb_center_x :: proc() -> f32 {
 
 @(private = "file")
 fb_half :: proc(y: f32) -> f32 {
-	t := clamp((y - FB_NUT_Y) / (FB_END_Y - FB_NUT_Y), 0, 1)
+	// The board widens along its real length: over the part shown, only a
+	// share of the whole widening.
+	t := clamp((y - FB_NUT_Y) / (FB_END_Y - FB_NUT_Y), 0, 1.1) * fb_phys(max(g.fb_view, 1)) / fb_phys(f32(FB_SEMIS))
 	return FB_HALF_NUT + (FB_HALF_END - FB_HALF_NUT) * t
 }
 
@@ -123,9 +150,8 @@ fb_x :: proc(s: int, y: f32) -> f32 {
 @(private = "file")
 fb_radius :: proc(n: int) -> f32 {
 	if n == 0 do return 6.5
-	gap := fb_y(min(n + 1, FB_SEMIS)) - fb_y(n)
-	if n == FB_SEMIS do gap = fb_y(n) - fb_y(n - 1)
-	return clamp(gap * 0.42, 3, 6.5)
+	gap := fb_y(n + 1) - fb_y(n)
+	return clamp(gap * 0.42, 3, 8.5)
 }
 
 // The circle under the mouse, if any.
@@ -136,6 +162,7 @@ fb_hover :: proc() -> Fb_Pos {
 	best_d := f32(1e9)
 	for s in 0 ..< 4 {
 		for n in 0 ..= FB_SEMIS {
+			if !fb_in_view(n) do break
 			if !fb_visible(FB_OPEN[s] + n) do continue
 			y := fb_y(n)
 			dx, dy := m.x - fb_x(s, y), m.y - y
@@ -219,6 +246,13 @@ fb_places :: proc(midi: int) -> string {
 // ---------------------------------------------------------------------------
 
 fingerboard_draw :: proc() {
+	// Glide to the hand position's length of board.
+	{
+		target := fb_view_target()
+		if g.fb_view <= 0 do g.fb_view = target
+		g.fb_view += (target - g.fb_view) * min(rl.GetFrameTime() * 10, 1)
+		if abs(target - g.fb_view) < 0.01 do g.fb_view = target
+	}
 	fill(rect(FB_X, TOP_H, FB_W, 720 - TOP_H - STATUS_H), COL_PANEL)
 	rl.DrawLine(FB_X, TOP_H, FB_X, 720 - STATUS_H, COL_EDGE)
 	x0 := f32(FB_X + 8)
@@ -339,6 +373,7 @@ fingerboard_draw :: proc() {
 	// Octave (half the string) and two octaves (three quarters): where a
 	// cellist's hand finds its landmarks.
 	for mark in ([2]int{12, 24}) {
+		if !fb_in_view(mark) do continue
 		my := fb_y(mark)
 		l, r := fb_x(0, my) - 22, fb_x(3, my) + 22
 		for xx := l; xx < r; xx += 6 do rl.DrawLineEx({xx, my}, {min(xx + 3, r), my}, 1, {110, 96, 80, 255})
@@ -381,12 +416,13 @@ fingerboard_draw :: proc() {
 
 	// The trail (tracking on): the last notes up to the playhead, or up to
 	// the selected note when stopped.
-	trail: [TRACK_MAX]Tracked
+	trail: [TRACK_MAX * 4]Tracked
 	n_trail := fb_current_trail(trail[:])
 
 	// The positions.
 	for s in 0 ..< 4 {
 		for n in 0 ..= FB_SEMIS {
+			if !fb_in_view(n) do break
 			m := FB_OPEN[s] + n
 			py := fb_y(n)
 			x := fb_x(s, py)

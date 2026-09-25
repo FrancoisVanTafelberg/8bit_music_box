@@ -391,6 +391,21 @@ are worked out once into a table. The last N notes up to the playhead (or the se
 note) are drawn: each note filled in a colour cycled note by note (eight colours; older
 notes fainter, the newest ringed), and between them either the string and its circles
 coloured in, blending from one colour to the next, or a blended arrow straight across.
+*Best* (a third mode) always takes the place nearest the nut - the open string if there is
+one ([C string, F2] → G2 is the open G string). **Steps:** notes that start within 6 ticks
+of each other while the first still sounds (double stops, chords, strums) are one step;
+their places are chosen together, on different strings, at the least total cost (every
+assignment tried, at most 4^4); the colour and the N count go by step. Each note gets one
+line in: voice by voice (lowest to lowest) between chords of the same size, otherwise from
+the nearest note of the step before. Places past the thumb position's reach are used only
+when a note has no other.
+
+**The board's length follows the hand position:** it shows from the nut to three semitones
+past the last finger (at least 7, at most 20 - the thumb position's reach), gliding to a
+new length when the position changes; notes are spaced over what is shown, so they get
+bigger in the low positions. A tracked note past what is shown is pinned to the board's
+end and named.
+
 With tracking on, the notes playing light only at the place chosen for them; the layer's
 own colour is no longer used on the board. On the sheet, the active layer's notes in the
 trail are drawn in their tracking colour blended with the layer's: the k-th of n (oldest

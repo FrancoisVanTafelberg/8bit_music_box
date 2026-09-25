@@ -40,6 +40,7 @@ App :: struct {
 	fb_track:      bool,
 	fb_track_n:    int,
 	fb_track_mode: Track_Mode,
+	fb_view:       f32, // semitones of board shown (fingerboard.odin)
 	// The "lines" button: tint the key signature's rows and mark the rows
 	// of the key's home chord (sheet.odin, key_lines_draw).
 	key_lines:  bool,

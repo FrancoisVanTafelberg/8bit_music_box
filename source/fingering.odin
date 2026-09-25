@@ -30,6 +30,7 @@ package app
     straight across the board.
 */
 
+import "core:fmt"
 import "core:math"
 import "music"
 import rl "vendor:raylib"
@@ -37,12 +38,18 @@ import rl "vendor:raylib"
 Track_Mode :: enum u8 {
 	Same_String,
 	Nearest,
+	Best,
 }
 
 TRACK_MODE_NAME := [Track_Mode]string {
 	.Same_String = "Same string",
 	.Nearest     = "Nearest",
+	.Best        = "Best",
 }
+
+// Places further down than this (the thumb position's reach) are used only
+// when a note has no other.
+TRACK_LIMIT :: FB_VIEW_MAX
 
 TRACK_DEFAULT_N :: 8
 TRACK_MAX :: 64
@@ -106,66 +113,159 @@ fb_dist :: proc(a, b: Fb_Pos) -> f32 {
 // Choosing places
 // ---------------------------------------------------------------------------
 
-// Where a note would go, given where the last one was (`prev.ok` false for
-// the first note). Not ok if the note is not on the board at all.
-fb_choose :: proc(midi: int, prev: Fb_Pos, mode: Track_Mode) -> Fb_Pos {
-	best: Fb_Pos
-	if !prev.ok {
-		// The first: as low on the neck as it goes.
-		for s := 3; s >= 0; s -= 1 {
-			n := midi - FB_OPEN[s]
-			if n < 0 || n > FB_SEMIS do continue
-			if !best.ok || n < best.semis do best = {true, s, n}
+// How much a place costs, coming from the last step's places (`prev`, empty
+// for the first note): lower is better.
+@(private = "file")
+place_cost :: proc(p: Fb_Pos, prev: []Fb_Pos, mode: Track_Mode) -> f32 {
+	// Beyond thumb position is beyond this app: only if nothing else will do.
+	cost: f32 = p.semis > TRACK_LIMIT ? 100000 : 0
+	if len(prev) == 0 || mode == .Best {
+		// As near the nut as it goes: the open string, or the lowest
+		// position. (Best, always; the others, for the first note.) A hair
+		// of distance breaks a tie.
+		near := f32(1e9)
+		for q in prev do near = min(near, fb_dist(q, p))
+		return cost + f32(p.semis) * 1000 + (len(prev) > 0 ? near : 0)
+	}
+	best := f32(1e9)
+	for q in prev {
+		d := fb_dist(q, p)
+		switch mode {
+		case .Same_String:
+			// Staying on a string beats any distance.
+			if q.string != p.string do d += 10000
+		case .Nearest:
+			if q.string == p.string do d -= 0.01 // a tie keeps the string
+		case .Best:
 		}
-		return best
+		best = min(best, d)
 	}
-	if mode == .Same_String {
-		n := midi - FB_OPEN[prev.string]
-		if n >= 0 && n <= FB_SEMIS do return {true, prev.string, n}
+	return cost + best
+}
+
+// Places for the notes of one step (one note, or a chord: a double stop, a
+// strum), each on its own string, at the least total cost. Notes that are not
+// on the board get none (ok false).
+fb_choose_step :: proc(midis: []int, prev: []Fb_Pos, mode: Track_Mode, out: []Fb_Pos) {
+	n := min(len(midis), 4, len(out))
+	for &o in out do o = {}
+	// Every way of putting the notes on different strings (at most 4^4).
+	best_cost := f32(1e30)
+	pick: [4]int
+	best_pick: [4]int
+	found := false
+	total := 1
+	for _ in 0 ..< n do total *= 5 // 4 strings, or "not on the board"
+	for combo in 0 ..< total {
+		c := combo
+		used: [4]bool
+		cost: f32
+		ok := true
+		for k in 0 ..< n {
+			s := c % 5 - 1
+			c /= 5
+			pick[k] = s
+			if s < 0 {
+				// Leaving a note off costs more than any place, so it only
+				// happens when there is no string for it.
+				cost += 1e9
+				continue
+			}
+			semis := midis[k] - FB_OPEN[s]
+			if semis < 0 || semis > FB_SEMIS || used[s] {ok = false; break}
+			used[s] = true
+			cost += place_cost({true, s, semis}, prev, mode)
+		}
+		if ok && cost < best_cost {
+			best_cost = cost
+			best_pick = pick
+			found = true
+		}
 	}
-	best_d := f32(1e9)
-	for s in 0 ..< 4 {
-		n := midi - FB_OPEN[s]
-		if n < 0 || n > FB_SEMIS do continue
-		p := Fb_Pos{true, s, n}
-		d := fb_dist(prev, p)
-		// A tie keeps the string.
-		if s == prev.string do d -= 0.01
-		if d < best_d {best = p; best_d = d}
+	if !found do return
+	for k in 0 ..< n {
+		if best_pick[k] >= 0 do out[k] = {true, best_pick[k], midis[k] - FB_OPEN[best_pick[k]]}
 	}
-	return best
+}
+
+// Kept for single notes (and the tests): where one note goes after `prev`.
+fb_choose :: proc(midi: int, prev: Fb_Pos, mode: Track_Mode) -> Fb_Pos {
+	out: [1]Fb_Pos
+	m := [1]int{midi}
+	if prev.ok {
+		pv := [1]Fb_Pos{prev}
+		fb_choose_step(m[:], pv[:], mode, out[:])
+	} else {
+		fb_choose_step(m[:], nil, mode, out[:])
+	}
+	return out[0]
 }
 
 Tracked :: struct {
 	pos:   Fb_Pos,
 	midi:  int,
-	index: int, // in the layer: picks the colour
+	index: int, // the note, in the layer
+	step:  int, // which step (note or chord) of the layer: picks the colour
 }
 
-// The last `n` notes of `t` up to (and including) the one starting at or
-// before `upto_tick` - or, with `upto_note` >= 0, up to that note. Places are
-// chosen from the start of the layer, so a note's place does not change as the
-// window moves on. Returns how many were filled in (oldest first).
-fb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, mode: Track_Mode, out: []Tracked) -> int {
-	if len(out) == 0 do return 0
-	ring: [TRACK_MAX]Tracked
+// Notes starting this close together, all while the first still sounds, are
+// one step: played together, on different strings (a double stop, a chord,
+// a strum - which in a song file is often a tick or two apart). 6 ticks is a
+// quarter of a beat.
+STRUM_TICKS :: 6
+
+// The last `steps` steps of `t` up to the one starting at or before
+// `upto_tick` - or, with `upto_note` >= 0, up to the step holding that note.
+// Places are chosen from the start of the layer, so a note's place does not
+// change as the window moves on. Fills `out` with their notes, oldest first;
+// returns how many.
+fb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, mode: Track_Mode, steps: int, out: []Tracked) -> int {
+	if steps <= 0 || len(out) == 0 do return 0
+	ring: [TRACK_MAX * 4]Tracked
 	count := 0
-	prev: Fb_Pos
-	for note, i in t.notes {
-		if upto_note >= 0 {
-			if i > upto_note do break
-		} else if note.tick > upto_tick {
-			break
+	step := 0
+	prev_buf: [4]Fb_Pos
+	prev := prev_buf[:0]
+	first_note_of_window := 0 // ring index where the kept steps begin
+	step_start: [TRACK_MAX + 1]int // ring positions of recent step starts
+	i := 0
+	for i < len(t.notes) {
+		// Gather the step.
+		first := t.notes[i]
+		if upto_note < 0 && first.tick > upto_tick do break
+		j := i + 1
+		for j < len(t.notes) && j - i < 4 {
+			nj := t.notes[j]
+			if nj.tick - first.tick > STRUM_TICKS || nj.tick >= first.tick + first.len do break
+			j += 1
 		}
-		m := music.pitch_midi(note.pitch)
-		p := fb_choose(m, prev, mode)
-		if !p.ok do continue // off the board: no place, no line through it
-		prev = p
-		ring[count % TRACK_MAX] = {p, m, i}
-		count += 1
+		if upto_note >= 0 && i > upto_note do break
+		midis: [4]int
+		for k in i ..< j do midis[k - i] = music.pitch_midi(t.notes[k].pitch)
+		places: [4]Fb_Pos
+		fb_choose_step(midis[:j - i], prev, mode, places[:])
+		n_placed := 0
+		for k in 0 ..< j - i {
+			if !places[k].ok do continue // not on the board: no place, no line
+			if n_placed == 0 {
+				step_start[step % (TRACK_MAX + 1)] = count
+			}
+			ring[count % len(ring)] = {places[k], midis[k], i + k, step}
+			count += 1
+			n_placed += 1
+		}
+		if n_placed > 0 {
+			prev = prev_buf[:0]
+			for k in 0 ..< j - i do if places[k].ok {prev_buf[len(prev)] = places[k]; prev = prev_buf[:len(prev) + 1]}
+			step += 1
+		}
+		i = j
 	}
-	n := min(count, len(out), TRACK_MAX)
-	for k in 0 ..< n do out[k] = ring[(count - n + k) % TRACK_MAX]
+	if step == 0 do return 0
+	keep := min(steps, step, TRACK_MAX)
+	first_note_of_window = step_start[(step - keep) % (TRACK_MAX + 1)]
+	n := min(count - first_note_of_window, len(out))
+	for k in 0 ..< n do out[k] = ring[(count - n + k) % len(ring)]
 	return n
 }
 
@@ -181,7 +281,8 @@ colour_mix :: proc(a, b: rl.Color, t: f32) -> rl.Color {
 
 @(private = "file")
 fb_point :: proc(p: Fb_Pos) -> rl.Vector2 {
-	y := fb_y(p.semis)
+	// Past the end of what the board shows: pinned to its end.
+	y := fb_in_view(p.semis) ? fb_y(p.semis) : FB_END_Y + 4
 	return {fb_x(p.string, y), y}
 }
 
@@ -209,37 +310,51 @@ arrow_head :: proc(from, to: rl.Vector2, back: f32, c: rl.Color) {
 	rl.DrawTriangle(tip, base + side * 4.5, base - side * 4.5, c)
 }
 
-// The trail as the fingerboard shows it now: the last N notes of the active
-// layer up to the playhead, or up to the selected note when stopped. Empty
-// when tracking is off. Oldest first.
-fb_current_trail :: proc(out: []Tracked) -> int {
-	t := active_track()
-	if t == nil || !g.fb_track do return 0
-	n := min(g.fb_track_n, len(out))
-	if g.player.playing do return fb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_mode, out[:n])
-	if g.selected >= 0 && g.selected < len(t.notes) do return fb_track(t, 0, g.selected, g.fb_track_mode, out[:n])
-	return 0
-}
-
-// How strongly the k-th of n trail notes (oldest first) shows its tracking
-// colour: the newest fully, each older one a step less, as on the board.
-trail_weight :: proc(k, n: int) -> f32 {
-	return f32(k + 1) / f32(max(n, 1))
-}
-
-// Draw the trail: lines first, then the notes on top. Older notes fainter.
+// Draw the trail: lines first, then the notes on top. Older steps fainter.
+// Each note of a step gets one line in: from the note before; between chords
+// of the same size, voice by voice; otherwise from the nearest note of the
+// step before (a fan of lines into a chord, one line out of it).
 fb_track_draw :: proc(list: []Tracked) {
 	n := len(list)
 	if n == 0 do return
-	fade :: proc(c: rl.Color, k, n: int) -> rl.Color {
-		a := 0.35 + 0.65 * f32(k + 1) / f32(n)
+	first, last := list[0].step, list[n - 1].step
+	steps := last - first + 1
+	fade :: proc(c: rl.Color, rank, steps: int) -> rl.Color {
+		a := 0.35 + 0.65 * f32(rank + 1) / f32(steps)
 		return {c.r, c.g, c.b, u8(f32(c.a) * a)}
 	}
-	for k in 1 ..< n {
-		a, b := list[k - 1], list[k]
+	for b in list {
+		if b.step == first do continue
+		// Where it came from. Between two chords of the same size, voice by
+		// voice (lowest to lowest, and so on up); otherwise the nearest note
+		// of the step before.
+		size :: proc(list: []Tracked, step: int) -> int {
+			c := 0
+			for x in list do if x.step == step do c += 1
+			return c
+		}
+		rank :: proc(list: []Tracked, it: Tracked) -> int {
+			r := 0
+			for x in list do if x.step == it.step && x.midi < it.midi do r += 1
+			return r
+		}
+		from := -1
+		if nb := size(list, b.step); nb > 1 && nb == size(list, b.step - 1) {
+			rb := rank(list, b)
+			for a, k in list do if a.step == b.step - 1 && rank(list, a) == rb do from = k
+		} else {
+			best := f32(1e9)
+			for a, k in list {
+				if a.step != b.step - 1 do continue
+				d := fb_dist(a.pos, b.pos)
+				if d < best {best = d; from = k}
+			}
+		}
+		if from < 0 do continue
+		a := list[from]
 		if a.pos == b.pos do continue
-		ca := fade(track_colour(a.index), k - 1, n)
-		cb := fade(track_colour(b.index), k, n)
+		ca := fade(track_colour(a.step), a.step - first, steps)
+		cb := fade(track_colour(b.step), b.step - first, steps)
 		pa, pb := fb_point(a.pos), fb_point(b.pos)
 		if a.pos.string == b.pos.string {
 			// Along the string: the string itself, and every circle on the
@@ -255,6 +370,7 @@ fb_track_draw :: proc(list: []Tracked) {
 				rl.DrawLineEx({fb_x(s, y0), y0}, {fb_x(s, y1), y1}, 3, colour_mix(ca, cb, (t0 + t1) / 2))
 			}
 			for semis in lo + 1 ..< hi {
+				if !fb_in_view(semis) do continue
 				t := f32(semis - a.pos.semis) / f32(b.pos.semis - a.pos.semis)
 				p := fb_point({true, s, semis})
 				rl.DrawCircleLines(i32(p.x), i32(p.y), 4.5, colour_mix(ca, cb, t))
@@ -267,11 +383,32 @@ fb_track_draw :: proc(list: []Tracked) {
 			arrow_head(pa, pb, 7, cb)
 		}
 	}
-	for k in 0 ..< n {
-		it := list[k]
+	for it in list {
 		p := fb_point(it.pos)
-		c := fade(track_colour(it.index), k, n)
+		c := fade(track_colour(it.step), it.step - first, steps)
 		rl.DrawCircleV(p, 6.5, c)
-		if k == n - 1 do rl.DrawCircleLines(i32(p.x), i32(p.y), 8.5, rl.WHITE)
+		if it.step == last do rl.DrawCircleLines(i32(p.x), i32(p.y), 8.5, rl.WHITE)
+		if !fb_in_view(it.pos.semis) {
+			// Further down than the board shows: pinned to its end, named.
+			text(fmt.tprintf("%s v", fb_name(it.midi)), p.x + 9, p.y - 5, COL_TEXT)
+		}
 	}
+}
+
+// The trail as the fingerboard shows it now: the last N steps of the active
+// layer up to the playhead, or up to the selected note when stopped. Empty
+// when tracking is off. Oldest first.
+fb_current_trail :: proc(out: []Tracked) -> int {
+	t := active_track()
+	if t == nil || !g.fb_track do return 0
+	if g.player.playing do return fb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_mode, g.fb_track_n, out)
+	if g.selected >= 0 && g.selected < len(t.notes) do return fb_track(t, 0, g.selected, g.fb_track_mode, g.fb_track_n, out)
+	return 0
+}
+
+// How strongly a trail note shows its tracking colour (its step's rank among
+// the trail's, oldest 0): the newest fully, each older step a step less, as
+// on the board.
+trail_weight :: proc(rank, steps: int) -> f32 {
+	return f32(rank + 1) / f32(max(steps, 1))
 }

@@ -43,9 +43,17 @@ draw a line across the board for each finger, labelled f1–f4 at the right edge
 default; Shift/Ctrl for 10/100 on the -/+) up to the playhead - or up to the selected note
 when stopped - each filled in its own colour, with the way between them drawn: along the
 string, colouring the string and the circles on the way and blending from one note's
-colour to the next, or as an arrow straight across the board to another string. Two
+colour to the next, or as an arrow straight across the board to another string. Three
 modes: **Same string** stays on the string while it can play the note; **Nearest** goes to
-whichever place is physically closest on a real cello. On the sheet, the same notes take
+whichever place is physically closest on a real cello; **Best** always takes the place
+nearest the nut (the open string when there is one). Notes played together - double stops,
+chords, strums (starting within 6 ticks, while the first still sounds) - go on different
+strings and each gets its own line: voice by voice from a chord of the same size, otherwise
+from the nearest note before.
+
+The board shows only as much as the hand position needs - from the nut to a little past
+the last finger - so 1st position fills the panel with big notes; changing position glides
+to the new length. It never goes past the thumb position. On the sheet, the same notes take
 the same colours - the newest fully - and fade back to the layer's colour a step per note,
 at the rate they fade on the board.
 
