@@ -6,8 +6,10 @@ package app
     The Mixer renders blocks; music_rl.Output feeds them to a raylib
     AudioStream from the main loop. No audio callback: a callback runs on the
     audio thread, and a hot reload that unloads the code it points at crashes
-    the app. Polling from the frame is safe, and at 120 fps with 2048-frame
-    blocks (46 ms) the stream never runs dry unless the window is being dragged.
+    the app. Polling from the frame is safe: music_rl mixes a little every
+    frame, a block (1024 frames, 23 ms) ahead of the stream, which holds two
+    more - about 70 ms in all, so it only runs dry if a frame stalls longer
+    than that (a window being dragged). F3 shows how it is keeping up.
 
     The stream runs all the time (silence when nothing plays), so Play starts a
     song in the mixer, and a note preview is a one-note sound effect mixed over
@@ -23,7 +25,7 @@ import "music"
 import music_rl "music_rl"
 import rl "vendor:raylib"
 
-BLOCK :: 2048
+BLOCK :: 1024
 LATENCY :: f64(BLOCK) / music.SAMPLE_RATE
 
 Player :: struct {
@@ -31,7 +33,7 @@ Player :: struct {
 	playing:    bool,
 	from_tick:  i32,
 	start_time: f64,
-	base_sent:  int, // the stream's frame count when Play was pressed
+	base_sent:  int, // the mixer's frame count when Play was pressed
 	end_sent:   int, // ...when the song ended in the mixer; 0 while it plays
 	preview:    music.Sfx_Handle,
 }
@@ -53,7 +55,9 @@ player_play :: proc(p: ^Player, song: ^music.Song, from_tick: i32) {
 	g.audio.mode = g.mode
 	p.song = music.mixer_play_song(&g.audio, song, loop = false, from_tick = from_tick)
 	p.from_tick = from_tick
-	p.base_sent = g.out.sent
+	// Where in the stream the song begins: after everything mixed so far,
+	// including what is mixed ahead and not yet handed over.
+	p.base_sent = g.audio.frame
 	p.end_sent = 0
 	p.playing = true
 	// Hand the first block over now, so the song is not a frame late.
@@ -76,8 +80,8 @@ player_update :: proc(p: ^Player, song: ^music.Song) {
 	music_rl.output_update(&g.out, &g.audio)
 	if !p.playing do return
 
-	sent := g.out.sent - p.base_sent
-	if p.end_sent == 0 && !music.mixer_song_playing(&g.audio, p.song) do p.end_sent = max(sent, 1)
+	sent := g.out.sent - p.base_sent // negative until the mixed-ahead part is handed over
+	if p.end_sent == 0 && !music.mixer_song_playing(&g.audio, p.song) do p.end_sent = max(g.audio.frame - p.base_sent, 1)
 
 	// Re-anchor the clock if it has wandered from the audio (a stalled frame,
 	// a dragged window).

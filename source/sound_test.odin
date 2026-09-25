@@ -73,25 +73,17 @@ sound_test_draw :: proc() {
 	st.count = clamp(st.count, 1, most)
 
 	x := r.x + 12
-	shift := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
 	label("shots", x, y + 5)
 	x += 40
-	step := shift ? 10 : 1
-	if button(rect(x, y, 18, 20), "-") do st.count = max(st.count - step, 1)
-	text_centered(fmt.tprintf("%d", st.count), rect(x + 18, y, 40, 20))
-	if button(rect(x + 58, y, 18, 20), "+") do st.count = min(st.count + step, most)
-	x += 90
+	st.count = int(stepper(rect(x, y, 80, 20), f32(st.count), 1, f32(most), 1, 100, fmt.tprintf("%d", st.count)))
+	x += 94
 	label("over", x, y + 5)
 	x += 32
-	if button(rect(x, y, 18, 20), "-") do st.seconds = max(st.seconds - 0.25, 0.25)
-	text_centered(fmt.tprintf("%.2f s", st.seconds), rect(x + 18, y, 54, 20))
-	if button(rect(x + 72, y, 18, 20), "+") do st.seconds = min(st.seconds + 0.25, 10)
+	st.seconds = stepper(rect(x, y, 90, 20), st.seconds, 0.1, 30, 0.1, 2, fmt.tprintf("%.1f s", st.seconds))
 	x += 104
 	label("volume", x, y + 5)
 	x += 44
-	if button(rect(x, y, 18, 20), "-") do st.volume = max(st.volume - 0.1, 0.1)
-	text_centered(fmt.tprintf("%d%%", int(st.volume * 100 + 0.5)), rect(x + 18, y, 44, 20))
-	if button(rect(x + 62, y, 18, 20), "+") do st.volume = min(st.volume + 0.1, 3)
+	st.volume = stepper(rect(x, y, 80, 20), st.volume, 0.01, 3, 0.01, 1, fmt.tprintf("%d%%", int(st.volume * 100 + 0.5)))
 	x += 94
 	if button(rect(x, y, 96, 20), st.spread ? "spread L-R" : "all centre", st.spread) do st.spread = !st.spread
 	x += 110
@@ -106,7 +98,7 @@ sound_test_draw :: proc() {
 	x += 118
 	if button(rect(x, y, 56, 20), "Stop") do music.mixer_stop_all_sfx(&g.audio, 0.05)
 	y += 26
-	text(fmt.tprintf("Shift+click -/+ for 10 at a time. At most %d shots of this one (%d voices each; the mixer holds %d).", most, len(fx.voices), music.MAX_SFX_VOICES), r.x + 12, y, COL_FAINT)
+	text(fmt.tprintf("-/+: click 1, Shift+click 10, Ctrl+click 100 (seconds in tenths, volume in %%); wheel too, right-click resets. At most %d shots of this one (%d voices each).", most, len(fx.voices)), r.x + 12, y, COL_FAINT)
 	y += 22
 
 	// When each shot of the last burst fell.

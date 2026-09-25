@@ -50,7 +50,7 @@ layer becomes a cello, and Save puts the result in `cello_songs\`, never over th
 | **Sharps / flats** | the key signature decides; hold `Shift` for ♯, `Ctrl` for ♭, or use the accidental buttons |
 | **Edit** | drag to move, right-click to delete, mouse wheel on a note = up/down a semitone |
 | **Key lines** | the **lines** button next to the key: rows the key signature sharpens or flattens are tinted and named (F#, Bb) in the note column, and the rows of the key's home chord are marked - tonic brightest, 3rd and 5th fainter. Each row also shows its frequency ratio to a reference note (the tonic at or below the layer's first note): with C5 as 1:1, C6 is 2:1, G5 3:2, E5 5:4, C4 1:2. Right-click a row's name to make it the reference; right-click it again for automatic. On by default |
-| **Sound effects** | the **SFX** button (top right): every sound effect in `sounds/`, click to hear; "many at once" fires N of one over a few seconds, bunched on a bell curve (e.g. 100 muskets in 2 s), with a chart of when each fell |
+| **Sound effects** | the **SFX** button (top right): every sound effect in `sounds/`, click to hear; "many at once" fires N of one over a few seconds (the -/+ take Shift for 10 and Ctrl for 100 at a time, the wheel works too, right-click resets), bunched on a bell curve (e.g. 100 muskets in 2 s), with a chart of when each fell |
 | **Octave copy** | `Ctrl`+click a note: a copy of it an octave lower, same place and length; `Shift`+click: an octave higher |
 | **Selected note** | `↑`/`↓` a staff step, `Shift+↑/↓` a semitone, `←`/`→` a slot, `Del` removes it |
 | **Fine grid** | hold `Alt` to snap to 32nds |
@@ -62,6 +62,7 @@ layer becomes a cello, and Save puts the result in `cello_songs\`, never over th
 | **Import** | put `.mid` files in `imports\` and Open them, or drag a `.mid` / `.song` onto the window |
 | **Export** | WAV built in; MP3 / OGG / FLAC light up when `ffmpeg` is on PATH |
 | **Sound mode** | the 8-bit button: click cycles **4-bit** (NES 16-step volume, grittiest), **8-bit** (default), **16-bit** (a player's touch: tuning, vibrato and bow scratch vary note to note), **32-bit** (modelled bowed strings and wooden bodies); right-click goes back. Export uses it too |
+| `F3` | performance monitor: where each frame's time goes (logic, audio mixing, drawing, present), the mixing load, voices, underruns, and a graph of the last 240 frames. The FPS is always shown top right (click it too) |
 | `F7` | reload the instrument and sound effect files |
 | `F11` | fullscreen |
 

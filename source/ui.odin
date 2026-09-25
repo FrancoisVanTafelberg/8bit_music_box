@@ -148,3 +148,26 @@ lighten :: proc(c: rl.Color, t: f32) -> rl.Color {
 inst_color :: proc(c: [4]u8) -> rl.Color {
 	return {c[0], c[1], c[2], c[3]}
 }
+
+// A number with - and + either side. A click moves it by `unit`; with Shift
+// held, 10 units; with Ctrl, 100 (as Animal Kingdoms' count boxes do). The
+// mouse wheel over it does the same, and a right-click puts it back to
+// `reset`. `shown` formats the value for the middle.
+stepper :: proc(r: rl.Rectangle, value, lo, hi, unit, reset: f32, shown: string) -> f32 {
+	v := value
+	step := unit
+	if rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT) do step = unit * 10
+	if rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) do step = unit * 100
+	bw := f32(18)
+	if button(rect(r.x, r.y, bw, r.height), "-") do v -= step
+	mid := rect(r.x + bw, r.y, r.width - 2 * bw, r.height)
+	fill(mid, hovered(mid) ? COL_BUTTON : COL_SHEET)
+	text_centered(shown, mid)
+	if button(rect(r.x + r.width - bw, r.y, bw, r.height), "+") do v += step
+	whole := r
+	if w := ui_take_wheel(whole); w != 0 do v += w > 0 ? step : -step
+	if ui_take_right(mid) do v = reset
+	// Keep whole units whole (0.1 + 0.2 is not quite 0.3).
+	v = f32(int(v / unit + (v >= 0 ? 0.5 : -0.5))) * unit
+	return clamp(v, lo, hi)
+}

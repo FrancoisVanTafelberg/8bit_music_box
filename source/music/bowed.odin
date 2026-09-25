@@ -107,7 +107,7 @@ bowed_tune :: proc(b: ^Bowed, freq: f32) {
 
 // One sample. `bow` 0..1 is how hard the bow is being drawn (the envelope);
 // `grit` a little noise on its speed: rosin.
-bowed_tick :: #force_inline proc(b: ^Bowed, bow, grit: f32) -> f32 {
+bowed_tick :: #force_inline proc(b: ^Bowed, bow, grit: f32) -> f32 #no_bounds_check {
 	read :: #force_inline proc(line: ^[BOW_LINE]f32, w: int, d: f32) -> f32 {
 		pos := f32(w) - d
 		for pos < 0 do pos += BOW_LINE

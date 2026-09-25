@@ -44,6 +44,7 @@ App :: struct {
 	ratio_ref:  i16,
 	// The sound effect tester (sound_test.odin).
 	sfx_test:   Sound_Test,
+	perf:       Perf, // perf.odin: the FPS counter and F3 monitor
 	// All the sound: the instruments (from instruments/), the playing song,
 	// the note previews. The same Mixer a game would use; see music/mixer.odin.
 	audio:      music.Mixer,
@@ -130,6 +131,7 @@ game_init :: proc() {
 @(export)
 game_update :: proc() -> bool {
 	g.frames += 1
+	perf_begin()
 	rlu.update(&g.v)
 
 	if rlu.too_small(&g.v) {
@@ -147,7 +149,9 @@ game_update :: proc() -> bool {
 	ui_begin()
 	files_poll_dropped()
 	g.audio.mode = g.mode
+	perf_mark(.Logic)
 	player_update(&g.player, &g.song)
+	perf_mark(.Audio)
 	if g.player.playing && g.follow {
 		per_page := music.bar_ticks(&g.song) * BARS_PER_PAGE
 		g.page = clamp(player_tick(&g.player, &g.song) / per_page, 0, page_count() - 1)
@@ -156,6 +160,7 @@ game_update :: proc() -> bool {
 	// Input, top-most first: an overlay swallows the mouse before the panels
 	// see it, the panels before the sheet.
 	keys_update()
+	perf_mark(.Logic)
 	{
 		rlu.begin(&g.v)
 		rl.ClearBackground(COL_BG)
@@ -177,11 +182,15 @@ game_update :: proc() -> bool {
 		statusbar_draw()
 		if was_open do g.ui = held
 		overlay_draw()
+		perf_draw()
 		// The sheet reads the mouse last, after everything drawn over it
 		// has had its chance to claim the click.
 		sheet_input()
 	}
+	perf_mark(.Draw)
 	rlu.present(&g.v)
+	perf_mark(.Present)
+	perf_end()
 
 	free_all(context.temp_allocator)
 	return !rl.WindowShouldClose() && !g.quit

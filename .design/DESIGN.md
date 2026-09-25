@@ -379,6 +379,29 @@ Its own hot-reload library (`build/hot_reload/cello.dll`, the host built with
 `-define:GAME_NAME=cello`) and its own `last_cello_song.txt`, so it can run beside the
 music box.
 
+### 4.4 Performance
+
+**F3** opens a monitor (`source/perf.odin`); the FPS is always shown top right. Each
+frame is timed in four parts - logic, audio mixing, drawing, present (which includes the
+wait for the display, so it is idle time) - averaged and worst-cased over two seconds and
+graphed over the last 240 frames, with the mixing load (% of real time), voice counts and
+stream underruns.
+
+What it found first (80 muskets over 3 s): the mixing, and within it two things.
+`math.floor` - used to wrap oscillator phases - is a software routine in Odin, and was
+half the synth's time in a debug build; a truncating conversion does the same for the
+non-negative phases, bit for bit. Struck notes (drums, gunfire) computed `exp()` every
+sample for their decay; it is now one multiply a sample. Bounds checks are off in the
+voice loop. Together about 3x less work (a debug-build block at the peak of the burst:
+63 ms → 19 ms; release: 11 ms → 4 ms). And the mixing is now spread over the frames
+(`music_rl.output_update`: 128-frame pieces, a little more than a frame's worth each,
+kept a block ahead) instead of a whole block at once every few frames, and the editor's
+block is 1024 frames (23 ms) - about 70 ms of sound buffered in all.
+
+The hot-reload build is a debug build (`-debug`, no optimisation) and mixes several times
+slower than a release build; adding `-o:speed` to `build_hot_reload` trades stepping in a
+debugger for speed.
+
 ## 5. The `.song` format
 
 Plain text, one statement per line, `#` comments. Readable, diffable, hand-editable —

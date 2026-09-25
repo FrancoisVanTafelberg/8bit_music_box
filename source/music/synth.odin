@@ -120,6 +120,10 @@ Voice :: struct {
 	gl, gr:    f32,
 	release_from: f32,
 	mode:      Sound_Mode,
+	// A struck note's exponential decay, stepped instead of recomputed.
+	decay_env: f32,
+	decay_k:   f32,
+	decay_at:  u8, // 0 until the decay has begun
 	// 16-bit and up: this note's own small imperfections.
 	vib_k:     [2]f32, // rate and depth, scaled
 	wander:    [2]f32, // phases of a slow, irregular pitch drift
@@ -416,7 +420,10 @@ blep :: #force_inline proc(t, dt: f32) -> f32 {
 
 @(private)
 fract :: #force_inline proc(x: f32) -> f32 {
-	return x - math.floor(x)
+	// Only ever called with x >= 0 (phases), where truncating is flooring -
+	// and a conversion is one instruction, where math.floor is a software
+	// routine that was half the synth's time in a debug build.
+	return x - f32(i32(x))
 }
 
 @(private)
@@ -432,7 +439,7 @@ osc :: #force_inline proc(w: Wave, ph, dt, duty: f32, noise_out: f32, smooth := 
 	case .Triangle:
 		tri := 4 * abs(ph - 0.5) - 1 // -1..1
 		if smooth do return tri
-		return math.floor((tri + 1) * 7.5 + 0.5) / 7.5 - 1 // 16 steps
+		return f32(i32((tri + 1) * 7.5 + 0.5)) / 7.5 - 1 // 16 steps (>= 0: truncating = floor)
 	case .Saw:
 		return 2 * ph - 1 - blep(ph, dt)
 	case .Sine:
@@ -459,7 +466,9 @@ lfsr_step :: #force_inline proc(r: ^u32, metallic: bool) -> f32 {
 @(private)
 // `g0`..`g1` is the track's gain ramp across the block; this voice starts
 // `ramp_at` frames into a block of `ramp_len`.
-voice_render :: proc(v: ^Voice, out: []f32, g0, g1: f32, ramp_len, ramp_at: int) -> bool {
+// Hot: runs once per sample per sounding voice. No bounds checks (the loops
+// stay inside `out`), which in a debug build is a tenth of its time.
+voice_render :: proc(v: ^Voice, out: []f32, g0, g1: f32, ramp_len, ramp_at: int) -> bool #no_bounds_check {
 	ins := &v.ins
 	frames := len(out) / 2
 	gate := f32(v.ev.gate) / RATE
@@ -500,8 +509,22 @@ voice_render :: proc(v: ^Voice, out: []f32, g0, g1: f32, ramp_len, ramp_at: int)
 			v.white ~= v.white << 5
 			noise = f32(v.white) / f32(max(u32)) * 2 - 1
 		}
-		env := envelope(ins, t, gate)
-		if v.mode == .Bit4 do env = math.round(env * 15) / 15
+		env: f32
+		if ins.sustain <= 0 && t >= ins.attack {
+			// Struck or plucked, past the attack: the exponential fall,
+			// one multiply a sample instead of an exp() (a quarter of the
+			// synth's time with a battle's worth of drums and gunfire).
+			if v.decay_at == 0 {
+				v.decay_env = math.exp(-(t - ins.attack) * 4.6 / max(ins.decay, 1e-3))
+				v.decay_k = math.exp(-4.6 / (max(ins.decay, 1e-3) * RATE))
+				v.decay_at = 1
+			}
+			env = t > gate + ins.decay ? 0 : v.decay_env
+			v.decay_env *= v.decay_k
+		} else {
+			env = envelope(ins, t, gate)
+		}
+		if v.mode == .Bit4 do env = f32(i32(env * 15 + 0.5)) / 15 // env >= 0: round
 
 		x: f32
 		if bowed {
