@@ -380,6 +380,20 @@ files, the Mixer — and `when CELLO` switches the differences:
   1-2-3 on 14-16-17 (B C♯ D). 6th and 7th are left out until checked against a method
   book: sources disagree on where they sit.
 
+**Tracking** (`source/fingering.odin`). Every note of the active layer is given a place on
+the board (a string and a semitone), in order from the start of the layer, each from the
+last: *Same string* keeps the string while it can play the note and otherwise takes the
+nearest place; *Nearest* always takes the physically nearest; the first note goes lowest
+on the neck. Physical distance uses a full-size cello: strings 695 mm nut to bridge, 23 mm
+outer to outer at the nut and 47 mm at the bridge (Hans Johannsson's cello measurements),
+semitone *n* at 695·(1 − 2^(−n/12)) mm from the nut; the distances between all 120 places
+are worked out once into a table. The last N notes up to the playhead (or the selected
+note) are drawn: each note filled in a colour cycled note by note (eight colours; older
+notes fainter, the newest ringed), and between them either the string and its circles
+coloured in, blending from one colour to the next, or a blended arrow straight across.
+With tracking on, the notes playing light only at the place chosen for them; the layer's
+own colour is no longer used on the board.
+
 Its own hot-reload library (`build/hot_reload/cello.dll`, the host built with
 `-define:GAME_NAME=cello`) and its own `last_cello_song.txt`, so it can run beside the
 music box.

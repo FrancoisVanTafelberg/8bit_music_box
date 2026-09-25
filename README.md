@@ -39,6 +39,14 @@ of that key (**All** shows every position, **Song** picks the song's key). The p
 buttons (or the mouse wheel over the board) choose a hand position, 1st by default, and
 draw a line across the board for each finger, labelled f1–f4 at the right edge.
 
+**Tracking** (on by default) follows the layer note by note: the last N notes (8 by
+default; Shift/Ctrl for 10/100 on the -/+) up to the playhead - or up to the selected note
+when stopped - each filled in its own colour, with the way between them drawn: along the
+string, colouring the string and the circles on the way and blending from one note's
+colour to the next, or as an arrow straight across the board to another string. Two
+modes: **Same string** stays on the string while it can play the note; **Nearest** goes to
+whichever place is physically closest on a real cello.
+
 It saves to `cello_songs\`. It can open anything in `songs\` or `imports\` too: every
 layer becomes a cello, and Save puts the result in `cello_songs\`, never over the original.
 

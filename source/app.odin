@@ -36,6 +36,10 @@ App :: struct {
 	fb_filter:  bool,
 	fb_key:     i8,
 	fb_hand:    i8, // index into HAND_POSITIONS
+	// Tracking on the fingerboard (fingering.odin).
+	fb_track:      bool,
+	fb_track_n:    int,
+	fb_track_mode: Track_Mode,
 	// The "lines" button: tint the key signature's rows and mark the rows
 	// of the key's home chord (sheet.odin, key_lines_draw).
 	key_lines:  bool,
@@ -115,6 +119,8 @@ game_init :: proc() {
 	g.length = .Quarter
 	g.selected = -1
 	g.fb_hand = HAND_DEFAULT
+	g.fb_track = true
+	g.fb_track_n = TRACK_DEFAULT_N
 	g.key_lines = true
 	g.ratio_ref = -1
 	g.sfx_test = {count = 100, seconds = 2, volume = 1, spread = true}

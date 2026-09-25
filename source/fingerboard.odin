@@ -38,8 +38,8 @@ FB_X :: FB_X_CELLO
 FB_W :: 1280 - FB_X
 FB_CX :: FB_X + 166 // the middle of the board
 
-FB_OPEN_Y :: TOP_H + 184 // the open-string circles, above the nut
-FB_NUT_Y :: TOP_H + 200
+FB_OPEN_Y :: TOP_H + 208 // the open-string circles, above the nut
+FB_NUT_Y :: TOP_H + 224
 FB_END_Y :: 720 - STATUS_H - 12
 
 FB_HALF_NUT :: 69 // half the board's width at the nut...
@@ -266,18 +266,27 @@ fingerboard_draw :: proc() {
 	text(hand.name, x0, y, COL_ACCENT)
 	// The legend, on the same line.
 	{
-		lcol := COL_ACCENT
-		if t := active_track(); t != nil do lcol = lighten(track_color(t), 0.3)
 		lx := x0 + 150
 		rl.DrawCircleV({lx + 4, y + 5}, 4, COL_ACCENT)
 		text("pointed", lx + 11, y, COL_DIM)
 		lx += 58
-		rl.DrawCircleV({lx + 4, y + 5}, 4, lcol)
+		rl.DrawCircleV({lx + 4, y + 5}, 3, TRACK_COLOURS[0])
+		rl.DrawCircleLines(i32(lx + 4), i32(y + 5), 5, rl.WHITE)
 		text("playing", lx + 11, y, COL_DIM)
 		lx += 58
 		rl.DrawCircleLines(i32(lx + 4), i32(y + 5), 4, {90, 80, 76, 255})
 		text("too high", lx + 11, y, COL_DIM)
 	}
+	y += 16
+
+	// Tracking: the path from note to note (fingering.odin).
+	if button(rect(x0, y, 64, 18), "Tracking", g.fb_track) do g.fb_track = !g.fb_track
+	g.fb_track_n = int(stepper(rect(x0 + 70, y, 84, 18), f32(g.fb_track_n), 1, TRACK_MAX, 1, TRACK_DEFAULT_N, fmt.tprintf("%d notes", g.fb_track_n)))
+	if button(rect(x0 + 160, y, 90, 18), TRACK_MODE_NAME[g.fb_track_mode], g.fb_track) {
+		g.fb_track_mode = Track_Mode((int(g.fb_track_mode) + 1) % len(Track_Mode))
+		set_status("tracking: %s", g.fb_track_mode == .Same_String ? "stay on the string while it can play the note" : "go to the physically nearest place for each note")
+	}
+
 	// The wheel over the board steps through them.
 	if w := ui_take_wheel(rect(FB_X, FB_OPEN_Y - 12, FB_W, FB_END_Y - FB_OPEN_Y + 24)); w != 0 {
 		g.fb_hand = i8(clamp(int(g.fb_hand) + (w < 0 ? 1 : -1), 0, len(HAND_POSITIONS) - 1))
@@ -288,15 +297,17 @@ fingerboard_draw :: proc() {
 	here := fb_hover()
 	here_midi := here.ok ? fb_midi(here) : -1
 	sounding: [16]int
+	sounding_idx: [16]int // their index in the layer: their colour
 	n_sounding := 0
 	selected := -1
 	if t := active_track(); t != nil {
 		if g.player.playing {
 			tick := player_tick(&g.player, &g.song)
-			for note in t.notes {
+			for note, i in t.notes {
 				if note.tick > tick do break
 				if tick < note.tick + note.len && n_sounding < len(sounding) {
 					sounding[n_sounding] = music.pitch_midi(note.pitch)
+					sounding_idx[n_sounding] = i
 					n_sounding += 1
 				}
 			}
@@ -368,10 +379,19 @@ fingerboard_draw :: proc() {
 		text_centered(FB_STRING_NAME[s], rect(top.x - 20, FB_OPEN_Y - 22, 40, 12), COL_DIM)
 	}
 
+	// The trail (tracking on): the last notes up to the playhead, or up to
+	// the selected note when stopped.
+	trail: [TRACK_MAX]Tracked
+	n_trail := 0
+	if t := active_track(); t != nil && g.fb_track {
+		if g.player.playing {
+			n_trail = fb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_mode, trail[:g.fb_track_n])
+		} else if g.selected >= 0 && g.selected < len(t.notes) {
+			n_trail = fb_track(t, 0, g.selected, g.fb_track_mode, trail[:g.fb_track_n])
+		}
+	}
+
 	// The positions.
-	// The layer's colour, for its notes sounding.
-	col := COL_ACCENT
-	if t := active_track(); t != nil do col = track_color(t)
 	for s in 0 ..< 4 {
 		for n in 0 ..= FB_SEMIS {
 			m := FB_OPEN[s] + n
@@ -380,7 +400,9 @@ fingerboard_draw :: proc() {
 			r := fb_radius(n)
 			lit_target := m == target
 			lit_here := m == here_midi
-			lit_play := is_sounding(sounding[:n_sounding], m)
+			// With tracking on, the trail shows what is playing, at the one
+			// place it is played; without, every place for it lights up.
+			lit_play := !g.fb_track && is_sounding(sounding[:n_sounding], m)
 			lit_sel := m == selected
 			lit := lit_target || lit_here || lit_play || lit_sel
 			if !lit && !fb_visible(m) do continue
@@ -395,7 +417,9 @@ fingerboard_draw :: proc() {
 				rl.DrawCircleLines(i32(x), i32(py), r, {150, 132, 112, 255})
 			}
 			if lit_play {
-				rl.DrawCircleV({x, py}, r + 2, lighten(col, 0.3))
+				col := COL_ACCENT
+				for sm, k in sounding[:n_sounding] do if sm == m do col = track_colour(sounding_idx[k])
+				rl.DrawCircleV({x, py}, r + 2, col)
 				rl.DrawCircleLines(i32(x), i32(py), r + 3, rl.WHITE)
 			}
 			if lit_target || lit_here {
@@ -411,6 +435,8 @@ fingerboard_draw :: proc() {
 			}
 		}
 	}
+
+	fb_track_draw(trail[:n_trail])
 
 	// Click a circle: hear it.
 	if here.ok && ui_take_click(rect(FB_X, FB_OPEN_Y - 12, FB_W, FB_END_Y - FB_OPEN_Y + 24)) {
