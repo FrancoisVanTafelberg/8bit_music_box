@@ -45,7 +45,9 @@ when stopped - each filled in its own colour, with the way between them drawn: a
 string, colouring the string and the circles on the way and blending from one note's
 colour to the next, or as an arrow straight across the board to another string. Two
 modes: **Same string** stays on the string while it can play the note; **Nearest** goes to
-whichever place is physically closest on a real cello.
+whichever place is physically closest on a real cello. On the sheet, the same notes take
+the same colours - the newest fully - and fade back to the layer's colour a step per note,
+at the rate they fade on the board.
 
 It saves to `cello_songs\`. It can open anything in `songs\` or `imports\` too: every
 layer becomes a cello, and Save puts the result in `cello_songs\`, never over the original.

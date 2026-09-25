@@ -234,8 +234,13 @@ sheet_draw :: proc() {
 
 	// Notes: the other layers first and dim, the active one last and bright.
 	playing_tick := g.player.playing ? player_tick(&g.player, &g.song) : -1
+	// Cello Helper, tracking on: the active layer's notes in the trail take
+	// the fingerboard's colours, fading back to the layer's as it moves on.
+	trail: [TRACK_MAX]Tracked
+	n_trail := 0
+	when CELLO do n_trail = fb_current_trail(trail[:])
 	for &tr, i in g.song.tracks do if i != g.active do notes_draw(&tr, false, playing_tick)
-	if t != nil do notes_draw(t, true, playing_tick)
+	if t != nil do notes_draw(t, true, playing_tick, trail[:n_trail])
 
 	// The ghost of the note a click would place.
 	if hov.ok && t != nil && !g.drag.active && overlay_none() {
@@ -261,7 +266,7 @@ sheet_draw :: proc() {
 }
 
 @(private = "file")
-notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32) {
+notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tracked = nil) {
 	base := track_color(t)
 	ps := page_start()
 	pe := ps + page_ticks()
@@ -281,7 +286,14 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32) {
 		col := base
 		if !active do col = with_alpha(base, muted ? 40 : 95)
 		if active && muted do col = with_alpha(base, 150)
-		if sounding do col = lighten(base, 0.55)
+		in_trail := false
+		for tr, k in trail {
+			if tr.index != i do continue
+			col = colour_mix(base, track_colour(i), trail_weight(k, len(trail)))
+			in_trail = true
+			break
+		}
+		if sounding && !in_trail do col = lighten(base, 0.55)
 
 		// The body: how long it lasts. The head: where it starts, a square
 		// pixel block, because this is an 8-bit music box.

@@ -382,14 +382,7 @@ fingerboard_draw :: proc() {
 	// The trail (tracking on): the last notes up to the playhead, or up to
 	// the selected note when stopped.
 	trail: [TRACK_MAX]Tracked
-	n_trail := 0
-	if t := active_track(); t != nil && g.fb_track {
-		if g.player.playing {
-			n_trail = fb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_mode, trail[:g.fb_track_n])
-		} else if g.selected >= 0 && g.selected < len(t.notes) {
-			n_trail = fb_track(t, 0, g.selected, g.fb_track_mode, trail[:g.fb_track_n])
-		}
-	}
+	n_trail := fb_current_trail(trail[:])
 
 	// The positions.
 	for s in 0 ..< 4 {

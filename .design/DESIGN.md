@@ -392,7 +392,10 @@ note) are drawn: each note filled in a colour cycled note by note (eight colours
 notes fainter, the newest ringed), and between them either the string and its circles
 coloured in, blending from one colour to the next, or a blended arrow straight across.
 With tracking on, the notes playing light only at the place chosen for them; the layer's
-own colour is no longer used on the board.
+own colour is no longer used on the board. On the sheet, the active layer's notes in the
+trail are drawn in their tracking colour blended with the layer's: the k-th of n (oldest
+first) at weight (k+1)/n, so the newest shows the full colour and each fades back a step
+per note - the same steps as their fading on the board.
 
 Its own hot-reload library (`build/hot_reload/cello.dll`, the host built with
 `-define:GAME_NAME=cello`) and its own `last_cello_song.txt`, so it can run beside the

@@ -173,8 +173,8 @@ fb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, mode: Track_Mo
 // Drawing
 // ---------------------------------------------------------------------------
 
-@(private = "file")
-mix :: proc(a, b: rl.Color, t: f32) -> rl.Color {
+// From colour a (t = 0) to colour b (t = 1).
+colour_mix :: proc(a, b: rl.Color, t: f32) -> rl.Color {
 	l :: proc(x, y: u8, t: f32) -> u8 {return u8(f32(x) + (f32(y) - f32(x)) * clamp(t, 0, 1))}
 	return {l(a.r, b.r, t), l(a.g, b.g, t), l(a.b, b.b, t), l(a.a, b.a, t)}
 }
@@ -192,7 +192,7 @@ gradient_line :: proc(a, b: rl.Vector2, ca, cb: rl.Color, width: f32) {
 	for k in 0 ..< PIECES {
 		t0 := f32(k) / PIECES
 		t1 := f32(k + 1) / PIECES
-		rl.DrawLineEx(a + (b - a) * t0, a + (b - a) * t1, width, mix(ca, cb, (t0 + t1) / 2))
+		rl.DrawLineEx(a + (b - a) * t0, a + (b - a) * t1, width, colour_mix(ca, cb, (t0 + t1) / 2))
 	}
 }
 
@@ -207,6 +207,24 @@ arrow_head :: proc(from, to: rl.Vector2, back: f32, c: rl.Color) {
 	base := tip - u * 8
 	rl.DrawTriangle(tip, base - side * 4.5, base + side * 4.5, c)
 	rl.DrawTriangle(tip, base + side * 4.5, base - side * 4.5, c)
+}
+
+// The trail as the fingerboard shows it now: the last N notes of the active
+// layer up to the playhead, or up to the selected note when stopped. Empty
+// when tracking is off. Oldest first.
+fb_current_trail :: proc(out: []Tracked) -> int {
+	t := active_track()
+	if t == nil || !g.fb_track do return 0
+	n := min(g.fb_track_n, len(out))
+	if g.player.playing do return fb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_mode, out[:n])
+	if g.selected >= 0 && g.selected < len(t.notes) do return fb_track(t, 0, g.selected, g.fb_track_mode, out[:n])
+	return 0
+}
+
+// How strongly the k-th of n trail notes (oldest first) shows its tracking
+// colour: the newest fully, each older one a step less, as on the board.
+trail_weight :: proc(k, n: int) -> f32 {
+	return f32(k + 1) / f32(max(n, 1))
 }
 
 // Draw the trail: lines first, then the notes on top. Older notes fainter.
@@ -234,13 +252,13 @@ fb_track_draw :: proc(list: []Tracked) {
 				t1 := f32(q + 1) / PIECES
 				y0 := pa.y + (pb.y - pa.y) * t0
 				y1 := pa.y + (pb.y - pa.y) * t1
-				rl.DrawLineEx({fb_x(s, y0), y0}, {fb_x(s, y1), y1}, 3, mix(ca, cb, (t0 + t1) / 2))
+				rl.DrawLineEx({fb_x(s, y0), y0}, {fb_x(s, y1), y1}, 3, colour_mix(ca, cb, (t0 + t1) / 2))
 			}
 			for semis in lo + 1 ..< hi {
 				t := f32(semis - a.pos.semis) / f32(b.pos.semis - a.pos.semis)
 				p := fb_point({true, s, semis})
-				rl.DrawCircleLines(i32(p.x), i32(p.y), 4.5, mix(ca, cb, t))
-				rl.DrawCircleLines(i32(p.x), i32(p.y), 5.5, mix(ca, cb, t))
+				rl.DrawCircleLines(i32(p.x), i32(p.y), 4.5, colour_mix(ca, cb, t))
+				rl.DrawCircleLines(i32(p.x), i32(p.y), 5.5, colour_mix(ca, cb, t))
 			}
 			arrow_head(pa, pb, 7, cb)
 		} else {
