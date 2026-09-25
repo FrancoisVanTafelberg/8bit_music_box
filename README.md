@@ -24,8 +24,8 @@ you are editing survives. `F5` forces a reload, `F6` restarts.
 ## Cello Helper
 
 A second program from the same code: the editor with only the cello (as many cello
-layers as you like), two bars to a page, and the **Cello Fingerboard** where the other
-two bars were.
+layers as you like), a half-width side panel, four bars to a page, and the **Cello
+Fingerboard** down the right-hand side.
 
     run_cello_dev.bat               hot reload, like run_dev.bat
     build_cello_release.bat         build\cello_helper.exe   (or ./build_cello_release.sh)
@@ -54,7 +54,7 @@ layer becomes a cello, and Save puts the result in `cello_songs\`, never over th
 | **Octave copy** | `Ctrl`+click a note: a copy of it an octave lower, same place and length; `Shift`+click: an octave higher |
 | **Selected note** | `↑`/`↓` a staff step, `Shift+↑/↓` a semitone, `←`/`→` a slot, `Del` removes it |
 | **Fine grid** | hold `Alt` to snap to 32nds |
-| **Layers** | `+ Add instrument`; click a layer to edit it; `M` mute, `S` solo (live, even mid-song); `Tab` next layer |
+| **Layers** | `+ Add instrument`; click a layer to edit it; `M` mute, `S` solo (live, even mid-song); `Tab` next layer; **Set colour** picks the selected layer's colour on the sheet (saved in the song) |
 | **Play** | `Space` from this page, `Shift+Space` from the start. **Follow** turns pages with the playhead |
 | **Pages** | `PgUp`/`PgDn`, `[` `]`, `←`/`→` with nothing selected, or click the page strip |
 | **Undo** | `Ctrl+Z`, `Ctrl+Y` / `Ctrl+Shift+Z` |

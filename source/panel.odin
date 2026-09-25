@@ -16,6 +16,7 @@ Overlay :: enum {
 	Instruments,
 	Open,
 	Sounds, // the sound effect tester (sound_test.odin)
+	Colour, // the colour picker for the active layer (Set colour)
 }
 
 overlay_none :: proc() -> bool {
@@ -154,7 +155,8 @@ title_end :: proc(keep: bool) {
 // Left panel
 // ---------------------------------------------------------------------------
 
-LAYER_ROWS :: 12
+// One row fewer in the Cello Helper, for the Set colour button below.
+LAYER_ROWS :: 11 when CELLO else 12
 LAYER_H :: 20
 
 panel_draw :: proc() {
@@ -163,6 +165,8 @@ panel_draw :: proc() {
 	x := f32(8)
 	w := f32(PANEL_W - 16)
 	y := f32(TOP_H + 8)
+	// The Cello Helper's panel is half as wide: shorter labels, stacked rows.
+	compact :: CELLO
 
 	label("LAYERS", x, y)
 	text(fmt.tprintf("%d", len(g.song.tracks)), x + w - 12, y, COL_FAINT)
@@ -181,9 +185,15 @@ panel_draw :: proc() {
 		on := i == g.active
 		fill(r, on ? COL_PANEL_HI : (hovered(r) ? COL_BUTTON : COL_SHEET))
 		if on do outline(r, COL_ACCENT)
-		fill(rect(r.x + 4, r.y + 5, 9, 9), inst_color(inst_of(t).color))
 		audible := music.track_audible(&g.song, t)
-		text(fit_text(t.name, w - 64), r.x + 18, r.y + 5, audible ? COL_TEXT : COL_FAINT)
+		when compact {
+			// A thin stripe of the layer's colour: more room for the name.
+			fill(rect(r.x + 1, r.y + 2, 3, r.height - 4), track_color(t))
+			text(fit_text(t.name, w - 48), r.x + 7, r.y + 5, audible ? COL_TEXT : COL_FAINT)
+		} else {
+			fill(rect(r.x + 4, r.y + 5, 9, 9), track_color(t))
+			text(fit_text(t.name, w - 64), r.x + 18, r.y + 5, audible ? COL_TEXT : COL_FAINT)
+		}
 		mr := rect(r.x + w - 40, r.y + 2, 18, 15)
 		sr := rect(r.x + w - 20, r.y + 2, 18, 15)
 		if button(mr, "M", t.mute) {t.mute = !t.mute; g.dirty = true}
@@ -191,13 +201,13 @@ panel_draw :: proc() {
 		if ui_take_click(r) do select_layer(i)
 	}
 	if n > LAYER_ROWS {
-		text(fmt.tprintf("%d-%d of %d  (wheel)", g.layer_scroll + 1, min(g.layer_scroll + LAYER_ROWS, n), n), x, y + list.height + 2, COL_FAINT)
+		text(fmt.tprintf(compact ? "%d-%d/%d" : "%d-%d of %d  (wheel)", g.layer_scroll + 1, min(g.layer_scroll + LAYER_ROWS, n), n), x, y + list.height + 2, COL_FAINT)
 	}
 	y += list.height + 14
 
 	when CELLO {
 		// The Cello Helper has one instrument: another layer is another cello.
-		if button(rect(x, y, w, 20), "+ Add cello layer") {
+		if button(rect(x, y, w, 20), "+ Cello layer") {
 			i := music.song_add_track(&g.song, music.inst_or_default(&g.song, CELLO_KEY))
 			select_layer(i)
 			g.dirty = true
@@ -207,7 +217,18 @@ panel_draw :: proc() {
 		if button(rect(x, y, w, 20), "+ Add instrument") do g.overlay = .Instruments
 	}
 	y += 24
-	if button(rect(x, y, w, 20), "Remove layer", false, n > 0) {
+	// The active layer's colour on the sheet.
+	if button(rect(x, y, w, 20), compact ? "Set colour" : "Set layer colour", false, n > 0) {
+		g.overlay = .Colour
+		g.colour_y = y
+	}
+	if n > 0 {
+		sw := rect(x + w - 9, y + 6, 6, 8)
+		fill(sw, track_color(&g.song.tracks[g.active]))
+		outline(sw, COL_EDGE)
+	}
+	y += 24
+	if button(rect(x, y, w, 20), compact ? "Remove" : "Remove layer", false, n > 0) {
 		if confirmed("remove-layer", fmt.tprintf("Remove the %s layer and its notes?", g.song.tracks[g.active].name)) {
 			// The engine counts layers by position: stop before they shift.
 			player_stop(&g.player)
@@ -221,7 +242,7 @@ panel_draw :: proc() {
 	y += 30
 
 	// Note length.
-	label("LENGTH (1-6  . dotted  T triplet)", x, y)
+	label(compact ? "LENGTH  1-6 . T" : "LENGTH (1-6  . dotted  T triplet)", x, y)
 	y += 14
 	bw := (w - 8) / 3
 	for l, i in music.Length {
@@ -229,27 +250,47 @@ panel_draw :: proc() {
 		if button(r, music.LENGTH_LABEL[l], g.length == l) do g.length = l
 	}
 	y += 48
-	hw := (w - 4) / 2
-	if button(rect(x, y, hw, 20), "Dotted", g.mod == .Dotted) do g.mod = g.mod == .Dotted ? .None : .Dotted
-	if button(rect(x + hw + 4, y, hw, 20), "Triplet", g.mod == .Triplet) do g.mod = g.mod == .Triplet ? .None : .Triplet
+	when compact {
+		// One above the other: "Triplet" does not fit in half of 88 px.
+		if button(rect(x, y, w, 20), "Dotted", g.mod == .Dotted) do g.mod = g.mod == .Dotted ? .None : .Dotted
+		y += 24
+		if button(rect(x, y, w, 20), "Triplet", g.mod == .Triplet) do g.mod = g.mod == .Triplet ? .None : .Triplet
+	} else {
+		hw := (w - 4) / 2
+		if button(rect(x, y, hw, 20), "Dotted", g.mod == .Dotted) do g.mod = g.mod == .Dotted ? .None : .Dotted
+		if button(rect(x + hw + 4, y, hw, 20), "Triplet", g.mod == .Triplet) do g.mod = g.mod == .Triplet ? .None : .Triplet
+	}
 	y += 30
 
 	// Accidental mode.
-	label("ACCIDENTAL  (Shift #  Ctrl b)", x, y)
+	label(compact ? "ACCIDENTAL" : "ACCIDENTAL  (Shift #  Ctrl b)", x, y)
 	y += 14
-	qw := (w - 12) / 4
 	names := [Acc_Mode]string{.Key = "key", .Sharp = "#", .Flat = "b", .Natural = "nat"}
-	for m, i in Acc_Mode {
-		if button(rect(x + f32(i) * (qw + 4), y, qw, 20), names[m], g.acc_mode == m) do g.acc_mode = m
+	when compact {
+		// Two by two.
+		qw := (w - 4) / 2
+		for m, i in Acc_Mode {
+			if button(rect(x + f32(i % 2) * (qw + 4), y + f32(i / 2) * 24, qw, 20), names[m], g.acc_mode == m) do g.acc_mode = m
+		}
+		y += 24
+	} else {
+		qw := (w - 12) / 4
+		for m, i in Acc_Mode {
+			if button(rect(x + f32(i) * (qw + 4), y, qw, 20), names[m], g.acc_mode == m) do g.acc_mode = m
+		}
 	}
 	y += 30
 
 	// The active instrument.
+	when compact {
+		if t := active_track(); t != nil do instrument_box_compact(t, x, y, w)
+		return
+	}
 	if t := active_track(); t != nil {
 		ins := inst_of(t)
 		fill(rect(x, y, w, 120), COL_SHEET)
 		outline(rect(x, y, w, 120), COL_EDGE)
-		fill(rect(x, y, 4, 120), inst_color(ins.color))
+		fill(rect(x, y, 4, 120), track_color(t))
 		text(ins.name, x + 10, y + 6, COL_TEXT, FONT_BIG)
 		text(music.FAMILY_NAME[ins.family], x + 10, y + 28, COL_DIM)
 		text(fmt.tprintf("range  %s - %s", midi_name(int(ins.lo)), midi_name(int(ins.hi))), x + 10, y + 42, COL_TEXT)
@@ -359,6 +400,8 @@ overlay_draw :: proc() {
 		open_overlay_draw()
 	case .Sounds:
 		sound_test_draw()
+	case .Colour:
+		colour_picker_draw()
 	}
 	// Whatever the overlay did not take, nobody underneath gets.
 	if g.ui.clicked || g.ui.right {
@@ -592,3 +635,88 @@ restore :: proc(from, to: ^[dynamic]Undo) {
 
 undo :: proc() {restore(&g.undo, &g.redo)}
 redo :: proc() {restore(&g.redo, &g.undo)}
+
+// The Cello Helper's instrument box: the same things, stacked for 88 px.
+@(private = "file")
+instrument_box_compact :: proc(t: ^music.Track, x, y0, w: f32) {
+	ins := inst_of(t)
+	y := y0
+	H :: 150
+	fill(rect(x, y, w, H), COL_SHEET)
+	outline(rect(x, y, w, H), COL_EDGE)
+	fill(rect(x, y, 3, H), track_color(t))
+	text(ins.name, x + 8, y + 5, COL_TEXT, FONT_BIG)
+	y += 28
+	text(fmt.tprintf("%s - %s", midi_name(int(ins.lo)), midi_name(int(ins.hi))), x + 8, y, COL_TEXT)
+	y += 13
+	text(fit_text(wave_desc(ins), w - 12), x + 8, y, COL_DIM)
+	y += 16
+	text("volume", x + 8, y, COL_DIM)
+	y += 12
+	if button(rect(x + 6, y, 18, 16), "-") {t.volume = max(t.volume - 0.1, 0); g.dirty = true}
+	text_centered(fmt.tprintf("%d%%", int(t.volume * 100 + 0.5)), rect(x + 24, y, w - 48, 16))
+	if button(rect(x + w - 24, y, 18, 16), "+") {t.volume = min(t.volume + 0.1, 2); g.dirty = true}
+	y += 20
+	if button(rect(x + 6, y, w - 12, 16), "hear") do player_preview(&g.player, t.inst, music.pitch_from_midi(int(ins.lo + ins.hi) / 2, int(g.song.key)))
+	y += 22
+	switch ins.origin {
+	case .Fallback:
+		text("no inst. files!", x + 8, y, COL_BAD)
+	case .File:
+		text(fit_text(ins.source, w - 12), x + 8, y, COL_DIM)
+	case .Song:
+		text("in this song", x + 8, y, COL_GOOD)
+	}
+	y += 14
+	if ins.origin != .Song && button(rect(x + 6, y, w - 12, 16), "embed") {
+		key := ins.key
+		music.song_embed_instrument(&g.song, t.inst)
+		g.dirty = true
+		set_status("%s is now defined inside this song: it plays the same on any copy of the app", key)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Set colour: a palette beside the button. Click a swatch to colour the
+// active layer; "Instrument" goes back to its instrument's colour. Saved in
+// the song (a `color r g b` line in the track).
+// ---------------------------------------------------------------------------
+
+@(private = "file")
+LAYER_PALETTE := [?][3]u8 {
+	{236, 84, 84}, {246, 136, 64}, {250, 196, 60}, {246, 232, 110}, {150, 220, 80}, {70, 190, 110},
+	{64, 200, 190}, {80, 170, 246}, {96, 116, 246}, {160, 100, 246}, {220, 100, 220}, {246, 120, 170},
+	{160, 50, 50}, {170, 96, 40}, {176, 140, 40}, {120, 150, 50}, {40, 120, 70}, {40, 120, 130},
+	{40, 90, 170}, {90, 60, 170}, {140, 60, 140}, {230, 230, 236}, {160, 160, 176}, {110, 100, 90},
+}
+
+@(private = "file")
+colour_picker_draw :: proc() {
+	if g.active < 0 || g.active >= len(g.song.tracks) {g.overlay = .None; return}
+	t := &g.song.tracks[g.active]
+	COLS :: 6
+	SW :: f32(22)
+	rows := (len(LAYER_PALETTE) + COLS - 1) / COLS
+	r := rect(PANEL_W + 4, clamp(g.colour_y - 30, TOP_H + 4, 720 - STATUS_H - 200), 12 + COLS * (SW + 4), 64 + f32(rows) * (SW + 4))
+	fill(r, COL_PANEL)
+	outline(r, COL_ACCENT)
+	text(fit_text(fmt.tprintf("Colour: %s", t.name), r.width - 16), r.x + 8, r.y + 8, COL_TEXT)
+	for c, i in LAYER_PALETTE {
+		sr := rect(r.x + 8 + f32(i % COLS) * (SW + 4), r.y + 26 + f32(i / COLS) * (SW + 4), SW, SW)
+		fill(sr, {c[0], c[1], c[2], 255})
+		on := t.color[3] != 0 && t.color[0] == c[0] && t.color[1] == c[1] && t.color[2] == c[2]
+		if on || hovered(sr) do outline(rect(sr.x - 2, sr.y - 2, sr.width + 4, sr.height + 4), on ? COL_ACCENT : COL_TEXT)
+		if ui_take_click(sr) {
+			t.color = {c[0], c[1], c[2], 255}
+			g.dirty = true
+			g.overlay = .None
+		}
+	}
+	br := rect(r.x + 8, r.y + r.height - 28, r.width - 16, 20)
+	if button(br, "Instrument's colour", t.color[3] == 0) {
+		t.color = {}
+		g.dirty = true
+		g.overlay = .None
+	}
+	if hovered(r) do ui_take_all()
+}

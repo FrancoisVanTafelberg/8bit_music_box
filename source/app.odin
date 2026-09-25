@@ -45,6 +45,7 @@ App :: struct {
 	// The sound effect tester (sound_test.odin).
 	sfx_test:   Sound_Test,
 	perf:       Perf, // perf.odin: the FPS counter and F3 monitor
+	colour_y:   f32, // where the Set colour button is, for its palette
 	// All the sound: the instruments (from instruments/), the playing song,
 	// the note previews. The same Mixer a game would use; see music/mixer.odin.
 	audio:      music.Mixer,

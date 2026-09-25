@@ -353,8 +353,13 @@ files, the Mixer — and `when CELLO` switches the differences:
   here has every layer turned into a cello ("Cello (was Violin)"), out-of-range notes
   shown red and counted. Saves go to `cello_songs/`, so an orchestral song in `songs/`
   is never overwritten by its cello version.
-* **Two bars to a page** (`BARS_PER_PAGE`), the sheet 500 px wide.
-* **The Cello Fingerboard** (`source/fingerboard.odin`) in the space of the other two bars.
+* **Four bars to a page**, as in the music box: the left panel is half as wide (104 px,
+  laid out compact - stacked rows, short labels) and the sheet runs to the fingerboard
+  (748 px).
+* **The Cello Fingerboard** (`source/fingerboard.odin`), a 348 px panel down the right:
+  just the board (drawn three quarters of its first width), the note names beside it,
+  the 8va marks to its left, the finger labels at the edge, and the key and hand-position
+  buttons above.
   Player's view: nut at the top, strings C G D A left to right, 29 semitones per string
   to the end of the fingerboard. Semitone *n* sits at `1 - 2^(-n/12)` of the string, so
   positions crowd together down the board as they do under the hand; the octave (half
@@ -422,6 +427,7 @@ volume 0.8
 pan -0.3
 mute 0
 solo 0
+color 80 170 246     # optional: the layer's own colour on the sheet (Set colour)
 # note  tick  length  pitch  velocity      (24 ticks = one quarter note)
 note 0 24 F#4 100
 note 24 24 F#4 100

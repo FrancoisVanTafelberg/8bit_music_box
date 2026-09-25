@@ -29,6 +29,8 @@ Track :: struct {
 	pan:    f32,
 	mute:   bool,
 	solo:   bool,
+	// The layer's own colour on the sheet; alpha 0 = its instrument's.
+	color:  [4]u8,
 }
 
 Song :: struct {

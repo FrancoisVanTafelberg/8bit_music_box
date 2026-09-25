@@ -41,6 +41,7 @@ song_to_string :: proc(s: ^Song, allocator := context.allocator) -> string {
 		fmt.sbprintfln(w, "pan %.3f", t.pan)
 		fmt.sbprintfln(w, "mute %d", t.mute ? 1 : 0)
 		fmt.sbprintfln(w, "solo %d", t.solo ? 1 : 0)
+		if t.color[3] != 0 do fmt.sbprintfln(w, "color %d %d %d", t.color[0], t.color[1], t.color[2])
 		fmt.sbprintln(w, "# note  tick  length  pitch  velocity   (24 ticks = one quarter)")
 		buf: [8]u8
 		for n in t.notes {
@@ -168,7 +169,7 @@ song_parse :: proc(text: string, out: ^Song, rep: ^Load_Report, name := "song") 
 			append(&s.tracks, Track{name = strings.clone(args[0] if len(args) > 0 else "Track"), inst = default_inst(), volume = 0.8})
 			cur = &s.tracks[len(s.tracks) - 1]
 			append(&pending, Pending{key = "violin"})
-		case "instrument", "volume", "pan", "mute", "solo", "note":
+		case "instrument", "volume", "pan", "mute", "solo", "color", "colour", "note":
 			if cur == nil {bad(rep, name, line_no, fmt.tprintf("'%s' before any 'track'", cmd)); ok = false; continue}
 			switch cmd {
 			case "instrument":
@@ -186,6 +187,14 @@ song_parse :: proc(text: string, out: ^Song, rep: ^Load_Report, name := "song") 
 				cur.mute = len(args) > 0 && args[0] == "1"
 			case "solo":
 				cur.solo = len(args) > 0 && args[0] == "1"
+			case "color", "colour":
+				// The layer's own colour, r g b.
+				if len(args) < 3 {bad(rep, name, line_no, "color: r g b"); continue}
+				for k in 0 ..< 3 {
+					v, _ := strconv.parse_int(args[k])
+					cur.color[k] = u8(clamp(v, 0, 255))
+				}
+				cur.color[3] = 255
 			case "note":
 				if len(args) < 3 {bad(rep, name, line_no, "note needs: tick length pitch [velocity]"); ok = false; continue}
 				tick, ok1 := strconv.parse_int(args[0])

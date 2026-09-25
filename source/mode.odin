@@ -4,9 +4,9 @@ package app
     One code base, two programs.
 
     8-Bit Music Box   the full editor: every instrument, 4 bars to a page.
-    Cello Helper      the same editor with only the cello, 2 bars to a page,
-                      and the Cello Fingerboard (fingerboard.odin) where the
-                      other two bars were.
+    Cello Helper      the same editor with only the cello, a narrower panel,
+                      and the Cello Fingerboard (fingerboard.odin) down the
+                      right-hand side.
 
     Which one gets built is decided at compile time:
 
@@ -20,7 +20,7 @@ package app
 CELLO :: #config(CELLO, false)
 
 APP_TITLE :: "Cello Helper" when CELLO else "8-Bit Music Box"
-BARS_PER_PAGE :: 2 when CELLO else 4
+BARS_PER_PAGE :: 4
 
 // The Cello Helper's only instrument.
 CELLO_KEY :: "cello"

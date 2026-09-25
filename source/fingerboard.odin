@@ -30,15 +30,20 @@ import rl "vendor:raylib"
 // From the open string to the end of the fingerboard.
 FB_SEMIS :: 29
 
-FB_X :: SHEET_R
+// The panel, from here to the right edge of the screen (the sheet ends where
+// it starts). Just wide enough for the board, the note names beside its
+// circles, the octave marks to its left and the finger labels at the edge.
+FB_X_CELLO :: 1280 - 348
+FB_X :: FB_X_CELLO
 FB_W :: 1280 - FB_X
+FB_CX :: FB_X + 166 // the middle of the board
 
-FB_OPEN_Y :: TOP_H + 134 // the open-string circles, above the nut
-FB_NUT_Y :: TOP_H + 150
+FB_OPEN_Y :: TOP_H + 184 // the open-string circles, above the nut
+FB_NUT_Y :: TOP_H + 200
 FB_END_Y :: 720 - STATUS_H - 12
 
-FB_HALF_NUT :: 92 // half the board's width at the nut...
-FB_HALF_END :: 124 // ...and at its end: a fingerboard widens toward the bridge
+FB_HALF_NUT :: 69 // half the board's width at the nut...
+FB_HALF_END :: 93 // ...and at its end: a fingerboard widens toward the bridge
 
 // Open strings, low to high = left to right.
 FB_OPEN := [4]int{36, 43, 50, 57} // C2 G2 D3 A3
@@ -101,7 +106,7 @@ fb_y :: proc(n: int) -> f32 {
 }
 
 fb_center_x :: proc() -> f32 {
-	return f32(FB_X) + f32(FB_W) / 2
+	return f32(FB_CX)
 }
 
 @(private = "file")
@@ -220,7 +225,7 @@ fingerboard_draw :: proc() {
 	y := f32(TOP_H + 6)
 
 	label("CELLO FINGERBOARD", x0, y)
-	text("player's view: nut at the top, C string on the left", x0 + text_width("CELLO FINGERBOARD") + 12, y, COL_FAINT)
+	text("nut at top, C string left", x0 + text_width("CELLO FINGERBOARD") + 10, y, COL_FAINT)
 	y += 14
 
 	// The key filter.
@@ -251,11 +256,27 @@ fingerboard_draw :: proc() {
 	}
 	y += 14
 
-	// The hand position.
+	// The hand position: two rows of five.
 	hand := &HAND_POSITIONS[clamp(int(g.fb_hand), 0, len(HAND_POSITIONS) - 1)]
-	pw := (f32(FB_W) - 16 - f32(len(HAND_POSITIONS) - 1) * 4) / f32(len(HAND_POSITIONS))
+	pw := (f32(FB_W) - 16 - 4 * 4) / 5
 	for hp, i in HAND_POSITIONS {
-		if button(rect(x0 + f32(i) * (pw + 4), y, pw, 18), hp.short, int(g.fb_hand) == i) do g.fb_hand = i8(i)
+		if button(rect(x0 + f32(i % 5) * (pw + 4), y + f32(i / 5) * 22, pw, 18), hp.short, int(g.fb_hand) == i) do g.fb_hand = i8(i)
+	}
+	y += 46
+	text(hand.name, x0, y, COL_ACCENT)
+	// The legend, on the same line.
+	{
+		lcol := COL_ACCENT
+		if t := active_track(); t != nil do lcol = lighten(track_color(t), 0.3)
+		lx := x0 + 150
+		rl.DrawCircleV({lx + 4, y + 5}, 4, COL_ACCENT)
+		text("pointed", lx + 11, y, COL_DIM)
+		lx += 58
+		rl.DrawCircleV({lx + 4, y + 5}, 4, lcol)
+		text("playing", lx + 11, y, COL_DIM)
+		lx += 58
+		rl.DrawCircleLines(i32(lx + 4), i32(y + 5), 4, {90, 80, 76, 255})
+		text("too high", lx + 11, y, COL_DIM)
 	}
 	// The wheel over the board steps through them.
 	if w := ui_take_wheel(rect(FB_X, FB_OPEN_Y - 12, FB_W, FB_END_Y - FB_OPEN_Y + 24)); w != 0 {
@@ -290,7 +311,7 @@ fingerboard_draw :: proc() {
 	// The board: ebony, widening toward the bridge.
 	cx := fb_center_x()
 	{
-		pad :: 16
+		pad :: 12
 		tl := rl.Vector2{cx - FB_HALF_NUT * 1.5 * 0.75 - pad, FB_NUT_Y}
 		tr := rl.Vector2{cx + FB_HALF_NUT * 1.5 * 0.75 + pad, FB_NUT_Y}
 		bl := rl.Vector2{cx - FB_HALF_END * 1.5 * 0.75 - pad, FB_END_Y + 8}
@@ -310,7 +331,8 @@ fingerboard_draw :: proc() {
 		my := fb_y(mark)
 		l, r := fb_x(0, my) - 22, fb_x(3, my) + 22
 		for xx := l; xx < r; xx += 6 do rl.DrawLineEx({xx, my}, {min(xx + 3, r), my}, 1, {110, 96, 80, 255})
-		text(mark == 12 ? "octave" : "2 octaves", l - 58, my - 5, COL_FAINT)
+		s := mark == 12 ? "8va" : "2x8va"
+		text(s, l - text_width(s) - 3, my - 5, COL_FAINT)
 	}
 
 	// The hand: a line across the board where each finger stops the
@@ -336,7 +358,6 @@ fingerboard_draw :: proc() {
 			if semi <= 0 do continue
 			finger_line(int(semi), fmt.tprintf("f%d", f + 1), hand_col[f], &below)
 		}
-		text(hand.name, f32(1280 - 8) - text_width(hand.name), TOP_H + 66, COL_ACCENT)
 	}
 
 	// Strings: thickest on the left.
@@ -344,12 +365,13 @@ fingerboard_draw :: proc() {
 		top := rl.Vector2{fb_x(s, FB_NUT_Y), FB_NUT_Y}
 		bottom := rl.Vector2{fb_x(s, FB_END_Y + 8), FB_END_Y + 8}
 		rl.DrawLineEx(top, bottom, 3 - f32(s) * 0.5, {176, 172, 160, 255})
-		text_centered(fmt.tprintf("%s string", FB_STRING_NAME[s]), rect(top.x - 34, FB_OPEN_Y - 24, 68, 12), COL_DIM)
+		text_centered(FB_STRING_NAME[s], rect(top.x - 20, FB_OPEN_Y - 22, 40, 12), COL_DIM)
 	}
 
 	// The positions.
-	cello := fb_cello()
-	col := cello != nil ? inst_color(cello.color) : COL_ACCENT
+	// The layer's colour, for its notes sounding.
+	col := COL_ACCENT
+	if t := active_track(); t != nil do col = track_color(t)
 	for s in 0 ..< 4 {
 		for n in 0 ..= FB_SEMIS {
 			m := FB_OPEN[s] + n
@@ -389,16 +411,6 @@ fingerboard_draw :: proc() {
 			}
 		}
 	}
-
-	// Legend.
-	ly := f32(FB_END_Y - 4)
-	lx := f32(FB_X + 10)
-	rl.DrawCircleV({lx + 4, ly + 5}, 4, COL_ACCENT)
-	text("pointed at", lx + 12, ly, COL_DIM)
-	rl.DrawCircleV({lx + 4, ly - 9}, 4, lighten(col, 0.3))
-	text("playing", lx + 12, ly - 14, COL_DIM)
-	rl.DrawCircleLines(i32(lx + 4), i32(ly - 23), 4, {90, 80, 76, 255})
-	text("out of range", lx + 12, ly - 28, COL_DIM)
 
 	// Click a circle: hear it.
 	if here.ok && ui_take_click(rect(FB_X, FB_OPEN_Y - 12, FB_W, FB_END_Y - FB_OPEN_Y + 24)) {

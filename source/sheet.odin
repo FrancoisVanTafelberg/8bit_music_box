@@ -22,14 +22,14 @@ import rl "vendor:raylib"
 
 TOP_H :: 32
 STATUS_H :: 20
-PANEL_W :: 208
+// The Cello Helper's panel is half as wide (panel.odin lays it out compact).
+PANEL_W :: 104 when CELLO else 208
 // Clef marks, the frequency ratios of the key lines (key_ratio), note names.
 GUTTER_W :: 72
 GUTTER_NAME_X :: GUTTER_W - 24 // where the note names start
 BARS_X :: PANEL_W + GUTTER_W
-// In the Cello Helper the sheet is half as wide (two bars) and the Cello
-// Fingerboard takes the rest.
-BARS_W :: 472 when CELLO else 1280 - BARS_X - 8
+// In the Cello Helper the fingerboard takes the right of the screen.
+BARS_W :: FB_X_CELLO - 8 - BARS_X when CELLO else 1280 - BARS_X - 8
 SHEET_R :: BARS_X + BARS_W + 8 // the sheet's right edge
 BAR_NUM_Y :: TOP_H + 2
 ROWS_Y :: TOP_H + 18
@@ -140,6 +140,13 @@ inst_of :: proc(t: ^music.Track) -> ^music.Instrument {
 	return music.inst_get(&g.song, t.inst)
 }
 
+// A layer's colour: its own if it has been given one (Set colour), else its
+// instrument's.
+track_color :: proc(t: ^music.Track) -> rl.Color {
+	if t.color[3] != 0 do return inst_color(t.color)
+	return inst_color(inst_of(t).color)
+}
+
 in_range :: proc(inst: music.Inst_Id, p: music.Pitch) -> bool {
 	ins := music.inst_get(&g.song, inst)
 	m := i32(music.pitch_midi(p))
@@ -234,7 +241,7 @@ sheet_draw :: proc() {
 	if hov.ok && t != nil && !g.drag.active && overlay_none() {
 		if music.track_note_at(t, hov.step, hov.raw_tick) < 0 {
 			p := placed_pitch(hov.step)
-			col := inst_color(inst_of(t).color)
+			col := track_color(t)
 			if !in_range(t.inst, p) do col = COL_BAD
 			x0 := tick_x(hov.tick)
 			w := f32(music.note_ticks(g.length, g.mod)) * px_per_tick()
@@ -255,8 +262,7 @@ sheet_draw :: proc() {
 
 @(private = "file")
 notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32) {
-	ins := inst_of(t)
-	base := inst_color(ins.color)
+	base := track_color(t)
 	ps := page_start()
 	pe := ps + page_ticks()
 	left, right := f32(BARS_X), f32(BARS_X + BARS_W)
@@ -380,7 +386,7 @@ strip_draw :: proc() {
 			for note in t.notes {
 				if note.tick >= e do break
 				if note.tick >= s {
-					fill(rect(r.x + 2, r.y + 2, 4, 4), inst_color(inst_of(t).color))
+					fill(rect(r.x + 2, r.y + 2, 4, 4), track_color(t))
 					break
 				}
 			}
