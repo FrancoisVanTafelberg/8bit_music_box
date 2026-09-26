@@ -4,26 +4,40 @@ package app
     Input mode: play along on a real instrument, and see what you played.
 
     Switch it on (the Mic button under the sheet, or I) and the microphone is
-    listened to (mic_windows.odin); what note is sounding is worked out as it
-    comes in (music/pitch.odin: band-pass, a noise gate that learns the room,
-    YIN), and shown:
+    listened to (mic_windows.odin); which notes are sounding - one, or a
+    chord of two, three or more - is worked out as it comes in
+    (music/chord.odin: band-pass, the room's noise learned and taken away,
+    harmonic salience, one note at a time), and shown:
 
-      * as a big dot on the sheet, in the colour opposite the layer's, on the
-        row of the note, a little above or below the row's middle when the
-        note is sharp or flat (with the name and cents beside it). Stopped,
-        it sits on the bar cursor; playing, it rides the playhead;
-      * in the Cello Helper, on the fingerboard too, where the note is played
+      * as a big dot on the sheet for each note, in the colour opposite the
+        layer's, on the row of the note, a little above or below the row's
+        middle when the note is sharp or flat (with the name and cents beside
+        it). Stopped, they sit on the bar cursor; playing, they ride the
+        playhead;
+      * with the Helper on, on the fingerboard too, where the notes are played
         (chosen as the tracking mode would), slid along the string by how
-        sharp or flat it is;
-      * and while the song plays, as a line drawn behind the playhead: the
-        take. It stays on the sheet until Play is pressed again or Reset.
+        sharp or flat they are - or on the keyboard's keys;
+      * and while the song plays, as lines drawn behind the playhead, one for
+        each note: the take. It stays on the sheet until Play or Reset.
+
+    Two modes (the button beside Mic):
+
+      Notes   what is said above: whatever is being played.
+      Check   the same, and while the song plays each note of the layer being
+              practised is checked against what was heard while it sounded
+              (music.chord_check, music.check_verdict): outlined green when it
+              was played in tune, blue when nearly (out of tune, a semitone
+              off, in another octave, or only for part of it), red when it
+              was not played. A note is judged once the playhead has passed
+              it; the outlines stay until Play or Reset.
 
     Play scope (the button beside Mic): the whole song, one bar from the
     cursor, or the page. Bar and Page stop at their end, and the cursor stays
     where it was, so Play again goes round the same bar.
 
     Where the take is drawn in time: each reading knows how long ago the
-    sound it describes was heard (music.Pitch_Reading.delay), and the
+    sound it describes was heard (music.Chord_Reading.delay: about 100 ms
+    for the cello's range, 50 ms higher up), and the
     Latency setting adds what the sound card and Windows take on top (40 ms
     is typical; turn it up if the line lags the notes it should sit on).
 */
@@ -55,9 +69,28 @@ SCOPE_NAME := [Play_Scope]string {
 	.Page = "Page",
 }
 
+// Up to this many notes of each reading are kept in the take and shown.
+INPUT_NOTES :: 4
+
 Take_Point :: struct {
-	tick: f32, // where in the song (fractional ticks)
-	midi: f32, // 0 = nothing played
+	tick:  f32, // where in the song (fractional ticks)
+	notes: [INPUT_NOTES]f32,
+	n:     u8, // 0 = nothing played
+}
+
+Input_Mode :: enum u8 {
+	Notes, // show what is played
+	Check, // ...and check it against the layer
+}
+
+// One note of the layer, checked (Check mode).
+Check_Note :: struct {
+	tick:    i32,
+	len:     i32,
+	midi:    i16,
+	tally:   music.Check_Tally,
+	verdict: music.Check_Verdict,
+	final:   bool,
 }
 
 Input :: struct {
@@ -68,18 +101,24 @@ Input :: struct {
 	listed:      bool,
 	os:          Mic_Os,
 	open:        bool,
-	det:         music.Pitch_Detector,
+	det:         music.Chord_Detector,
 	latency_ms:  f32,
 	sensitivity: f32,
-	// Now: the note being played (0 = none), and when it was last heard.
-	midi:        f32,
+	mode:        Input_Mode,
+	// Now: the notes being played (n 0 = none), and when last heard.
+	notes:       [INPUT_NOTES]f32,
+	n:           int,
 	heard_at:    f64,
-	// The fingerboard place it is shown at, kept from note to note so the
-	// tracking mode can choose the next one from it.
-	fb_pos:      Fb_Pos,
-	fb_midi:     int,
-	// What was played along with the song: until Play or Reset.
+	// The fingerboard places they are shown at, kept from reading to
+	// reading so the tracking mode can choose the next ones from them.
+	fb_pos:      [INPUT_NOTES]Fb_Pos,
+	fb_midis:    [INPUT_NOTES]int,
+	fb_n:        int,
+	// What was played along with the song, and (Check) how each note of the
+	// layer went: until Play or Reset.
 	take:        [dynamic]Take_Point,
+	checks:      [dynamic]Check_Note,
+	was_playing: bool,
 	scope:       Play_Scope,
 }
 
@@ -93,7 +132,9 @@ input_init :: proc() {
 input_shutdown :: proc() {
 	input_close()
 	delete(g.input.take)
+	delete(g.input.checks)
 	g.input.take = nil
+	g.input.checks = nil
 }
 
 input_devices_refresh :: proc() {
@@ -117,9 +158,9 @@ input_open :: proc() -> bool {
 	}
 	in_.open = true
 	lo, hi := input_range()
-	music.pitch_init(&in_.det, lo, hi)
+	music.chord_init(&in_.det, lo, hi)
 	in_.det.sensitivity = in_.sensitivity
-	in_.midi = 0
+	in_.n = 0
 	return true
 }
 
@@ -128,7 +169,7 @@ input_close :: proc() {
 	if !g.input.open do return
 	mic_os_close(&g.input.os)
 	g.input.open = false
-	g.input.midi = 0
+	g.input.n = 0
 }
 
 input_toggle :: proc() {
@@ -156,6 +197,17 @@ input_set_device :: proc(i: int) {
 
 input_reset :: proc() {
 	clear(&g.input.take)
+	clear(&g.input.checks)
+}
+
+input_mode_step :: proc() {
+	g.input.mode = g.input.mode == .Notes ? .Check : .Notes
+	switch g.input.mode {
+	case .Notes:
+		set_status("input: the notes you play are shown")
+	case .Check:
+		set_status("check: play along - each note turns green (right), blue (nearly) or red (missed) once it has passed")
+	}
 }
 
 // The notes to listen for: the active layer's instrument's range.
@@ -169,38 +221,137 @@ input_range :: proc() -> (lo, hi: f32) {
 }
 
 // Every frame: collect what the mic heard, find the notes in it, and while
-// playing, add them to the take.
+// playing, add them to the take (and check them).
 input_update :: proc() {
 	in_ := &g.input
-	if !in_.on || !in_.open do return
+	if !in_.on || !in_.open {
+		in_.was_playing = g.player.playing
+		return
+	}
 	samples: [MIC_BUF * MIC_BUFS]f32
 	n := mic_os_read(&in_.os, samples[:])
 	lo, hi := input_range()
-	music.pitch_set_range(&in_.det, lo, hi)
+	music.chord_set_range(&in_.det, lo, hi)
 	in_.det.sensitivity = in_.sensitivity
-	readings: [64]music.Pitch_Reading
-	k := music.pitch_feed(&in_.det, samples[:n], readings[:])
+	readings: [32]music.Chord_Reading
+	k := music.chord_feed(&in_.det, samples[:n], readings[:])
 	now := rl.GetTime()
-	for r in readings[:k] {
+	for &r in readings[:k] {
 		heard := now - f64(r.delay) / music.PITCH_RATE - f64(in_.latency_ms) / 1000
-		input_heard(r.midi, heard)
+		input_heard(&r, heard)
 	}
 	// A reading that has not come for a while (a stalled device) is stale.
-	if now - in_.heard_at > 0.3 do in_.midi = 0
+	if now - in_.heard_at > 0.3 do in_.n = 0
+	check_update()
 }
 
-// One reading: `midi` (0 = nothing) was sounding at time `heard` (the
-// frame clock). Also what the screenshot tool feeds.
-input_heard :: proc(midi: f32, heard: f64) {
+// One reading, of what was sounding at time `heard` (the frame clock). Also
+// what the screenshot tool feeds.
+input_heard :: proc(r: ^music.Chord_Reading, heard: f64) {
 	in_ := &g.input
-	in_.midi = midi
+	in_.n = min(r.n, INPUT_NOTES)
+	for i in 0 ..< in_.n do in_.notes[i] = r.notes[i]
 	in_.heard_at = rl.GetTime()
 	if !g.player.playing do return
 	tick := player_tick_at(&g.player, &g.song, heard)
 	if tick < f32(g.player.from_tick) do return
 	if g.player.stop_tick > 0 && tick >= f32(g.player.stop_tick) do return
-	append(&in_.take, Take_Point{tick, midi})
+	p := Take_Point{tick = tick, n = u8(in_.n)}
+	for i in 0 ..< in_.n do p.notes[i] = in_.notes[i]
+	append(&in_.take, p)
+	if in_.mode == .Check do check_reading(r, tick)
 }
+
+// ---------------------------------------------------------------------------
+// Check mode
+// ---------------------------------------------------------------------------
+
+// A reading heard at `tick`: every note of the layer sounding then (past its
+// first moment - the attack - and before its last) gets its verdict on it.
+@(private = "file")
+check_reading :: proc(r: ^music.Chord_Reading, tick: f32) {
+	t := active_track()
+	if t == nil do return
+	spt := f32(music.tick_seconds(&g.song))
+	// Everything the layer has sounding now, for chord_check.
+	expected: [16]int
+	ne := 0
+	for note in t.notes {
+		if f32(note.tick) > tick do break
+		if tick < f32(note.tick + note.len) && ne < len(expected) {expected[ne] = music.pitch_midi(note.pitch); ne += 1}
+	}
+	for note in t.notes {
+		if f32(note.tick) > tick do break
+		ln := f32(note.len)
+		skip := min(0.1 / spt, ln * 0.35) // the attack
+		tail := min(0.04 / spt, ln * 0.15) // ...and the release
+		if tick < f32(note.tick) + skip || tick >= f32(note.tick) + ln - tail do continue
+		m := music.pitch_midi(note.pitch)
+		c := check_find(note.tick, m)
+		if c == nil {
+			append(&g.input.checks, Check_Note{tick = note.tick, len = note.len, midi = i16(m)})
+			c = &g.input.checks[len(g.input.checks) - 1]
+		}
+		if c.final do continue
+		f, cents := music.chord_check(r, m, expected[:ne])
+		music.check_add(&c.tally, f, cents)
+		c.verdict = music.check_verdict(c.tally)
+	}
+}
+
+check_find :: proc(tick: i32, midi: int) -> ^Check_Note {
+	for &c in g.input.checks do if c.tick == tick && int(c.midi) == midi do return &c
+	return nil
+}
+
+// Notes the playhead (as heard) has passed are judged for good; when play
+// stops, the rest are, and the status line says how it went.
+check_update :: proc() {
+	in_ := &g.input
+	if in_.mode == .Check {
+		if g.player.playing {
+			heard := player_tick_at(&g.player, &g.song, rl.GetTime() - f64(in_.latency_ms) / 1000 - 0.12)
+			for &c in in_.checks do if !c.final && f32(c.tick + c.len) <= heard do c.final = true
+		} else if in_.was_playing {
+			right, near, missed := 0, 0, 0
+			for &c in in_.checks {
+				c.final = true
+				switch c.verdict {
+				case .Correct:
+					right += 1
+				case .Almost:
+					near += 1
+				case .Missed:
+					missed += 1
+				case .None:
+				}
+			}
+			if len(in_.checks) > 0 do set_status("checked %d notes: %d right, %d nearly, %d missed", right + near + missed, right, near, missed)
+		}
+	}
+	in_.was_playing = g.player.playing
+}
+
+// The outline a checked note gets on the sheet: green right, blue nearly, red
+// missed; ok false if it has none (yet).
+check_colour :: proc(tick: i32, midi: int) -> (col: rl.Color, final: bool, ok: bool) {
+	if g.input.mode != .Check do return
+	c := check_find(tick, midi)
+	if c == nil do return
+	switch c.verdict {
+	case .Correct:
+		col = COL_GOOD
+	case .Almost:
+		col = CHECK_BLUE
+	case .Missed:
+		col = COL_BAD
+	case .None:
+		return
+	}
+	return col, c.final, true
+}
+
+CHECK_BLUE :: rl.Color{80, 160, 255, 255}
 
 // ---------------------------------------------------------------------------
 // Drawing
@@ -221,7 +372,7 @@ input_colour :: proc() -> rl.Color {
 // row's edge).
 @(private = "file")
 input_y :: proc(midi: f32) -> (y: f32, step: int, cents: int) {
-	m := int(math.round(midi))
+	m := note_of(midi)
 	p := music.pitch_from_midi(m, int(g.song.key))
 	step = clamp(int(p.step), sheet_lo(), sheet_hi())
 	cents = int(math.round((midi - f32(m)) * 100))
@@ -237,28 +388,32 @@ input_sheet_draw :: proc() {
 	pe := ps + f32(page_ticks())
 	left, right := f32(bars_x()), f32(bars_x() + bars_w())
 
-	// The take: a line through the readings, broken where nothing was played
-	// (or where readings are more than a sixteenth apart).
+	// The take: a line for each note, from each reading to the next - to the
+	// nearest note of the reading before (within a tone and a half), broken
+	// where nothing was played or readings are more than a sixteenth apart.
 	gap := f32(music.TPQ) / 4
 	prev: Take_Point
-	have := false
-	for p in in_.take {
-		if p.tick < ps - gap || p.tick > pe + gap {have = false; continue}
-		if p.midi <= 0 {have = false; continue}
-		if have && p.tick - prev.tick <= gap && p.tick >= prev.tick {
+	for &p in in_.take {
+		if p.tick < ps - gap || p.tick > pe + gap {prev = {}; continue}
+		if prev.n > 0 && p.tick - prev.tick <= gap && p.tick >= prev.tick {
 			x0 := clamp(left + (prev.tick - ps) * px_per_tick(), left, right)
 			x1 := clamp(left + (p.tick - ps) * px_per_tick(), left, right)
-			y0, _, _ := input_y(prev.midi)
-			y1, _, _ := input_y(p.midi)
-			same := int(math.round(prev.midi)) == int(math.round(p.midi))
-			rl.DrawLineEx({x0, y0}, {x1, y1}, same ? 4 : 1.5, same ? col : with_alpha(col, 150))
+			for a in p.notes[:p.n] {
+				from := f32(-1)
+				best := f32(1.5)
+				for b in prev.notes[:prev.n] do if abs(a - b) < best {best = abs(a - b); from = b}
+				if from < 0 do continue
+				y0, _, _ := input_y(from)
+				y1, _, _ := input_y(a)
+				same := int(math.round(from)) == int(math.round(a))
+				rl.DrawLineEx({x0, y0}, {x1, y1}, same ? 4 : 1.5, same ? col : with_alpha(col, 150))
+			}
 		}
 		prev = p
-		have = true
 	}
 
 	if !in_.on do return
-	// The live dot.
+	// The live dots.
 	x := f32(-1)
 	if g.player.playing {
 		t := player_tick(&g.player, &g.song)
@@ -267,24 +422,30 @@ input_sheet_draw :: proc() {
 		c := play_from()
 		if f32(c) >= ps && f32(c) < pe do x = tick_x(c)
 	}
-	if x < 0 || in_.midi <= 0 do return
-	y, _, cents := input_y(in_.midi)
+	if x < 0 || in_.n == 0 do return
 	r := clamp(row_h() * 0.75, 9, 14)
-	rl.DrawCircleV({x, y}, r + 2, {0, 0, 0, 160})
-	rl.DrawCircleV({x, y}, r, col)
-	rl.DrawCircleLines(i32(x), i32(y), r + 2, rl.WHITE)
-	s := fmt.tprintf("%s %s%d", midi_name(int(math.round(in_.midi))), cents >= 0 ? "+" : "", cents)
-	lx := x + r + 6
-	if lx + text_width(s) + 6 > right do lx = x - r - 10 - text_width(s)
-	fill(rect(lx - 3, y - 7, text_width(s) + 6, 14), {0, 0, 0, 170})
-	text(s, lx, y - 5, abs(cents) <= 10 ? COL_GOOD : (abs(cents) <= 25 ? COL_ACCENT : COL_BAD))
+	last_label := f32(-1000)
+	for i := in_.n - 1; i >= 0; i -= 1 { // top down, for the labels
+		midi := in_.notes[i]
+		y, _, cents := input_y(midi)
+		rl.DrawCircleV({x, y}, r + 2, {0, 0, 0, 160})
+		rl.DrawCircleV({x, y}, r, col)
+		rl.DrawCircleLines(i32(x), i32(y), r + 2, rl.WHITE)
+		s := fmt.tprintf("%s %s%d", midi_name(note_of(midi)), cents >= 0 ? "+" : "", cents)
+		ly := max(y, last_label + 14) // labels kept apart when notes are close
+		last_label = ly
+		lx := x + r + 6
+		if lx + text_width(s) + 6 > right do lx = x - r - 10 - text_width(s)
+		fill(rect(lx - 3, ly - 7, text_width(s) + 6, 14), {0, 0, 0, 170})
+		text(s, lx, ly - 5, abs(cents) <= 10 ? COL_GOOD : (abs(cents) <= 25 ? COL_ACCENT : COL_BAD))
+	}
 }
 
 // ---------------------------------------------------------------------------
 // The practice controls: under the sheet, right of the page boxes.
 // ---------------------------------------------------------------------------
 
-PRACTICE_W :: 256
+PRACTICE_W :: 304
 
 practice_draw :: proc() {
 	y := f32(STRIP_Y)
@@ -300,6 +461,8 @@ practice_draw :: proc() {
 	x += 48
 	if button(rect(x, y, 36, h), "Mic", g.input.on) do input_toggle()
 	x += 38
+	if button(rect(x, y, 44, h), g.input.mode == .Check ? "Check" : "Notes", g.input.mode == .Check) do input_mode_step()
+	x += 48
 	// The level, with the gate's threshold marked.
 	{
 		r := rect(x, y + 3, 34, h - 6)
@@ -307,7 +470,7 @@ practice_draw :: proc() {
 		if g.input.on {
 			d := &g.input.det
 			lvl := level_frac(d.level)
-			fill(rect(r.x, r.y, r.width * lvl, r.height), g.input.midi > 0 ? input_colour() : COL_DIM)
+			fill(rect(r.x, r.y, r.width * lvl, r.height), g.input.n > 0 ? input_colour() : COL_DIM)
 			thr := level_frac(max(d.floor * d.sensitivity, music.PITCH_ABS_MIN))
 			rl.DrawLineEx({r.x + r.width * thr, r.y - 2}, {r.x + r.width * thr, r.y + r.height + 2}, 1, COL_TEXT)
 		}
@@ -316,7 +479,7 @@ practice_draw :: proc() {
 	x += 36
 	if button(rect(x, y, 18, h), "v", g.overlay == .Mic) do g.overlay = .Mic
 	x += 22
-	if button(rect(x, y, 44, h), "Reset", false, len(g.input.take) > 0) {
+	if button(rect(x, y, 44, h), "Reset", false, len(g.input.take) > 0 || len(g.input.checks) > 0) {
 		input_reset()
 		set_status("take cleared")
 	}
@@ -347,7 +510,7 @@ mic_overlay_draw :: proc() {
 	if !in_.listed do input_devices_refresh()
 	W :: f32(340)
 	rows := in_.n_devices + 1
-	H := 200 + f32(rows) * 22
+	H := 212 + f32(rows) * 22
 	r := rect(f32(bars_x() + bars_w()) - W, f32(STRIP_Y) - H - 4, W, H)
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
@@ -372,7 +535,7 @@ mic_overlay_draw :: proc() {
 	m := rect(x + 40, y, W - 60, 14)
 	fill(m, COL_SHEET)
 	if in_.on {
-		fill(rect(m.x, m.y, m.width * level_frac(d.level), m.height), in_.midi > 0 ? input_colour() : COL_DIM)
+		fill(rect(m.x, m.y, m.width * level_frac(d.level), m.height), in_.n > 0 ? input_colour() : COL_DIM)
 		fl := level_frac(d.floor)
 		rl.DrawLineEx({m.x + m.width * fl, m.y}, {m.x + m.width * fl, m.y + m.height}, 2, COL_FAINT)
 		th := level_frac(max(d.floor * d.sensitivity, music.PITCH_ABS_MIN))
@@ -381,7 +544,7 @@ mic_overlay_draw :: proc() {
 	outline(m, COL_EDGE)
 	y += 18
 	if in_.on {
-		note := in_.midi > 0 ? fmt.tprintf("%s  %.1f Hz", midi_name(int(math.round(in_.midi))), music.midi_freq(in_.midi)) : "-"
+		note := input_names()
 		room := d.floor > 0 ? fmt.tprintf("%.0f dB", 20 * math.log10(d.floor)) : "-"
 		text(fmt.tprintf("hearing: %s     room %s", note, room), x + 40, y, COL_TEXT)
 	} else {
@@ -403,5 +566,24 @@ mic_overlay_draw :: proc() {
 	text("Playing along? Use headphones - the mic hears speakers too.", x, y, COL_FAINT)
 	y += 12
 	text("Listens for the active layer's range. I: mic   K: metronome", x, y, COL_FAINT)
+	y += 12
+	text("Notes / Check (beside Mic): show what you play, or check it.", x, y, COL_FAINT)
 	if hovered(r) do ui_take_all()
+}
+
+// "D3 A3" - the notes heard now, or "-".
+input_names :: proc() -> string {
+	in_ := &g.input
+	if in_.n == 0 do return "-"
+	s := ""
+	for f in in_.notes[:in_.n] {
+		m := note_of(f)
+		s = len(s) == 0 ? midi_name(m) : fmt.tprintf("%s %s", s, midi_name(m))
+	}
+	return s
+}
+
+// The MIDI note nearest a fractional one, kept to the MIDI range.
+note_of :: proc(f: f32) -> int {
+	return clamp(int(math.round(f)), 0, 127)
 }

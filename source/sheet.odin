@@ -380,6 +380,14 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tr
 			if active do outline(head, {0, 0, 0, 120})
 		}
 		if sounding do outline(rect(x0 - 1, yc - note_half() - 1, x1 - x0 + 2, 2 * note_half() + 2), rl.WHITE)
+		// Check mode (input.odin): how it was played - green right, blue
+		// nearly, red missed; thin while it is still being judged.
+		if active {
+			if cc, final, ok := check_colour(n.tick, music.pitch_midi(n.pitch)); ok {
+				r := rect(x0 - 3, yc - note_half() - 3, x1 - x0 + 6, 2 * note_half() + 6)
+				rl.DrawRectangleLinesEx(r, final ? 2 : 1, final ? cc : with_alpha(cc, 150))
+			}
+		}
 		if active && i == g.selected do outline(rect(x0 - 2, yc - note_half() - 2, x1 - x0 + 4, 2 * note_half() + 4), COL_ACCENT)
 
 		// Accidentals, only where the key signature does not already say so.

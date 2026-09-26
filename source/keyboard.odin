@@ -166,7 +166,9 @@ keyboard_draw :: proc() {
 	}
 	key_fill :: proc(m, target, here, selected: int, sounding: []int, trail: []Tracked, first_step, steps: int, base: rl.Color) -> rl.Color {
 		c := base
-		if !fb_in_key(m) do c = kb_is_black(m) ? rl.Color{58, 56, 62, 255} : rl.Color{120, 118, 112, 255}
+		// Outside the filter's key: white keys go grey, black keys go white -
+		// a dark grey black key would look much like any other.
+		if !fb_in_key(m) do c = kb_is_black(m) ? rl.Color{214, 210, 198, 255} : rl.Color{120, 118, 112, 255}
 		for s in sounding do if s == m do c = COL_ACCENT
 		for tr in trail do if tr.midi == m do c = colour_mix(c, track_colour(tr.step), f32(fade({0, 0, 0, 255}, tr.step - first_step, steps).a) / 255)
 		if m == target || m == here do c = COL_ACCENT
@@ -231,10 +233,11 @@ keyboard_draw :: proc() {
 	}
 
 	// Input mode: the note being played, on its key, off-centre by its cents.
-	if g.input.on && g.input.midi > 0 {
-		m := int(math.round(g.input.midi))
-		if _, ok := kb_key_rect(m); ok {
-			cents := g.input.midi - f32(m)
+	if g.input.on {
+		for f in g.input.notes[:g.input.n] {
+			m := note_of(f)
+			if _, ok := kb_key_rect(m); !ok do continue
+			cents := f - f32(m)
 			p := kb_point(m)
 			p.y -= cents * row_h() * 0.5
 			col := input_colour()
@@ -317,12 +320,13 @@ keyboard_controls :: proc(t: ^music.Track, lo, hi, here: int) {
 	if g.input.on {
 		label("MIC", x, y)
 		y += 13
-		if g.input.midi > 0 {
-			mm := int(math.round(g.input.midi))
-			c := int(math.round((g.input.midi - f32(mm)) * 100))
+		if g.input.n == 0 do text("-", x, y, COL_DIM, FONT_BIG)
+		for i := g.input.n - 1; i >= 0; i -= 1 { // highest first
+			f := g.input.notes[i]
+			mm := note_of(f)
+			c := int(math.round((f - f32(mm)) * 100))
 			text(fmt.tprintf("%s %s%d", fb_name(mm), c >= 0 ? "+" : "", c), x, y, abs(c) <= 10 ? COL_GOOD : (abs(c) <= 25 ? COL_ACCENT : COL_BAD), FONT_BIG)
-		} else {
-			text("-", x, y, COL_DIM, FONT_BIG)
+			y += 22
 		}
 	}
 

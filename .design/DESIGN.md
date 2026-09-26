@@ -268,7 +268,41 @@ Play along on a real instrument and see what was played (`source/input.odin`).
   driver thread is about to call, and the buffers live in `App` so they do not move.
   Every device from `waveInGetNumDevs` is listed. Other platforms: `mic_other.odin`, a
   stub that says so.
-- **Detection** (`music/pitch.odin`, headless): a 4th-order high-pass a fifth below the
+- **Detection: chords** (`music/chord.odin`, headless) - what the input mode uses. Every
+  256 samples (12 ms): the band-pass (4th-order high-pass a fifth below the range, low-pass
+  at 5 kHz); a Hann window and radix-2 FFT of 4096 samples (186 ms: C2 and C#2 are 4 Hz
+  apart) when the range goes below ~F#3, else 2048; the room's spectrum learned per bin
+  from frames with no note and no loudness (fast down, slow up), subtracted twice over,
+  the rest square-rooted; the RMS gate as below. **Salience** of every candidate a fifth
+  of a semitone apart over the range ±1: its 14 harmonics' peaks (±1.5 %), Klapuri's
+  weights `(f+27)/(hf+320)`, less half of what lies half-way between harmonics (so
+  "notes" made of a low note's close-packed upper harmonics score nothing). **One at a
+  time**: the best candidate (well above the average of all, and after the first at
+  least 0.3 of it - 0.55 an octave or a twelfth above a note found), its frequency
+  refined from its harmonics' interpolated peaks, then its harmonics - all of them, to 5
+  kHz - taken out down to a smooth envelope (a partial taller than its neighbours' mean
+  keeps the excess: another note's share). Up to 4 notes. **Steadiness**: a note is
+  reported after 2 frames running, dropped after 3 missing. Each reading also carries,
+  for every semitone, its presence in what is left after the notes found are taken out
+  (and 255 for those found), with its cents.
+  `tools/chord_test` renders single notes, cello double and triple stops, piano triads,
+  violin double stops and guitar chords (16-bit and 8-bit), adds a noisy room, and
+  scores it: 94-100 % of up to three notes found, no false notes, nothing in the silence;
+  with the room 12 dB louder the same but the piano triads (81 %, decaying notes); guitar
+  chords of 4-6 notes 98 % (of three), with some extra notes - beyond the goal. About
+  0.35 ms an analysis optimised, 1.3 ms in a debug build.
+- **Checking** (`chord_check`, `check_verdict`): for each note of the layer sounding
+  when a reading was heard (past its first 0.1 s and before its last 0.04 s): Good if a
+  note found is within half a semitone and 25 cents, or if what is left there has
+  presence ≥ 38/255 within 25 cents; Near if out of tune, or a note found is a semitone
+  off or the same note in another octave - not counting notes found that are other
+  notes of the chord played right; else Miss. A note is Correct when Good for at least
+  half its readings, Almost when Good or Near for 40 %, else Missed; judged once the
+  playhead (as heard) has passed it. `tools/chord_test` checks the verdicts: a right
+  chord, 35 cents sharp, a semitone up, a note left out, nothing, another chord, cello
+  double and triple stops, the wrong octave.
+- **Detection: one note** (`music/pitch.odin`, kept, not used by the app now): a 4th-order
+  high-pass a fifth below the
   instrument's lowest note and a low-pass above its top note's 2nd harmonic; an RMS
   noise gate whose floor is learned only from readings that are not notes (quick down,
   slow up), threshold `floor × sensitivity` (2 = 6 dB) with hysteresis; YIN (cumulative
@@ -278,14 +312,16 @@ Play along on a real instrument and see what was played (`source/input.odin`).
   `tools/pitch_test` renders a cello part (32-bit bowed and 16-bit), adds hiss, 50 Hz
   hum, fan rumble and a murmur of voices, and checks it: 99-100 % of readings right,
   ~6 cents mean error, no notes in the noise; with the room 12 dB louder, 96 %.
-- **Timing**: each reading carries its delay (half the analysed stretch plus the
-  median's lag) and the Latency setting adds the driver's; `player_tick_at` turns the
+- **Timing**: each reading carries its delay (half the analysed stretch plus a frame for
+  steadiness) and the Latency setting adds the driver's; `player_tick_at` turns the
   moment it was heard into a fractional tick.
-- **Display**: the live dot (hue of the layer's colour turned 180°) at the playhead or
-  the bar cursor, displaced from the row's middle by the cents; the take, a line
-  through the readings recorded while playing (broken at silences), cleared by Play and
-  Reset; with the Helper on, a marker on the fingerboard at the place `fb_choose` picks
-  in the current tracking mode, slid along the string by the cents.
+- **Display**: a live dot per note (hue of the layer's colour turned 180°) at the playhead
+  or the bar cursor, displaced from the row's middle by the cents; the take, a line per
+  note through the readings recorded while playing (each joined to the nearest note of the
+  reading before, broken at silences), cleared by Play and Reset; with the Helper on,
+  markers on the fingerboard at the places `fb_choose_step` picks for the chord in the
+  current tracking mode, slid along the strings by the cents, or dots on the keyboard's
+  keys. In Check mode, the layer's notes get their verdict's outline (thin while judged).
 
 Playing along through speakers, the mic hears the song too: headphones.
 
@@ -303,7 +339,8 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `source/music/` | package `music` — **no raylib**. Theory (pitches, keys, lengths), the song model, the `.song` format, the instrument table, the synth engine, sound effects, the Mixer, WAV writing and MIDI import. Headless, so `tools/render` can use it, and so can any other program (§4.2) |
 | `source/music_rl/` | package `music_rl`: the Mixer's sound out through a raylib `AudioStream`. The only raylib-facing piece of the engine |
 | `tools/render/` | CLI: render a `.song` or `.mid` straight to WAV, or sound effects (`-- sfx cannon`, `-- sfx all`) |
-| `tools/pitch_test/` | checks the input mode's pitch detection on a rendered cello part in a noisy room (`-- -noisy` for a louder one) |
+| `tools/pitch_test/` | checks the one-note pitch detection on a rendered cello part in a noisy room (`-- -noisy` for a louder one) |
+| `tools/chord_test/` | checks the chord detection and the Check mode's verdicts on rendered chords in a noisy room (`-- -noisy`, `-- -v`) |
 | `examples/battle_demo/` | the engine inside another program: a march with layers toggled live, battle sounds on keys |
 | `instruments/` | the orchestra, `.inst` files |
 | `sounds/` | sound effects, `.sfx` files |
@@ -433,8 +470,8 @@ the cello's but whatever the selected layer's instrument file describes.
   which is exactly the white keys, so each white key is drawn across its row
   (`row_y(step)`, whatever range the sheet shows) and each black key (64 % of a row high,
   60 % of a white key long) straddles the line between its two. Low at the bottom, the
-  black keys' end toward the sheet. Lit as the fingerboard is; the key filter greys keys
-  outside the key; tracking (`kb_track`) keeps the last N steps (notes starting within 6
+  black keys' end toward the sheet. Lit as the fingerboard is; the key filter greys the white keys
+  outside the key and turns the black ones white; tracking (`kb_track`) keeps the last N steps (notes starting within 6
   ticks while the first sounds are one step) without places to choose, fills each key in
   its step's colour and draws the path from the nearest note of the step before; the
   sheet takes the same colours (`fb_current_trail`). The input dot sits on the heard
