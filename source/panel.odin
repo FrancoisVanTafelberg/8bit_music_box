@@ -374,6 +374,7 @@ statusbar_draw :: proc() {
 	age := rl.GetTime() - g.status_time
 	fb_msg, on_board := "", false
 	if g.helper && fb_board() != nil do fb_msg, on_board = fingerboard_status()
+	if g.helper && kb_board() != nil do fb_msg, on_board = keyboard_status()
 	if on_board {
 		text(fb_msg, 8, y + 5, COL_TEXT)
 		return

@@ -20,6 +20,10 @@ package music
                                           # used), and optionally the thumb
         board_default 1st                 # the hand position the Helper starts on
 
+    A keyboard instrument has a keyboard instead:
+
+        keyboard 1                        # the Helper shows a keyboard over its range
+
     An instrument without a `board` line has no fingerboard (the Helper says
     so). Up to BOARD_MAX_POSITIONS positions; a block that says `position` at
     all replaces the positions it was based on.
@@ -54,6 +58,9 @@ Board :: struct {
 	positions:   [BOARD_MAX_POSITIONS]Board_Position,
 	n_positions: u8,
 	default_pos: u8,
+	// A keyboard (piano, harpsichord, organ, celesta) instead of strings:
+	// the Helper draws its keys over the instrument's range.
+	keyboard:    bool,
 }
 
 board_position_name :: proc(p: ^Board_Position) -> string {return string(p.name[:p.name_len])}
@@ -92,6 +99,8 @@ board_line :: proc(b: ^Board, cmd: string, a: []string, fresh_positions: ^bool) 
 		b.reach = ok2 ? i8(clamp(r, 5, n)) : i8(min(n, 20))
 	case "frets":
 		b.frets = len(a) > 0 && a[0] == "1"
+	case "keyboard":
+		b.keyboard = len(a) == 0 || a[0] == "1"
 	case "position":
 		if len(a) < 6 do return "position: \"name\" short f1 f2 f3 f4 [thumb]  (semitones above the open string, 0 = finger not used)"
 		if !fresh_positions^ {
@@ -126,6 +135,7 @@ board_line :: proc(b: ^Board, cmd: string, a: []string, fresh_positions: ^bool) 
 
 // The board as `define_instrument` lines (a song that embeds the instrument).
 board_write :: proc(w: ^strings.Builder, b: ^Board) {
+	if b.keyboard do fmt.sbprintln(w, "keyboard 1")
 	if b.n_strings == 0 do return
 	buf: [8]u8
 	fmt.sbprint(w, "board")

@@ -195,7 +195,7 @@ inst_block_build :: proc(
 			}
 			ins.resonances[ins.n_resonances] = r
 			ins.n_resonances += 1
-		case "board", "board_mm", "board_semis", "frets", "position", "board_default":
+		case "board", "board_mm", "board_semis", "frets", "position", "board_default", "keyboard":
 			if msg := board_line(&ins.board, l.cmd, a, &fresh_positions); msg != "" do bad(rep, where_, l.no, msg)
 		case "color", "colour":
 			if len(a) < 3 {bad(rep, where_, l.no, "color: r g b"); continue}

@@ -616,7 +616,6 @@ fingerboard_status :: proc() -> (string, bool) {
 }
 
 // "G", "Bb", "F#" for a key signature.
-@(private = "file")
 key_short :: proc(key: int) -> string {
 	n := music.key_name(key)
 	for i in 0 ..< len(n) do if n[i] == ' ' do return n[:i]

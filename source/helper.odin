@@ -33,7 +33,7 @@ helper_toggle :: proc() {
 		g.helper_fit = g.fit_range
 		g.fit_range = true
 		g.fb_inst_ok = false
-		set_status("Helper on: the selected layer's fingerboard on the right - pick a string layer")
+		set_status("Helper on: the selected layer's fingerboard (or keyboard) on the right")
 	} else {
 		g.fit_range = g.helper_fit
 		set_status("Helper off")
@@ -46,6 +46,10 @@ helper_draw :: proc() {
 	rl.DrawLine(FB_X, TOP_H, FB_X, 720 - STATUS_H, COL_EDGE)
 	if fb_board() != nil {
 		fingerboard_draw()
+		return
+	}
+	if kb_board() != nil {
+		keyboard_draw()
 		return
 	}
 	x0 := f32(FB_X + 8)
@@ -74,7 +78,7 @@ helper_draw :: proc() {
 	y += 14
 	line := ""
 	for &ins in music.reg().list {
-		if ins.board.n_strings == 0 do continue
+		if ins.board.n_strings == 0 && !ins.board.keyboard do continue
 		next := len(line) == 0 ? ins.name : fmt.tprintf("%s, %s", line, ins.name)
 		if text_width(next) > box.width - 20 && len(line) > 0 {
 			text_centered(fmt.tprintf("%s,", line), rect(box.x, y, box.width, 12), COL_DIM)

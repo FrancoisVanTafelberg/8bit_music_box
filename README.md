@@ -26,10 +26,22 @@ you are editing survives. `F5` forces a reload, `F6` restarts.
 **Helper** in the top bar (or `H`): a practice view for string players. The layer panel
 narrows, the sheet shows only the selected layer's instrument's rows (the **inst** range;
 turning the Helper off puts back what was there), and the right-hand side shows that
-instrument's **fingerboard**. Select another layer and the board changes with it. Boards
-come from the instrument files: the **violin**, **viola**, **cello**, **contrabass** and
-**guitar** have one; for any other instrument the panel says the fingerboard is not
-implemented for it yet. (This replaces the separate Cello Helper program.)
+instrument's **fingerboard** - or, for the **piano**, **harpsichord**, **celesta** and
+**organ**, its **keyboard**. Select another layer and it changes with it. Boards come from
+the instrument files: the **violin**, **viola**, **cello**, **contrabass** and **guitar**
+have a fingerboard, the keyboard instruments a keyboard; for any other instrument the
+panel says the fingerboard is not implemented for it yet. (This replaces the separate
+Cello Helper program.)
+
+The keyboard is turned on its side and lined up with the sheet: every white key lies
+right beside its row (the rows are the white keys, a letter each) and every black key on
+the line between its two, low notes at the bottom, the black keys toward the sheet. Point
+at a note on the sheet and its key lights; point at a key and its row lights; click a key
+to hear it; the sounding notes light while playing. Beside it: the key filter (keys outside
+the chosen key go grey), **Tracking** (the last N notes up to the playhead or the selected
+note, each key filled in its step's colour with the hand's path drawn from key to key, and
+the same colours on the sheet), what the pointed-at note is, and in input mode the note
+the mic hears - also a dot on its key, off-centre by how sharp or flat it is.
 
 The fingerboard is the player's view down the neck: nut at the top, lowest string on the
 left, every place a finger can stop a string from the open string to the end of the

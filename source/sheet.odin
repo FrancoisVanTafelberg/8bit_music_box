@@ -216,6 +216,12 @@ sheet_draw :: proc() {
 	if hov.ok do fill(rect(panel_w(), row_y(hov.step), sheet_r() - panel_w(), row_h()), {255, 255, 255, 10})
 	// ...and with the Helper on, the row of the fingerboard note under the
 	// mouse, so a position on the board can be found on the staff.
+	if g.helper && kb_board() != nil && overlay_none() {
+		if m := kb_hover(); m >= 0 {
+			step := int(music.pitch_from_midi(m, fb_spell_key()).step)
+			if step >= sheet_lo() && step <= sheet_hi() do fill(rect(panel_w(), row_y(step), sheet_r() - panel_w(), row_h()), with_alpha(COL_ACCENT, 40))
+		}
+	}
 	if g.helper && fb_board() != nil {
 		if fh := fb_hover(); fh.ok && overlay_none() {
 			step := int(music.pitch_from_midi(fb_midi(fh), fb_spell_key()).step)

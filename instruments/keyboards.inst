@@ -6,6 +6,9 @@
 # The format is described in README.txt in this folder. Ranges are sounding
 # pitch (what you hear), not the written pitch of transposing instruments.
 
+# `keyboard 1`: the Helper shows a keyboard for these, lined up with the
+# sheet's rows (the celesta's keys are named as they sound, an octave above
+# where its part is written).
 define_instrument piano
 name "Piano"
 family keyboards
@@ -21,6 +24,7 @@ metallic 0
 gain 0.6
 pan 0
 color 110 170 250
+keyboard 1
 end
 
 define_instrument harpsichord
@@ -38,6 +42,7 @@ metallic 0
 gain 0.8
 pan 0
 color 140 190 240
+keyboard 1
 end
 
 define_instrument celesta
@@ -55,6 +60,7 @@ metallic 0
 gain 0.9
 pan 0.2
 color 160 210 255
+keyboard 1
 end
 
 define_instrument organ
@@ -72,4 +78,5 @@ metallic 0
 gain 0.4
 pan 0
 color 80 140 230
+keyboard 1
 end

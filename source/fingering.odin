@@ -297,7 +297,6 @@ fb_point :: proc(p: Fb_Pos) -> rl.Vector2 {
 }
 
 // A line that blends from one colour to the other, in pieces.
-@(private = "file")
 gradient_line :: proc(a, b: rl.Vector2, ca, cb: rl.Color, width: f32) {
 	PIECES :: 16
 	for k in 0 ..< PIECES {
@@ -307,7 +306,6 @@ gradient_line :: proc(a, b: rl.Vector2, ca, cb: rl.Color, width: f32) {
 	}
 }
 
-@(private = "file")
 arrow_head :: proc(from, to: rl.Vector2, back: f32, c: rl.Color) {
 	d := to - from
 	l := math.sqrt(d.x * d.x + d.y * d.y)
@@ -402,7 +400,13 @@ fb_track_draw :: proc(list: []Tracked) {
 // when tracking is off. Oldest first.
 fb_current_trail :: proc(out: []Tracked) -> int {
 	t := active_track()
-	if t == nil || !g.fb_track || fb_board() == nil do return 0
+	if t == nil || !g.fb_track do return 0
+	if kb_board() != nil {
+		if g.player.playing do return kb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_n, out)
+		if g.selected >= 0 && g.selected < len(t.notes) do return kb_track(t, 0, g.selected, g.fb_track_n, out)
+		return 0
+	}
+	if fb_board() == nil do return 0
 	if g.player.playing do return fb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_mode, g.fb_track_n, out)
 	if g.selected >= 0 && g.selected < len(t.notes) do return fb_track(t, 0, g.selected, g.fb_track_mode, g.fb_track_n, out)
 	return 0

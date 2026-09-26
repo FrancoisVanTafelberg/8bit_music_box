@@ -298,7 +298,7 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `main_hot_reload/` | the hot-reload host, unchanged apart from names: owns the window, swaps `build/hot_reload/game.dll` |
 | `main_release/` | shipping entry point |
 | `source/` | package `app` — one package, one file per concern. All state in one `App` block (`g`) so hot reload keeps the song you are editing |
-| `source/helper.odin` | the Helper: the selected string layer's fingerboard (§4.3) |
+| `source/helper.odin` | the Helper: the selected layer's fingerboard (`fingerboard.odin`) or keyboard (`keyboard.odin`) (§4.3) |
 | `source/rlu/` | virtual resolution, vendored from Animal Kingdoms (canvas 1280 × 720) |
 | `source/music/` | package `music` — **no raylib**. Theory (pitches, keys, lengths), the song model, the `.song` format, the instrument table, the synth engine, sound effects, the Mixer, WAV writing and MIDI import. Headless, so `tools/render` can use it, and so can any other program (§4.2) |
 | `source/music_rl/` | package `music_rl`: the Mixer's sound out through a raylib `AudioStream`. The only raylib-facing piece of the engine |
@@ -425,8 +425,21 @@ the cello's but whatever the selected layer's instrument file describes.
   | Contrabass | E1 A1 D2 G2 | 1060, 30, 80 | 26 / 20 | Simandl: ½ to 6th (fingers 1-2-4, a tone), thumb |
   | Guitar | E2 A2 D3 G3 B3 E4 | 650, 42, 58 | 19 / 19, fretted | open, 2nd-5th, 7th, 9th, 12th (a finger a fret) |
 
-  The harp and everything else has no board: the panel says "Fingerboard not implemented"
-  and lists the instruments that have one.
+  Keyboard instruments say `keyboard 1` instead (piano, harpsichord, celesta, organ in
+  `instruments/keyboards.inst`). The harp and everything else has neither: the panel says
+  "Fingerboard not implemented" and lists the instruments that have one.
+* **The keyboard** (`source/keyboard.odin`): turned on its side so it fits the 348 px
+  panel, and lined up with the sheet - the sheet's rows are staff steps, one a letter,
+  which is exactly the white keys, so each white key is drawn across its row
+  (`row_y(step)`, whatever range the sheet shows) and each black key (64 % of a row high,
+  60 % of a white key long) straddles the line between its two. Low at the bottom, the
+  black keys' end toward the sheet. Lit as the fingerboard is; the key filter greys keys
+  outside the key; tracking (`kb_track`) keeps the last N steps (notes starting within 6
+  ticks while the first sounds are one step) without places to choose, fills each key in
+  its step's colour and draws the path from the nearest note of the step before; the
+  sheet takes the same colours (`fb_current_trail`). The input dot sits on the heard
+  note's key, moved half a row per 100 cents. A column beside the keys holds the key
+  filter, tracking, and the pointed-at and heard notes.
 * **The board** (`source/fingerboard.odin`): the player's view, nut at the top, lowest
   string left; N strings spread over the board's width (six strings on a board 1.3× as
   wide). Semitone *n* sits at `1 - 2^(-n/12)` of the string, so positions crowd together

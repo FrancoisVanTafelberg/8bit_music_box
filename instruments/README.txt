@@ -52,6 +52,8 @@ The format, one block per instrument:
                                    #   fingers 1-4 stop (semitones above open, 0 =
                                    #   unused), and optionally the thumb (up to 10)
   board_default 1st                # the position the Helper starts in
+  keyboard 1                       # instead of a board: the Helper shows a keyboard
+                                   #   (the piano and the other keyboards)
   end
 
 Every line inside a block is optional. A block starts from:
