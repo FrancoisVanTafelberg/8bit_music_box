@@ -103,6 +103,7 @@ FB_VIEW_MAX :: 20
 FB_VIEW_MIN :: 7
 
 fb_view_target :: proc() -> f32 {
+	if !g.fb_dynamic do return FB_VIEW_MAX // Fixed: always down to the thumb position
 	hand := &HAND_POSITIONS[clamp(int(g.fb_hand), 0, len(HAND_POSITIONS) - 1)]
 	far := int(hand.thumb)
 	for f in hand.fingers do far = max(far, int(f))
@@ -316,9 +317,22 @@ fingerboard_draw :: proc() {
 	// Tracking: the path from note to note (fingering.odin).
 	if button(rect(x0, y, 64, 18), "Tracking", g.fb_track) do g.fb_track = !g.fb_track
 	g.fb_track_n = int(stepper(rect(x0 + 70, y, 84, 18), f32(g.fb_track_n), 1, TRACK_MAX, 1, TRACK_DEFAULT_N, fmt.tprintf("%d notes", g.fb_track_n)))
-	if button(rect(x0 + 160, y, 90, 18), TRACK_MODE_NAME[g.fb_track_mode], g.fb_track) {
+	if button(rect(x0 + 160, y, 84, 18), TRACK_MODE_NAME[g.fb_track_mode], g.fb_track) {
 		g.fb_track_mode = Track_Mode((int(g.fb_track_mode) + 1) % len(Track_Mode))
-		set_status("tracking: %s", g.fb_track_mode == .Same_String ? "stay on the string while it can play the note" : "go to the physically nearest place for each note")
+		switch g.fb_track_mode {
+		case .Same_String:
+			set_status("tracking: stay on the string while it can play the note")
+		case .Nearest:
+			set_status("tracking: go to the physically nearest place for each note")
+		case .Best:
+			set_status("tracking: each note as near the nut as it goes - open strings first")
+		}
+	}
+	// The board's length: Fixed at the thumb position's reach, or Dynamic,
+	// following the hand position.
+	if button(rect(x0 + 250, y, 82, 18), g.fb_dynamic ? "Dynamic" : "Fixed", g.fb_dynamic) {
+		g.fb_dynamic = !g.fb_dynamic
+		set_status(g.fb_dynamic ? "fingerboard: shows as much as the hand position needs" : "fingerboard: fixed, down to the thumb position")
 	}
 
 	// The wheel over the board steps through them.

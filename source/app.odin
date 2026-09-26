@@ -41,6 +41,7 @@ App :: struct {
 	fb_track_n:    int,
 	fb_track_mode: Track_Mode,
 	fb_view:       f32, // semitones of board shown (fingerboard.odin)
+	fb_dynamic:    bool, // the board's length follows the hand position (else fixed at thumb)
 	// The "lines" button: tint the key signature's rows and mark the rows
 	// of the key's home chord (sheet.odin, key_lines_draw).
 	key_lines:  bool,

@@ -396,8 +396,8 @@ outer to outer at the nut and 47 mm at the bridge (Hans Johannsson's cello measu
 semitone *n* at 695·(1 − 2^(−n/12)) mm from the nut; the distances between all 120 places
 are worked out once into a table. The last N notes up to the playhead (or the selected
 note) are drawn: each note filled in a colour cycled note by note (eight colours; older
-notes fainter, the newest ringed), and between them either the string and its circles
-coloured in, blending from one colour to the next, or a blended arrow straight across.
+notes fainter, the newest ringed), and between them either a line straight down the string
+(the places on the way left as they are), blending from one colour to the next, or a blended arrow straight across.
 *Best* (a third mode, and the default) always takes the place nearest the nut - the open string if there is
 one ([C string, F2] → G2 is the open G string). **Steps:** notes that start within 6 ticks
 of each other while the first still sounds (double stops, chords, strums) are one step;
@@ -407,7 +407,8 @@ line in: voice by voice (lowest to lowest) between chords of the same size, othe
 the nearest note of the step before. Places past the thumb position's reach are used only
 when a note has no other.
 
-**The board's length follows the hand position:** it shows from the nut to three semitones
+**The board's length** is **Fixed** by default - down to the thumb position's reach (20
+semitones) - or, with the **Dynamic** button, follows the hand position: it shows from the nut to three semitones
 past the last finger (at least 7, at most 20 - the thumb position's reach), gliding to a
 new length when the position changes; notes are spaced over what is shown, so they get
 bigger in the low positions. A tracked note past what is shown is pinned to the board's

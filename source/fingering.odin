@@ -25,7 +25,7 @@ package app
     The fingerboard then draws the last N notes up to the playhead (or up to
     the selected note, when stopped): each note filled with its own colour -
     the colours cycle, note by note - and the way from one to the next along
-    the string (the string and the circles on the way coloured, blending from
+    the string (the string coloured, blending from
     one note's colour into the next's), or, from string to string, an arrow
     straight across the board.
 */
@@ -357,10 +357,9 @@ fb_track_draw :: proc(list: []Tracked) {
 		cb := fade(track_colour(b.step), b.step - first, steps)
 		pa, pb := fb_point(a.pos), fb_point(b.pos)
 		if a.pos.string == b.pos.string {
-			// Along the string: the string itself, and every circle on the
-			// way, coloured in.
+			// Along the string: a line down the string itself, straight
+			// through the places on the way.
 			s := a.pos.string
-			lo, hi := min(a.pos.semis, b.pos.semis), max(a.pos.semis, b.pos.semis)
 			PIECES :: 24
 			for q in 0 ..< PIECES {
 				t0 := f32(q) / PIECES
@@ -368,13 +367,6 @@ fb_track_draw :: proc(list: []Tracked) {
 				y0 := pa.y + (pb.y - pa.y) * t0
 				y1 := pa.y + (pb.y - pa.y) * t1
 				rl.DrawLineEx({fb_x(s, y0), y0}, {fb_x(s, y1), y1}, 3, colour_mix(ca, cb, (t0 + t1) / 2))
-			}
-			for semis in lo + 1 ..< hi {
-				if !fb_in_view(semis) do continue
-				t := f32(semis - a.pos.semis) / f32(b.pos.semis - a.pos.semis)
-				p := fb_point({true, s, semis})
-				rl.DrawCircleLines(i32(p.x), i32(p.y), 4.5, colour_mix(ca, cb, t))
-				rl.DrawCircleLines(i32(p.x), i32(p.y), 5.5, colour_mix(ca, cb, t))
 			}
 			arrow_head(pa, pb, 7, cb)
 		} else {
