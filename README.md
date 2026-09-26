@@ -153,3 +153,13 @@ folder is where the work happens. To bring the repo up to date:
 It backs the repo folder up to `8bit_music_box.bak.YYYY-MM-DD-HH-MM` first, keeps its
 `.git` and `.gitignore`, and does not copy `.temp`, `build`, `exports`,
 `last_song.txt`, `last_cello_song.txt` or `songs_that_cannot_be_used_for_legal_reasons`. Nothing is written back here.
+
+## Files marked for deletion
+
+Claude can write files in this folder but not remove them, so a file that should go
+gets a companion `<file>.delete` saying why. Run
+
+    tools\clean_marked.bat       (or ./tools/clean_marked.sh)
+
+to delete every marked file and its marker - before `copy_to_repo`, so they do not
+travel to the repo. The same convention as Animal Kingdoms.
