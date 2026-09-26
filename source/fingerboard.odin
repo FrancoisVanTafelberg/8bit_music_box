@@ -381,6 +381,12 @@ fingerboard_draw :: proc() {
 		set_status(g.fb_dynamic ? "fingerboard: shows as much as the hand position needs" : "fingerboard: fixed, down to the thumb position")
 	}
 
+	// What the mic listens for: one note (the one played, not its
+	// overtones), or chords.
+	y += 22
+	if button(rect(x0, y, 64, 18), g.input.chords ? "Chords" : "Single", g.input.chords) do input_chords_toggle()
+	text(g.input.chords ? "mic: every note it can pick out" : "mic: one note - the note, not its overtones", x0 + 70, y + 4, COL_DIM)
+
 	// The wheel over the board steps through them.
 	if w := ui_take_wheel(rect(FB_X, FB_OPEN_Y - 12, FB_W, FB_END_Y - FB_OPEN_Y + 24)); w != 0 {
 		g.fb_hand = i8(clamp(int(g.fb_hand) + (w < 0 ? 1 : -1), 0, max(int(board.n_positions) - 1, 0)))

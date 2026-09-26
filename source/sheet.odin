@@ -311,10 +311,21 @@ sheet_draw :: proc() {
 		x := tick_x(playing_tick)
 		rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, COL_ACCENT)
 	}
-	// Bar or Page scope: where Play will stop.
-	if g.player.playing && g.player.stop_tick > ps && g.player.stop_tick <= ps + page_ticks() {
-		x := tick_x(g.player.stop_tick)
-		rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, with_alpha(COL_BAD, 160))
+	// Bar or Page scope: where Play will stop - or, repeating, where it
+	// goes back from (and the start it goes back to).
+	if g.player.playing {
+		p := &g.player
+		end := p.stop_tick
+		if p.loop do end = p.from_tick + p.loop_ticks
+		if end > ps && end <= ps + page_ticks() {
+			x := tick_x(end)
+			rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, with_alpha(p.loop ? COL_GOOD : COL_BAD, 160))
+		}
+		if p.loop && p.from_tick >= ps && p.from_tick < ps + page_ticks() {
+			x := tick_x(p.from_tick)
+			rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, with_alpha(COL_GOOD, 160))
+			rl.DrawTriangle({x, top - 8}, {x, top}, {x + 7, top - 4}, COL_GOOD)
+		}
 	}
 
 	// What the microphone hears (input.odin): the take, and the live dot.

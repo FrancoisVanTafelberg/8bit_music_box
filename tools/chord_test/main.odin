@@ -175,6 +175,74 @@ main :: proc() {
 	}
 	fmt.printfln("analysis: %.0f us on average, %.0f us at most", us_total / f64(max(us_n, 1)), us_max)
 
+	// Single-note mode: a note with overtones strong enough to be found as
+	// notes of their own (a cello's open C: its octave, twelfth and double
+	// octave played along with it, loud) must come out as the one note.
+	fmt.println("\nSingle-note mode (played, with overtones -> what it says)")
+	Single_Case :: struct {
+		name:   string,
+		inst:   string,
+		root:   int,
+		extra:  []int, // "overtones", played with it
+		vel:    []u8,
+	}
+	singles := []Single_Case {
+		{"cello C2 + loud 8va, 12th, 15th", "cello", 36, {48, 55, 60}, {115, 95, 80}},
+		{"cello G2 + loud 8va, 12th", "cello", 43, {55, 62}, {120, 100}},
+		{"cello D3 + loud 8va", "cello", 50, {62}, {127}},
+		{"cello C2 + overtones louder than it", "cello", 36, {48, 55, 60, 64}, {127, 127, 120, 110}},
+		{"cello C2 alone", "cello", 36, {}, {}},
+		{"cello A3 alone", "cello", 57, {}, {}},
+		{"piano C3 + loud 8va, 12th", "piano", 48, {60, 67}, {120, 100}},
+	}
+	for sc in singles {
+		song: music.Song
+		music.song_init(&song)
+		song.tempo = 60
+		ti := music.song_add_track(&song, sc.inst)
+		start := i32(music.TPQ * 4)
+		append(&song.tracks[ti].notes, music.Note{start, music.TPQ * 2, music.pitch_from_midi(sc.root, 0), 100})
+		for m, i in sc.extra do append(&song.tracks[ti].notes, music.Note{start, music.TPQ * 2, music.pitch_from_midi(m, 0), sc.vel[i]})
+		music.track_sort(&song.tracks[ti])
+		stereo := music.render_song(&song, .Bit16)
+		n := len(stereo) / 4
+		mic := make([]f32, n)
+		for i in 0 ..< n {
+			k := i * 4
+			mic[i] = (stereo[k] + stereo[k + 1] + stereo[k + 2] + stereo[k + 3]) * 0.25
+		}
+		peak: f32
+		for v in mic do peak = max(peak, abs(v))
+		if peak > 0 do for &v in mic do v *= 0.3 / peak
+		rng := rand.create(11)
+		context.random_generator = rand.default_random_generator(&rng)
+		for &v in mic do v += rand.float32_range(-1, 1) * 0.005 * noise
+		ins := music.inst_get(&song, song.tracks[ti].inst)
+		d := new(music.Chord_Detector)
+		music.chord_init(d, f32(ins.lo), f32(ins.hi))
+		d.single = true
+		out := make([]music.Chord_Reading, 64)
+		spt := music.tick_seconds(&song)
+		t0 := f64(start) * spt
+		t1 := t0 + (sc.inst == "piano" ? 0.9 : 1.9)
+		right, total, other := 0, 0, 0
+		for at := 0; at < len(mic); at += 512 {
+			chunk := mic[at:min(at + 512, len(mic))]
+			k := music.chord_feed(d, chunk, out)
+			for &rd in out[:k] {
+				t := f64(at + len(chunk) - rd.delay) / music.PITCH_RATE
+				if t < t0 + 0.2 || t >= t1 do continue
+				total += 1
+				if rd.n == 1 && abs(rd.notes[0] - f32(sc.root)) < 0.5 do right += 1
+				else if rd.n > 0 do other += 1
+			}
+		}
+		pct := 100 * right / max(total, 1)
+		fmt.printfln("  %-37s %3d%% %s, %d readings something else", sc.name, pct, music.pitch_name_temp(music.pitch_from_midi(sc.root, 0)), other)
+		if pct < 90 do all_ok = false
+		free(d)
+	}
+
 	// The Check mode: what was expected, what was played, what it says.
 	fmt.println("\nCheck mode (expected -> played: verdicts)")
 	Check_Case :: struct {

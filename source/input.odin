@@ -31,9 +31,11 @@ package app
               was not played. A note is judged once the playhead has passed
               it; the outlines stay until Play or Reset.
 
-    Play scope (the button beside Mic): the whole song, one bar from the
-    cursor, or the page. Bar and Page stop at their end, and the cursor stays
-    where it was, so Play again goes round the same bar.
+    Play scope (the button beside Play in the top bar): the whole song, the
+    page (the four bars on the sheet), or one bar from the cursor. Page and
+    Bar stop at their end, and the cursor stays where it was, so Play again
+    goes round the same bars - or Repeat (beside it) goes round by itself,
+    each time round a fresh take (and in Check mode, a count of how it went).
 
     Where the take is drawn in time: each reading knows how long ago the
     sound it describes was heard (music.Chord_Reading.delay: about 100 ms
@@ -105,6 +107,9 @@ Input :: struct {
 	latency_ms:  f32,
 	sensitivity: f32,
 	mode:        Input_Mode,
+	// Chords (several notes at once), or one note: the most prominent, or
+	// the note under it whose overtones those are (music.chord_single).
+	chords:      bool,
 	// Now: the notes being played (n 0 = none), and when last heard.
 	notes:       [INPUT_NOTES]f32,
 	n:           int,
@@ -200,6 +205,13 @@ input_reset :: proc() {
 	clear(&g.input.checks)
 }
 
+// One note, or chords (the button under Tracking on the fingerboard, the
+// keyboard's column, the microphone settings).
+input_chords_toggle :: proc() {
+	g.input.chords = !g.input.chords
+	set_status(g.input.chords ? "mic: chords - every note it can pick out (up to 4)" : "mic: single note - the note played, not its overtones")
+}
+
 input_mode_step :: proc() {
 	g.input.mode = g.input.mode == .Notes ? .Check : .Notes
 	switch g.input.mode {
@@ -233,6 +245,7 @@ input_update :: proc() {
 	lo, hi := input_range()
 	music.chord_set_range(&in_.det, lo, hi)
 	in_.det.sensitivity = in_.sensitivity
+	in_.det.single = !in_.chords
 	readings: [32]music.Chord_Reading
 	k := music.chord_feed(&in_.det, samples[:n], readings[:])
 	now := rl.GetTime()
@@ -253,6 +266,9 @@ input_heard :: proc(r: ^music.Chord_Reading, heard: f64) {
 	for i in 0 ..< in_.n do in_.notes[i] = r.notes[i]
 	in_.heard_at = rl.GetTime()
 	if !g.player.playing do return
+	// Repeating: sound from the time round before (it reaches the mic a
+	// moment late) belongs to that take, which has gone.
+	if (g.player.loop || g.player.last_pass >= 0) && player_pass_at(&g.player, &g.song, heard) != g.player.pass do return
 	tick := player_tick_at(&g.player, &g.song, heard)
 	if tick < f32(g.player.from_tick) do return
 	if g.player.stop_tick > 0 && tick >= f32(g.player.stop_tick) do return
@@ -313,23 +329,36 @@ check_update :: proc() {
 			heard := player_tick_at(&g.player, &g.song, rl.GetTime() - f64(in_.latency_ms) / 1000 - 0.12)
 			for &c in in_.checks do if !c.final && f32(c.tick + c.len) <= heard do c.final = true
 		} else if in_.was_playing {
-			right, near, missed := 0, 0, 0
-			for &c in in_.checks {
-				c.final = true
-				switch c.verdict {
-				case .Correct:
-					right += 1
-				case .Almost:
-					near += 1
-				case .Missed:
-					missed += 1
-				case .None:
-				}
-			}
-			if len(in_.checks) > 0 do set_status("checked %d notes: %d right, %d nearly, %d missed", right + near + missed, right, near, missed)
+			check_summary()
 		}
 	}
 	in_.was_playing = g.player.playing
+}
+
+// Judge what is left, and say how it went.
+@(private = "file")
+check_summary :: proc() {
+	right, near, missed := 0, 0, 0
+	for &c in g.input.checks {
+		c.final = true
+		switch c.verdict {
+		case .Correct:
+			right += 1
+		case .Almost:
+			near += 1
+		case .Missed:
+			missed += 1
+		case .None:
+		}
+	}
+	if len(g.input.checks) > 0 do set_status("checked %d notes: %d right, %d nearly, %d missed", right + near + missed, right, near, missed)
+}
+
+// Repeat: a time round is over. Checking, say how it went; then the take and
+// the checks start afresh for the next.
+input_pass_end :: proc() {
+	if g.input.mode == .Check && g.input.on do check_summary()
+	input_reset()
 }
 
 // The outline a checked note gets on the sheet: green right, blue nearly, red
@@ -445,7 +474,7 @@ input_sheet_draw :: proc() {
 // The practice controls: under the sheet, right of the page boxes.
 // ---------------------------------------------------------------------------
 
-PRACTICE_W :: 304
+PRACTICE_W :: 256
 
 practice_draw :: proc() {
 	y := f32(STRIP_Y)
@@ -453,12 +482,6 @@ practice_draw :: proc() {
 	x := f32(bars_x() + bars_w() - PRACTICE_W)
 	if button(rect(x, y, 48, h), "Metro", g.metronome) do metronome_toggle()
 	x += 52
-	{
-		r := rect(x, y, 44, h)
-		if button(r, SCOPE_NAME[g.input.scope], g.input.scope != .Song) do scope_step(1)
-		if ui_take_right(r) do scope_step(-1)
-	}
-	x += 48
 	if button(rect(x, y, 36, h), "Mic", g.input.on) do input_toggle()
 	x += 38
 	if button(rect(x, y, 44, h), g.input.mode == .Check ? "Check" : "Notes", g.input.mode == .Check) do input_mode_step()
@@ -491,16 +514,19 @@ level_frac :: proc(rms: f32) -> f32 {
 	return clamp((db + 60) / 60, 0, 1)
 }
 
+// Song -> Page -> Bar -> Song (right-click: back).
 scope_step :: proc(dir: int) {
-	n := len(Play_Scope)
-	g.input.scope = Play_Scope((int(g.input.scope) + dir + n) % n)
+	order := [3]Play_Scope{.Song, .Page, .Bar}
+	i := 0
+	for s, k in order do if s == g.input.scope do i = k
+	g.input.scope = order[(i + dir + 3) % 3]
 	switch g.input.scope {
 	case .Song:
-		set_status("Play plays the song")
+		set_status("Play plays the whole song")
+	case .Page:
+		set_status("Play plays the four bars on this page (from the cursor, if it is on it)")
 	case .Bar:
 		set_status("Play plays one bar, from the cursor (left/right arrows move it)")
-	case .Page:
-		set_status("Play plays to the end of the page")
 	}
 }
 
@@ -510,7 +536,7 @@ mic_overlay_draw :: proc() {
 	if !in_.listed do input_devices_refresh()
 	W :: f32(340)
 	rows := in_.n_devices + 1
-	H := 212 + f32(rows) * 22
+	H := 234 + f32(rows) * 22
 	r := rect(f32(bars_x() + bars_w()) - W, f32(STRIP_Y) - H - 4, W, H)
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
@@ -556,6 +582,10 @@ mic_overlay_draw :: proc() {
 	text("ignore noise", x, y + 4, COL_DIM)
 	in_.sensitivity = stepper(rect(x + 90, y, 110, 18), in_.sensitivity, 1, 10, 0.5, music.PITCH_SENSITIVITY_DEFAULT, fmt.tprintf("x%.1f  %.0f dB", in_.sensitivity, 20 * math.log10(in_.sensitivity)))
 	text("above the room", x + 206, y + 4, COL_FAINT)
+	y += 22
+	text("hear", x, y + 4, COL_DIM)
+	if button(rect(x + 90, y, 110, 18), in_.chords ? "Chords" : "Single note", in_.chords) do input_chords_toggle()
+	text(in_.chords ? "up to 4 notes at once" : "the note, not its overtones", x + 206, y + 4, COL_FAINT)
 	y += 22
 	text("latency", x, y + 4, COL_DIM)
 	in_.latency_ms = stepper(rect(x + 90, y, 110, 18), in_.latency_ms, 0, 400, 5, MIC_LATENCY_DEFAULT, fmt.tprintf("%.0f ms", in_.latency_ms))

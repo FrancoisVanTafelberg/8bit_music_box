@@ -95,6 +95,9 @@ Chord_Detector :: struct {
 	lo, hi:      f32,
 	sensitivity: f32,
 	max_notes:   int,
+	// One note only (chord_single): the note being played, not the chord
+	// its own overtones can look like.
+	single:      bool,
 	f_lo, f_hi:  f32,
 	hp:          [2]Biquad,
 	lp:          Biquad,
@@ -234,6 +237,7 @@ chord_analyse :: proc(d: ^Chord_Detector, r: ^Chord_Reading) #no_bounds_check {
 	n_found := 0
 	if d.open {
 		n_found = chord_find(d, found[:min(d.max_notes, CHORD_MAX_NOTES)], r)
+		if d.single do n_found = chord_single(found[:n_found])
 	}
 
 	// Learn the room from what is not a note - and not loud: a note the
@@ -362,6 +366,31 @@ chord_find :: proc(d: ^Chord_Detector, out: []f32, r: ^Chord_Reading) -> int #no
 		}
 	}
 	return n
+}
+
+// Single-note mode: of the notes found, the one being played. A string
+// with strong overtones (a cello's open C) can make its octave, twelfth or
+// double octave strong enough to be found as notes of their own; what is
+// played is then the lowest note of which the strongest is an overtone -
+// the strongest itself, if it is no note's overtone. Leaves it in found[0];
+// returns 1 (or 0).
+chord_single :: proc(found: []f32) -> int {
+	if len(found) == 0 do return 0
+	strongest := found[0] // found strongest first
+	root := strongest
+	for f in found[1:] {
+		if f < root && overtone_of(strongest, f) do root = f
+	}
+	found[0] = root
+	return 1
+}
+
+// Is `hi` (MIDI) the 2nd to 8th harmonic of `lo`, within 40 cents?
+overtone_of :: proc(hi, lo: f32) -> bool {
+	ratio := math.pow(2, (hi - lo) / 12)
+	k := math.round(ratio)
+	if k < 2 || k > 8 do return false
+	return abs(12 * math.log2(ratio / k)) < 0.4
 }
 
 // ---------------------------------------------------------------------------

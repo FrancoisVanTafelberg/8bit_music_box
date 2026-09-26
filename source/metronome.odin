@@ -71,7 +71,8 @@ metronome_toggle :: proc() {
 	metronome_sync()
 	// Playing: carry on from here with (or without) the clicks. The engine
 	// took its copy of the notes at Play, so it starts again where it is.
-	if g.player.playing do player_play(&g.player, &g.song, player_tick(&g.player, &g.song))
+	// Repeating, it goes back to where the time round began.
+	if g.player.playing do player_play(&g.player, &g.song, g.player.loop ? g.player.from_tick : player_tick(&g.player, &g.song))
 	set_status(g.metronome ? "metronome on: a click a beat, the first of each bar higher" : "metronome off")
 }
 

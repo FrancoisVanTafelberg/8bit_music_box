@@ -101,16 +101,24 @@ topbar_draw :: proc() {
 	if button(rect(x, y, 42, h), "Helper", g.helper) do helper_toggle()
 	x += 46
 
-	// Transport.
-	if button(rect(x, y, 56, h), g.player.playing ? "Stop" : "Play", g.player.playing) do toggle_play(rl.IsKeyDown(.LEFT_SHIFT))
-	x += 60
-	if button(rect(x, y, 30, h), "|<") {player_stop(&g.player); g.page = 0; g.cursor_tick = 0}
-	x += 34
-	if button(rect(x, y, 50, h), "Follow", g.follow) do g.follow = !g.follow
-	x += 54
+	// Transport: Play, what it plays (the song, the page, a bar), Repeat.
+	if button(rect(x, y, 48, h), g.player.playing ? "Stop" : "Play", g.player.playing) do toggle_play(rl.IsKeyDown(.LEFT_SHIFT))
+	x += 50
+	{
+		r := rect(x, y, 40, h)
+		if button(r, SCOPE_NAME[g.input.scope], g.input.scope != .Song) do scope_step(1)
+		if ui_take_right(r) do scope_step(-1)
+	}
+	x += 42
+	if button(rect(x, y, 48, h), "Repeat", g.repeat) do repeat_toggle()
+	x += 52
+	if button(rect(x, y, 26, h), "|<") {player_stop(&g.player); g.page = 0; g.cursor_tick = 0}
+	x += 30
+	if button(rect(x, y, 46, h), "Follow", g.follow) do g.follow = !g.follow
+	x += 50
 	// Sound mode: click cycles 4-bit, 8-bit, 16-bit, 32-bit (right-click back).
 	{
-		r := rect(x, y, 50, h)
+		r := rect(x, y, 46, h)
 		if button(r, music.SOUND_MODE_NAME[g.mode], g.mode != music.DEFAULT_MODE) {
 			g.mode = music.Sound_Mode((int(g.mode) + 1) % len(music.Sound_Mode))
 			set_status("sound: %s - %s", music.SOUND_MODE_NAME[g.mode], MODE_HINT[g.mode])
@@ -120,25 +128,24 @@ topbar_draw :: proc() {
 			set_status("sound: %s - %s", music.SOUND_MODE_NAME[g.mode], MODE_HINT[g.mode])
 		}
 	}
-	x += 64
+	x += 50
 
 	// File.
-	if button(rect(x, y, 40, h), "New") do file_new()
-	x += 44
-	if button(rect(x, y, 40, h), "Open") do open_overlay()
-	x += 44
-	if button(rect(x, y, 40, h), "Save") do file_save()
-	x += 52
-	label("export", x, y + 5)
-	x += 38
-	if button(rect(x, y, 36, h), "WAV") do file_export("wav")
+	if button(rect(x, y, 38, h), "New") do file_new()
 	x += 40
+	if button(rect(x, y, 38, h), "Open") do open_overlay()
+	x += 40
+	if button(rect(x, y, 38, h), "Save") do file_save()
+	x += 44
+	// Export (the rest need ffmpeg).
+	if button(rect(x, y, 34, h), "WAV") do file_export("wav")
+	x += 36
 	for fmt_name in ([3]string{"mp3", "ogg", "flac"}) {
-		if button(rect(x, y, 36, h), strings.to_upper(fmt_name, context.temp_allocator), false, g.has_ffmpeg) do file_export(fmt_name)
-		x += 40
+		if button(rect(x, y, 34, h), strings.to_upper(fmt_name, context.temp_allocator), false, g.has_ffmpeg) do file_export(fmt_name)
+		x += 36
 	}
-	x += 8
-	if button(rect(x, y, 40, h), "SFX") do g.overlay = .Sounds
+	x += 6
+	if button(rect(x, y, 34, h), "SFX") do g.overlay = .Sounds
 }
 
 @(private = "file")
@@ -572,6 +579,7 @@ keys_update :: proc() {
 	if rl.IsKeyPressed(.I) do input_toggle()
 	if rl.IsKeyPressed(.K) do metronome_toggle()
 	if rl.IsKeyPressed(.H) do helper_toggle()
+	if rl.IsKeyPressed(.R) do repeat_toggle()
 
 	// Pages.
 	if rl.IsKeyPressed(.PAGE_DOWN) || rl.IsKeyPressed(.RIGHT_BRACKET) do g.page = min(g.page + 1, page_count() - 1)

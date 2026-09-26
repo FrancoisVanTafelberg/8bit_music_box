@@ -293,6 +293,10 @@ keyboard_controls :: proc(t: ^music.Track, lo, hi, here: int) {
 	y += 13
 	if button(rect(x, y, 64, 18), g.fb_track ? "On" : "Off", g.fb_track) do g.fb_track = !g.fb_track
 	g.fb_track_n = int(stepper(rect(x + 68, y, w - 68, 18), f32(g.fb_track_n), 1, TRACK_MAX, 1, TRACK_DEFAULT_N, fmt.tprintf("%d notes", g.fb_track_n)))
+	y += 22
+	// What the mic listens for: one note, or chords.
+	if button(rect(x, y, 64, 18), g.input.chords ? "Chords" : "Single", g.input.chords) do input_chords_toggle()
+	text(g.input.chords ? "mic: chords" : "mic: one note", x + 68, y + 4, COL_DIM)
 	y += 24
 	text("the last notes up to the", x, y, COL_FAINT)
 	y += 11

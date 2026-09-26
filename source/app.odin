@@ -66,6 +66,8 @@ App :: struct {
 	// were last laid out for.
 	metronome:  bool,
 	metro_sig:  [4]i32,
+	// Repeat (player.odin): go round the song or the scope again at its end.
+	repeat:     bool,
 	sheet_lo:   int,
 	sheet_hi:   int,
 	row_h:      int,

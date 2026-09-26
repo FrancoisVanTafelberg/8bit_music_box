@@ -195,7 +195,7 @@ engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, mode := DEFAUL
 	// One pass: from `from_tick` to the end of the last note's bar.
 	bt := bar_ticks(song)
 	end := (song_end_tick(song) + bt - 1) / bt * bt
-	if to_tick > 0 do end = min(end, to_tick)
+	if to_tick > 0 do end = to_tick // a scope: round its bars, notes or not
 	e.loop_len = int(f64(max(end - from_tick, 0)) * spt * SAMPLE_RATE)
 }
 

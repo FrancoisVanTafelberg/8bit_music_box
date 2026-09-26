@@ -21,6 +21,7 @@ package app
     drifts from the samples by more than a block.
 */
 
+import "core:math"
 import "music"
 import music_rl "music_rl"
 import rl "vendor:raylib"
@@ -37,6 +38,14 @@ Player :: struct {
 	end_sent:   int, // ...when the song ended in the mixer; 0 while it plays
 	stop_tick:  i32, // the Bar and Page play scopes stop here; 0 = the song's end
 	preview:    music.Sfx_Handle,
+	// Repeat: the engine goes round from_tick .. from_tick + loop_ticks
+	// (the scope's end, or the end of the song's last bar), and so does the
+	// playhead. `pass` counts the times round; `last_pass`, once Repeat has
+	// been switched off mid-play, is the pass to finish on (-1: none).
+	loop:       bool,
+	loop_ticks: i32,
+	pass:       int,
+	last_pass:  int,
 }
 
 player_init :: proc(p: ^Player) {
@@ -55,7 +64,11 @@ player_play :: proc(p: ^Player, song: ^music.Song, from_tick: i32) {
 	player_stop(p)
 	g.audio.mode = g.mode
 	p.stop_tick = scope_end(from_tick)
-	p.song = music.mixer_play_song(&g.audio, song, loop = false, from_tick = from_tick, to_tick = p.stop_tick > 0 ? p.stop_tick : -1)
+	p.loop_ticks = loop_length(song, from_tick, p.stop_tick)
+	p.loop = g.repeat && p.loop_ticks > 0
+	p.pass = 0
+	p.last_pass = -1
+	p.song = music.mixer_play_song(&g.audio, song, loop = p.loop, from_tick = from_tick, to_tick = p.stop_tick > 0 ? p.stop_tick : -1)
 	p.from_tick = from_tick
 	// Where in the stream the song begins: after everything mixed so far,
 	// including what is mixed ahead and not yet handed over.
@@ -91,6 +104,21 @@ player_update :: proc(p: ^Player, song: ^music.Song) {
 	now := rl.GetTime() - p.start_time
 	if abs(now - heard) > 3 * LATENCY do p.start_time = rl.GetTime() - max(heard, 0)
 
+	// Going round: a new pass starts the take (and the checks) afresh.
+	if p.loop || p.last_pass >= 0 {
+		pass := player_pass(p, song)
+		if p.last_pass >= 0 && pass > p.last_pass {
+			// Repeat was switched off: this pass was the last.
+			player_stop(p)
+			input_pass_end()
+			return
+		}
+		if pass != p.pass {
+			p.pass = pass
+			input_pass_end()
+		}
+		return
+	}
 	if p.stop_tick > 0 {
 		// A scope ends at its bar line, not where the last note stops.
 		if player_tick(p, song) >= p.stop_tick do player_stop(p)
@@ -98,6 +126,49 @@ player_update :: proc(p: ^Player, song: ^music.Song) {
 		p.song = 0
 		p.playing = false
 	}
+}
+
+// How long one time round is, playing from `from`: to the scope's end, or
+// to the end of the bar the song's last note ends in (as the engine does).
+loop_length :: proc(song: ^music.Song, from, stop: i32) -> i32 {
+	bt := music.bar_ticks(song)
+	end := (music.song_end_tick(song) + bt - 1) / bt * bt
+	if stop > 0 do end = stop
+	return max(end - from, 0)
+}
+
+// Which time round the playhead is on (0 the first) - now, or at `time`.
+player_pass :: proc(p: ^Player, song: ^music.Song) -> int {
+	return player_pass_at(p, song, rl.GetTime())
+}
+
+player_pass_at :: proc(p: ^Player, song: ^music.Song, time: f64) -> int {
+	if p.loop_ticks <= 0 do return 0
+	t := max(time - p.start_time - LATENCY, 0) / music.tick_seconds(song)
+	return int(t / f64(p.loop_ticks))
+}
+
+// The Repeat button (and R): go round again at the end instead of stopping.
+// Switched on while playing, the engine is told at once; switched off, the
+// time round being played is the last.
+repeat_toggle :: proc() {
+	g.repeat = !g.repeat
+	p := &g.player
+	if p.playing {
+		if g.repeat {
+			if p.loop_ticks > 0 {
+				music.mixer_set_song_loop(&g.audio, p.song, true)
+				p.loop = true
+				p.last_pass = -1
+				p.pass = player_pass(p, &g.song)
+			}
+		} else if p.loop {
+			music.mixer_set_song_loop(&g.audio, p.song, false)
+			p.loop = false
+			p.last_pass = player_pass(p, &g.song)
+		}
+	}
+	set_status(g.repeat ? "repeat on: at the end, back to where Play started, and round again" : "repeat off")
 }
 
 // Where the play scope (input.odin) ends, playing from `from`: the end of
@@ -118,14 +189,15 @@ scope_end :: proc(from: i32) -> i32 {
 
 // The tick under the playhead right now.
 player_tick :: proc(p: ^Player, song: ^music.Song) -> i32 {
-	t := max(rl.GetTime() - p.start_time - LATENCY, 0)
-	return p.from_tick + i32(t / music.tick_seconds(song))
+	return i32(player_tick_at(p, song, rl.GetTime()))
 }
 
 // The (fractional) tick that was being heard at `time` (the frame clock).
+// Repeating, it goes round with the engine.
 player_tick_at :: proc(p: ^Player, song: ^music.Song, time: f64) -> f32 {
-	t := time - p.start_time - LATENCY
-	return f32(p.from_tick) + f32(t / music.tick_seconds(song))
+	t := max(time - p.start_time - LATENCY, 0) / music.tick_seconds(song)
+	if (p.loop || p.last_pass >= 0) && p.loop_ticks > 0 do t = math.mod(t, f64(p.loop_ticks))
+	return f32(p.from_tick) + f32(t)
 }
 
 // One note, now: what you hear when you place or click a note. The previous

@@ -240,9 +240,20 @@ The playhead sweeps across, every sounding note is outlined and brightened in ev
 layer, and with **Follow** on the view flips to the next page as the playhead leaves this
 one. Mute and solo apply live to the next play.
 
-**Scope** (under the sheet): Song, Bar or Page. Bar and Page pass an end tick to the
-engine (`engine_start(.., to_tick)`: later notes left out, sounding ones cut at it), and
-the player stops when the playhead reaches it; the cursor does not move.
+**Play mode** (beside Play): Song, Page (the four bars on the sheet) or Bar. Page and Bar
+pass an end tick to the engine (`engine_start(.., to_tick)`: later notes left out,
+sounding ones cut at it, and a pass is exactly to that tick, notes or not), and the
+player stops when the playhead reaches it; the cursor does not move.
+
+**Repeat** (`g.repeat`, R): the engine's own loop (`engine_set_loop`), sample-exact, round
+`from_tick` .. the scope's end - or, for the whole song, the end of the bar its last note
+ends in (`loop_length`, the same sum the engine does). The playhead goes round with it:
+`player_tick_at` takes the elapsed ticks modulo the time round; `player_pass_at` says
+which time round a moment belongs to. At each new pass `input_pass_end` gives Check
+mode's count and clears the take and checks; mic readings heard in the pass before
+(they arrive ~0.1 s late) are dropped. Switched on while playing, the engine is told at
+once; switched off, `last_pass` makes the current time round the last. A metronome
+toggle while repeating restarts at the loop's start.
 
 ### 3.6 The metronome
 
@@ -282,7 +293,12 @@ Play along on a real instrument and see what was played (`source/input.odin`).
   refined from its harmonics' interpolated peaks, then its harmonics - all of them, to 5
   kHz - taken out down to a smooth envelope (a partial taller than its neighbours' mean
   keeps the excess: another note's share). Up to 4 notes. **Steadiness**: a note is
-  reported after 2 frames running, dropped after 3 missing. Each reading also carries,
+  reported after 2 frames running, dropped after 3 missing. **Single-note mode**
+  (`d.single`, the default; the Single/Chords button): of the notes found, the lowest
+  that the strongest is the 2nd to 8th harmonic of (within 40 cents), else the strongest
+  (`chord_single`) - a string's loud octave or twelfth never shows as a second note.
+  `tools/chord_test` plays notes with their 8va, 12th and 15th added loud, even louder
+  than the note: 100 % the note alone (in Chords mode the same case reports extras). Each reading also carries,
   for every semitone, its presence in what is left after the notes found are taken out
   (and 255 for those found), with its cents.
   `tools/chord_test` renders single notes, cello double and triple stops, piano triads,
