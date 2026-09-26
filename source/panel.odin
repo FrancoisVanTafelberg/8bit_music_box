@@ -388,6 +388,8 @@ statusbar_draw :: proc() {
 	}
 	if len(msg) > 0 && age < 6 {
 		text(msg, 8, y + 5, g.status_bad ? COL_BAD : COL_GOOD)
+	} else if cs := check_hover_text(); cs != "" {
+		text(cs, 8, y + 5, COL_TEXT)
 	} else if hov := sheet_hover(); hov.ok {
 		p := placed_pitch(hov.step)
 		bt := music.bar_ticks(&g.song)

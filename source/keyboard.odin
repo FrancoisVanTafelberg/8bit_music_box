@@ -329,7 +329,7 @@ keyboard_controls :: proc(t: ^music.Track, lo, hi, here: int) {
 			f := g.input.notes[i]
 			mm := note_of(f)
 			c := int(math.round((f - f32(mm)) * 100))
-			text(fmt.tprintf("%s %s%d", fb_name(mm), c >= 0 ? "+" : "", c), x, y, abs(c) <= 10 ? COL_GOOD : (abs(c) <= 25 ? COL_ACCENT : COL_BAD), FONT_BIG)
+			text(fmt.tprintf("%s %s%d", fb_name(mm), c >= 0 ? "+" : "", c), x, y, abs(c) <= 10 ? COL_GOOD : (abs(c) <= music.CHECK_TUNE ? COL_ACCENT : COL_BAD), FONT_BIG)
 			y += 22
 		}
 	}

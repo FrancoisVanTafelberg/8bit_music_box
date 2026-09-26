@@ -612,7 +612,7 @@ fb_input_draw :: proc() {
 		// Labels left of the lowest string's side, right of the others.
 		lx := p.string * 2 < fb_strings() ? x - r - 8 - text_width(s) : x + r + 8
 		fill(rect(lx - 3, y - 7, text_width(s) + 6, 14), {0, 0, 0, 190})
-		text(s, lx, y - 5, abs(c) <= 10 ? COL_GOOD : (abs(c) <= 25 ? COL_ACCENT : COL_BAD))
+		text(s, lx, y - 5, abs(c) <= 10 ? COL_GOOD : (abs(c) <= music.CHECK_TUNE ? COL_ACCENT : COL_BAD))
 	}
 }
 

@@ -288,25 +288,37 @@ input_heard :: proc(r: ^music.Chord_Reading, heard: f64) {
 check_reading :: proc(r: ^music.Chord_Reading, tick: f32) {
 	t := active_track()
 	if t == nil do return
-	spt := f32(music.tick_seconds(&g.song))
-	// Everything the layer has sounding now, for chord_check.
-	expected: [16]int
+	spt := music.tick_seconds(&g.song)
+	// Every note whose window this reading falls in (music.check_window: the
+	// note less its attack and release, widened for a player a little ahead
+	// of or behind the playhead). They are also what chord_check is told is
+	// expected now.
+	Hit :: struct {note: music.Note, want: i32}
+	hits: [16]Hit
+	nh := 0
+	// ...and the notes just before and after, which a semitone-off reading
+	// may really be (music.check_nearby).
+	expected: [32]int
 	ne := 0
 	for note in t.notes {
-		if f32(note.tick) > tick do break
-		if tick < f32(note.tick + note.len) && ne < len(expected) {expected[ne] = music.pitch_midi(note.pitch); ne += 1}
+		if f32(note.tick) - 0.2 / f32(spt) > tick do break
+		if music.check_nearby(tick, note.tick, note.len, spt) && ne < len(expected) {
+			expected[ne] = music.pitch_midi(note.pitch)
+			ne += 1
+		}
+		lo, hi, want := music.check_window(note.tick, note.len, spt)
+		if tick < lo || tick >= hi || nh >= len(hits) do continue
+		hits[nh] = {note, want}
+		nh += 1
 	}
-	for note in t.notes {
-		if f32(note.tick) > tick do break
-		ln := f32(note.len)
-		skip := min(0.1 / spt, ln * 0.35) // the attack
-		tail := min(0.04 / spt, ln * 0.15) // ...and the release
-		if tick < f32(note.tick) + skip || tick >= f32(note.tick) + ln - tail do continue
+	for h in hits[:nh] {
+		note := h.note
 		m := music.pitch_midi(note.pitch)
 		c := check_find(note.tick, m)
 		if c == nil {
 			append(&g.input.checks, Check_Note{tick = note.tick, len = note.len, midi = i16(m)})
 			c = &g.input.checks[len(g.input.checks) - 1]
+			c.tally.want = h.want
 		}
 		if c.final do continue
 		f, cents := music.chord_check(r, m, expected[:ne])
@@ -326,8 +338,14 @@ check_update :: proc() {
 	in_ := &g.input
 	if in_.mode == .Check {
 		if g.player.playing {
+			// Judged once the last reading its window can take has come in.
 			heard := player_tick_at(&g.player, &g.song, rl.GetTime() - f64(in_.latency_ms) / 1000 - 0.12)
-			for &c in in_.checks do if !c.final && f32(c.tick + c.len) <= heard do c.final = true
+			spt := music.tick_seconds(&g.song)
+			for &c in in_.checks {
+				if c.final do continue
+				_, hi, _ := music.check_window(c.tick, c.len, spt)
+				if hi <= heard do c.final = true
+			}
 		} else if in_.was_playing {
 			check_summary()
 		}
@@ -466,7 +484,7 @@ input_sheet_draw :: proc() {
 		lx := x + r + 6
 		if lx + text_width(s) + 6 > right do lx = x - r - 10 - text_width(s)
 		fill(rect(lx - 3, ly - 7, text_width(s) + 6, 14), {0, 0, 0, 170})
-		text(s, lx, ly - 5, abs(cents) <= 10 ? COL_GOOD : (abs(cents) <= 25 ? COL_ACCENT : COL_BAD))
+		text(s, lx, ly - 5, abs(cents) <= 10 ? COL_GOOD : (abs(cents) <= music.CHECK_TUNE ? COL_ACCENT : COL_BAD))
 	}
 }
 
@@ -616,4 +634,41 @@ input_names :: proc() -> string {
 // The MIDI note nearest a fractional one, kept to the MIDI range.
 note_of :: proc(f: f32) -> int {
 	return clamp(int(math.round(f)), 0, 127)
+}
+
+// Check mode, the mouse on a checked note: how it went, in the status line.
+// "C#4: in tune 64% of it, near 20% (avg -12 cents) - right"
+check_hover_text :: proc() -> string {
+	if g.input.mode != .Check do return ""
+	hov := sheet_hover()
+	t := active_track()
+	if !hov.ok || t == nil do return ""
+	i := music.track_note_at(t, hov.step, hov.raw_tick)
+	if i < 0 do return ""
+	n := t.notes[i]
+	c := check_find(n.tick, music.pitch_midi(n.pitch))
+	if c == nil do return ""
+	tl := c.tally
+	of := max(tl.want > 0 ? tl.want : tl.frames, 1)
+	avg := ""
+	if tl.good + tl.near > 0 do avg = fmt.tprintf("  (on average %+d cents)", tl.cents_sum / (tl.good + tl.near))
+	verdict := "not judged yet"
+	switch c.verdict {
+	case .Correct:
+		verdict = "right"
+	case .Almost:
+		verdict = "nearly"
+	case .Missed:
+		verdict = "missed"
+	case .None:
+	}
+	return fmt.tprintf(
+		"%s: in tune (within %d cents) %d%% of it, near %d%%%s - %s",
+		music.pitch_name_temp(n.pitch),
+		music.CHECK_TUNE,
+		min(100 * int(tl.good) / int(of), 100),
+		min(100 * int(tl.near) / int(of), 100),
+		avg,
+		verdict,
+	)
 }

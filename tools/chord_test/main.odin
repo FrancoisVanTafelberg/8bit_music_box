@@ -329,6 +329,113 @@ main :: proc() {
 		if !ok do all_ok = false
 		free(d)
 	}
+	// The Check mode in time: quick notes (eighths at 120: a quarter of a
+	// second each), a semitone apart, played on time, late and early - as
+	// the app does it (music.check_window). A player behind the playhead
+	// must still get the right notes right, and the wrong ones wrong.
+	fmt.println("\nCheck mode in time (eighths at 120, C3 C#3 D3 E3 C3 ...)")
+	Timing_Case :: struct {
+		name:  string,
+		shift: f64, // seconds the playing is behind (+) or ahead (-) of the song
+		wrong: int, // this note of the run is played a semitone low (-1: none)
+		gap:   int, // this note is not played at all (-1: none)
+	}
+	timings := []Timing_Case {
+		{"on time", 0, -1, -1},
+		{"80 ms late", 0.08, -1, -1},
+		{"140 ms late", 0.14, -1, -1},
+		{"200 ms late", 0.2, -1, -1},
+		{"40 ms early", -0.04, -1, -1},
+		{"late, 4th note a semitone low", 0.1, 3, -1},
+		{"late, 6th note left out", 0.1, -1, 5},
+	}
+	run := [?]int{48, 49, 50, 52, 48, 49, 51, 49}
+	for tc in timings {
+		song: music.Song
+		music.song_init(&song)
+		song.tempo = 120
+		ti := music.song_add_track(&song, "cello")
+		start := i32(music.TPQ * 4)
+		eighth := i32(music.TPQ / 2)
+		expect_song: music.Song // what the layer says: always the run as written
+		music.song_init(&expect_song)
+		ei := music.song_add_track(&expect_song, "cello")
+		for m, k in run {
+			append(&expect_song.tracks[ei].notes, music.Note{start + i32(k) * eighth, eighth, music.pitch_from_midi(m, 0), 100})
+			if k == tc.gap do continue
+			pm := k == tc.wrong ? m - 1 : m
+			append(&song.tracks[ti].notes, music.Note{start + i32(k) * eighth, eighth, music.pitch_from_midi(pm, 0), 100})
+		}
+		music.track_sort(&song.tracks[ti])
+		stereo := music.render_song(&song, .Bit16)
+		n := len(stereo) / 4
+		shift := int(tc.shift * music.PITCH_RATE)
+		mic := make([]f32, n + max(shift, 0) + music.PITCH_RATE)
+		for i in 0 ..< n {
+			j := i + shift
+			if j < 0 || j >= len(mic) do continue
+			k := i * 4
+			mic[j] = (stereo[k] + stereo[k + 1] + stereo[k + 2] + stereo[k + 3]) * 0.25
+		}
+		peak: f32
+		for v in mic do peak = max(peak, abs(v))
+		if peak > 0 do for &v in mic do v *= 0.3 / peak
+		rng := rand.create(5)
+		context.random_generator = rand.default_random_generator(&rng)
+		for &v in mic do v += rand.float32_range(-1, 1) * 0.005 * noise
+		d := new(music.Chord_Detector)
+		music.chord_init(d, 36, 84)
+		d.single = true
+		out := make([]music.Chord_Reading, 64)
+		spt := music.tick_seconds(&song)
+		notes := expect_song.tracks[ei].notes[:]
+		tallies := make([]music.Check_Tally, len(notes))
+		for at := 0; at < len(mic); at += 512 {
+			chunk := mic[at:min(at + 512, len(mic))]
+			k := music.chord_feed(d, chunk, out)
+			for &rd in out[:k] {
+				tick := f32(f64(at + len(chunk) - rd.delay) / music.PITCH_RATE / spt)
+				near: [16]int
+				nn := 0
+				for note in notes do if music.check_nearby(tick, note.tick, note.len, spt) {near[nn] = music.pitch_midi(note.pitch); nn += 1}
+				for note, i in notes {
+					lo, hi, want := music.check_window(note.tick, note.len, spt)
+					if tick < lo || tick >= hi do continue
+					tallies[i].want = want
+					f, c := music.chord_check(&rd, music.pitch_midi(note.pitch), near[:nn])
+					music.check_add(&tallies[i], f, c)
+				}
+			}
+		}
+		got := make([]music.Check_Verdict, len(notes))
+		ok := true
+		for t, i in tallies {
+			got[i] = music.check_verdict(t)
+			want := music.Check_Verdict.Correct
+			if i == tc.wrong do want = .Almost
+			if i == tc.gap do want = .Missed
+			if got[i] != want do ok = false
+		}
+		short :: proc(v: music.Check_Verdict) -> string {
+			switch v {
+			case .Correct:
+				return "right"
+			case .Almost:
+				return "NEAR"
+			case .Missed:
+				return "MISS"
+			case .None:
+			}
+			return "-"
+		}
+		if !ok do for t, i in tallies do fmt.printfln("      %d: frames %d want %d good %d near %d", i, t.frames, t.want, t.good, t.near)
+		line := ""
+		for v in got do line = fmt.tprintf("%s %s", line, short(v))
+		fmt.printfln("  %-32s%s%s", tc.name, line, ok ? "" : "   <-- wrong")
+		if !ok do all_ok = false
+		free(d)
+	}
+
 	fmt.println(all_ok ? "PASS" : "FAIL")
 	if !all_ok do os.exit(1)
 }

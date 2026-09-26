@@ -307,14 +307,22 @@ Play along on a real instrument and see what was played (`source/input.odin`).
   with the room 12 dB louder the same but the piano triads (81 %, decaying notes); guitar
   chords of 4-6 notes 98 % (of three), with some extra notes - beyond the goal. About
   0.35 ms an analysis optimised, 1.3 ms in a debug build.
-- **Checking** (`chord_check`, `check_verdict`): for each note of the layer sounding
-  when a reading was heard (past its first 0.1 s and before its last 0.04 s): Good if a
-  note found is within half a semitone and 25 cents, or if what is left there has
-  presence ≥ 38/255 within 25 cents; Near if out of tune, or a note found is a semitone
-  off or the same note in another octave - not counting notes found that are other
-  notes of the chord played right; else Miss. A note is Correct when Good for at least
-  half its readings, Almost when Good or Near for 40 %, else Missed; judged once the
-  playhead (as heard) has passed it. `tools/chord_test` checks the verdicts: a right
+- **Checking** (`chord_check`, `check_window`, `check_verdict`): a note's readings are
+  those heard in its window - the note less its first 0.1 s (a third of a short note)
+  and last 0.04 s, widened 0.05 s before and 0.15 s after, since a player is behind the
+  playhead as a rule; `want` is how many readings the unwidened part holds, and the
+  verdict counts against that, so widening only helps. Each reading: Good if a note
+  found is within half a semitone and 20 cents, or if what is left there has presence
+  ≥ 64/255 within 20 cents; Near if out of tune, or a note found is a semitone off or
+  the same note in another octave - not counting notes found that are the pitches of
+  the layer's notes near that moment (`check_nearby`: from 0.08 s before one to 0.35 s
+  after it ends - a previous note still ringing is not a semitone-off try at the next);
+  else Miss. Correct: Good for half of `want`; Almost: Good or Near for half, or Good
+  for over a third; else Missed. Judged once the last reading its window can take has
+  come in. The status line shows a hovered note's figures. Without the widening, a
+  player 0.2 s late had the note before read as a semitone-off try at the next (the
+  C-for-C# report); `tools/chord_test` now plays a run of eighths on time, 80, 140,
+  200 ms late and 40 ms early, one wrong note and one left out. `tools/chord_test` checks the verdicts: a right
   chord, 35 cents sharp, a semitone up, a note left out, nothing, another chord, cello
   double and triple stops, the wrong octave.
 - **Detection: one note** (`music/pitch.odin`, kept, not used by the app now): a 4th-order

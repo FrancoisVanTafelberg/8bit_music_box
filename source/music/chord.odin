@@ -398,15 +398,16 @@ overtone_of :: proc(hi, lo: f32) -> bool {
 // ---------------------------------------------------------------------------
 
 // One reading's verdict on one expected note (MIDI m), of the `expected`
-// notes all meant to be sounding then (m among them).
+// notes all meant to be sounding about then (m among them; see
+// check_nearby).
 Check_Frame :: enum u8 {
 	Miss, // nothing there
 	Near, // there but out of tune, or a semitone off, or in another octave
 	Good, // there, within CHECK_TUNE cents
 }
 
-CHECK_TUNE :: 25 // cents either way that count as in tune
-CHECK_PRESENT :: 38 // presence (of 255) that counts as played, when not found outright
+CHECK_TUNE :: 20 // cents either way that count as in tune
+CHECK_PRESENT :: 64 // presence (of 255) that counts as played, when not found outright
 
 chord_check :: proc(r: ^Chord_Reading, m: int, expected: []int) -> (Check_Frame, int) {
 	// Found outright?
@@ -441,6 +442,37 @@ chord_check :: proc(r: ^Chord_Reading, m: int, expected: []int) -> (Check_Frame,
 Check_Tally :: struct {
 	frames, good, near: i32,
 	cents_sum:          i32, // over good and near frames
+	want:               i32, // readings the note's own length holds (check_window); 0 = use frames
+}
+
+// Where a note's readings are taken from, in ticks: its length without the
+// attack (0.1 s, or a third of a short note) and the release (0.04 s), then
+// widened - CHECK_EARLY before and CHECK_LATE after - because a player is
+// never exactly with the playhead: the sound reaches the ear a little after
+// the playhead passes, and the hand follows the ear. A note played late is
+// still the right note. `want`: how many readings the unwidened part holds -
+// what the verdict counts against, so the widening can only help.
+CHECK_EARLY :: 0.05 // seconds
+CHECK_LATE :: 0.15
+
+// Is a note near enough to `tick` that what is heard then may still be (or
+// already be) that note - its ring after it ends, a player late for the
+// next one? Such notes, played right, are not taken as a semitone-off try at
+// the note being checked (chord_check's `expected`).
+check_nearby :: proc(tick: f32, note_tick, length: i32, spt: f64) -> bool {
+	s := f32(spt)
+	return tick >= f32(note_tick) - 0.08 / s && tick < f32(note_tick + length) + 0.35 / s
+}
+
+check_window :: proc(tick, length: i32, spt: f64) -> (lo, hi: f32, want: i32) {
+	s := f32(spt)
+	ln := f32(length)
+	skip := min(0.1 / s, ln * 0.35)
+	tail := min(0.04 / s, ln * 0.15)
+	core_lo := f32(tick) + skip
+	core_hi := f32(tick) + ln - tail
+	want = max(i32((core_hi - core_lo) * s * PITCH_RATE / CHORD_HOP), 1)
+	return core_lo - CHECK_EARLY / s, core_hi + CHECK_LATE / s, want
 }
 
 Check_Verdict :: enum u8 {
@@ -463,12 +495,14 @@ check_add :: proc(t: ^Check_Tally, f: Check_Frame, cents: int) {
 	}
 }
 
-// Correct: in tune for at least half the note. Almost: there (in tune or
-// near it) for at least 40 % of it. Missed: otherwise.
+// Correct: in tune for at least half the note. Almost: there - in tune or
+// near it - for half of it, or in tune for over a third of it. Missed:
+// otherwise (a stray reading or two at its edges is not the note played).
 check_verdict :: proc(t: Check_Tally) -> Check_Verdict {
 	if t.frames == 0 do return .None
-	if t.good * 2 >= t.frames do return .Correct
-	if (t.good + t.near) * 5 >= t.frames * 2 do return .Almost
+	n := t.want > 0 ? t.want : t.frames
+	if t.good * 2 >= n do return .Correct
+	if (t.good + t.near) * 2 >= n || t.good * 20 >= n * 7 do return .Almost
 	return .Missed
 }
 
