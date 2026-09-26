@@ -361,8 +361,9 @@ fingerboard_draw :: proc() {
 	y += 16
 
 	// Tracking: the path from note to note (fingering.odin).
-	if button(rect(x0, y, 64, 18), "Tracking", g.fb_track) do g.fb_track = !g.fb_track
-	g.fb_track_n = int(stepper(rect(x0 + 70, y, 84, 18), f32(g.fb_track_n), 1, TRACK_MAX, 1, TRACK_DEFAULT_N, fmt.tprintf("%d notes", g.fb_track_n)))
+	// Off / Tracking (the notes up to now) / Suggest (the next ones).
+	if button(rect(x0, y, 64, 18), track_show_name(), g.fb_track) do track_show_step()
+	g.fb_track_n = int(stepper(rect(x0 + 70, y, 84, 18), f32(g.fb_track_n), 1, TRACK_MAX - 1, 1, TRACK_DEFAULT_N, fmt.tprintf(g.fb_suggest ? "next %d" : "%d notes", g.fb_track_n)))
 	if button(rect(x0 + 160, y, 84, 18), TRACK_MODE_NAME[g.fb_track_mode], g.fb_track) {
 		g.fb_track_mode = Track_Mode((int(g.fb_track_mode) + 1) % len(Track_Mode))
 		switch g.fb_track_mode {

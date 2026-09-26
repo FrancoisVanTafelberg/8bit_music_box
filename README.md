@@ -55,11 +55,18 @@ choose a hand position - the instrument's own: semitone-apart fingers on the cel
 violin and viola's frame, Simandl on the double bass, a finger per fret on the guitar -
 and draw a line across the board for each finger, labelled f1–f4 at the right edge.
 
-**Tracking** (on by default) follows the layer note by note: the last N notes (8 by
-default; Shift/Ctrl for 10/100 on the -/+) up to the playhead - or up to the selected note
-when stopped - each filled in its own colour, with the way between them drawn: along the
-string, as a line straight down it blending from one note's colour to the next, or as an arrow straight across the board to another string. Three
-modes: **Same string** stays on the string while it can play the note; **Nearest** goes to
+**Tracking** - one button, three states: **Off**, **Tracking** (the default) and
+**Suggest**. **Tracking** follows the layer note by note: the last N notes (8 by default;
+Shift/Ctrl for 10/100 on the -/+) up to the playhead - or up to the selected note when
+stopped - each filled in its own colour, with the way between them drawn: along the
+string, as a line straight down it, or straight across the board to another string. Only
+the line between the current note and the one before is drawn full, with an arrow
+pointing at the one before and the number **-1**; the lines further back fade (-2, -3 ...).
+**Suggest** looks ahead instead: the current note (ringed) and the next N (`next 4`) - from
+the playhead, or the selected note, or when stopped the bar cursor - with the line to the
+next note full, its arrow pointing at it, numbered **+1**, and +2, +3 ... fading after it.
+A repeated note (the same place again) gets its -1 / +1 beside it. The keyboard does the
+same. Three place-choosing modes: **Same string** stays on the string while it can play the note; **Nearest** goes to
 whichever place is physically closest on the real instrument (its string length and
 spacing are in its instrument file); **Best** (the default) always takes the place nearest
 the nut (the open string when there is one). Notes played together - double stops,
@@ -95,7 +102,7 @@ Songs the old Cello Helper saved in `cello_songs\` still show in Open, marked [c
 | **Helper** | `H` or the **Helper** button: the selected string layer's fingerboard on the right (see above) |
 | **Layers** | `+ Add instrument`; click a layer to edit it; `M` mute, `S` solo (live, even mid-song); `Tab` next layer; **Set colour** picks the selected layer's colour on the sheet (saved in the song) |
 | **Play** | `Space` from the bar cursor (or this page's start, if the cursor is on another page), `Shift+Space` from the start. **Follow** turns pages with the playhead |
-| **Play mode** | the button beside Play: **Song** (the whole song, the default), **Page** (the four bars on the sheet - from the cursor if it is on this page, else from the page's start) or **Bar** (one bar from the cursor). Page and Bar stop at their end (a red line marks it) and leave the cursor where it was, so Play goes round the same bars again; `→` moves on. Right-click steps back |
+| **Play mode** | the button beside Play: **Song** (the whole song, the default, turning the pages as it goes), **Scroll** (the whole song, continuously: the playhead stays at the sheet's left edge and the sheet scrolls past it at the tempo), **Page** (the four bars on the sheet - from the cursor if it is on this page, else from the page's start) or **Bar** (one bar from the cursor). Page and Bar stop at their end (a red line marks it) and leave the cursor where it was, so Play goes round the same bars again; `→` moves on. Right-click steps back |
 | **Repeat** | the **Repeat** button beside it (or `R`): at the end - of the song, the page or the bar - it goes straight back to where Play started and round again, seamlessly, until you stop it. Green lines mark where it goes back from and to. Each time round the mic's take (and in Check mode the checks) start afresh, and Check mode's count for the time round shows in the status line. Switched off while playing, the time round being played is the last |
 | **Metronome** | the top layer is always the **Metronome**. **Metro** under the sheet (or `K`, or its `on` button) fills every bar with a click a beat, the first beat of each bar higher; they follow the time signature and the number of bars, and go again when it is switched off. It plays in time with the song, keeps going when another layer is soloed, has its own `M` mute, and is never saved or exported. Its clicks show as ticks along the top of the sheet |
 | **Input mode** | **Mic** under the sheet (or `I`) listens to a microphone and shows what you play - one note, or a chord (three notes reliably; more when they stand out): a big dot on the sheet for each note, in the colour opposite the layer's, on that note's row - above or below the row's middle when sharp or flat, with the name and cents beside it (green within 10 cents, gold within 20, red beyond). Stopped, they sit on the bar cursor; playing, they ride the playhead and leave a line behind for each note - the take - which stays until Play or **Reset**. With the Helper on they also show on the fingerboard (a chord on different strings) or the keyboard. Listens for the selected layer's range; readings run about 0.1 s behind the sound for the cello's range, 0.05 s higher up. Windows only for now |
@@ -104,7 +111,7 @@ Songs the old Cello Helper saved in `cello_songs\` still show in Open, marked [c
 | **Microphone** | the **v** button beside Mic: pick any input device (or the system default), watch the level (the white mark is the noise gate), set **ignore noise** (how far above the room's own noise a note must be: x2 / 6 dB by default; raise it in a noisy room) and **latency** (raise it if the take lags the notes). The room's noise is learned by itself while you are not playing. Use headphones when playing along - the mic hears the speakers too |
 | **Pages** | `PgUp`/`PgDn`, `[` `]`, or click the page strip |
 | **Undo** | `Ctrl+Z`, `Ctrl+Y` / `Ctrl+Shift+Z` |
-| **Files** | `Ctrl+S` save, `Ctrl+O` open, `Ctrl+N` new, `Ctrl+E` export WAV |
+| **Files** | `Ctrl+S` (or Save) opens the Save menu: **Overwrite** the file the song came from, or **Save new** - a new file beside it (the name suggested is the current one's with `_2`, `_3` ..., typed over as you like; Enter saves), after which the new file is the one being worked on and the original stays as it was; an existing file is never overwritten that way. `Ctrl+O` open, `Ctrl+N` new, `Ctrl+E` export WAV |
 | **Import** | put `.mid` files in `imports\` and Open them, or drag a `.mid` / `.song` onto the window |
 | **Export** | WAV built in; MP3 / OGG / FLAC light up when `ffmpeg` is on PATH |
 | **Sound mode** | the 8-bit button: click cycles **4-bit** (NES 16-step volume, grittiest), **8-bit** (default), **16-bit** (a player's touch: tuning, vibrato and bow scratch vary note to note), **32-bit** (modelled bowed strings and wooden bodies); right-click goes back. Export uses it too |

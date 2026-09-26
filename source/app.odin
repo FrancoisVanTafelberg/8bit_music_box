@@ -41,6 +41,7 @@ App :: struct {
 	fb_inst_ok: bool,
 	// Tracking on the fingerboard (fingering.odin).
 	fb_track:      bool,
+	fb_suggest:    bool, // ...showing the notes to come, not those gone (fingering.odin)
 	fb_track_n:    int,
 	fb_track_mode: Track_Mode,
 	fb_view:       f32, // semitones of board shown (fingerboard.odin)
@@ -68,6 +69,8 @@ App :: struct {
 	metro_sig:  [4]i32,
 	// Repeat (player.odin): go round the song or the scope again at its end.
 	repeat:     bool,
+	// The Scroll play mode: the tick at the sheet's left edge (sheet.odin).
+	scroll_view: f32,
 	sheet_lo:   int,
 	sheet_hi:   int,
 	row_h:      int,
@@ -96,6 +99,11 @@ App :: struct {
 
 	// Panels
 	overlay:      Overlay,
+	// The Save menu: the name a new file gets, being typed, and where the
+	// menu hangs from.
+	save_name:    [64]u8,
+	save_len:     int,
+	save_x:       f32,
 	open_files:   [dynamic]string,
 	layer_scroll: int,
 	editing_title: bool,
@@ -186,8 +194,13 @@ game_update :: proc() -> bool {
 	player_update(&g.player, &g.song)
 	input_update()
 	perf_mark(.Audio)
-	if g.player.playing && g.follow {
-		per_page := music.bar_ticks(&g.song) * BARS_PER_PAGE
+	per_page := music.bar_ticks(&g.song) * BARS_PER_PAGE
+	if scrolling() {
+		// Continuous: the sheet's left edge is the playhead, moving on
+		// smoothly; the page boxes say which page it is in.
+		g.scroll_view = player_tick_at(&g.player, &g.song, rl.GetTime())
+		g.page = clamp(i32(g.scroll_view) / per_page, 0, page_count() - 1)
+	} else if g.player.playing && g.follow {
 		g.page = clamp(player_tick(&g.player, &g.song) / per_page, 0, page_count() - 1)
 	}
 

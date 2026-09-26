@@ -18,6 +18,7 @@ Overlay :: enum {
 	Sounds, // the sound effect tester (sound_test.odin)
 	Colour, // the colour picker for the active layer (Set colour)
 	Mic, // the microphone: device, level, gate, latency (input.odin)
+	Save, // Overwrite, or Save as a new file (files.odin)
 }
 
 overlay_none :: proc() -> bool {
@@ -135,7 +136,7 @@ topbar_draw :: proc() {
 	x += 40
 	if button(rect(x, y, 38, h), "Open") do open_overlay()
 	x += 40
-	if button(rect(x, y, 38, h), "Save") do file_save()
+	if button(rect(x, y, 38, h), "Save", g.overlay == .Save) do save_menu_open(x)
 	x += 44
 	// Export (the rest need ffmpeg).
 	if button(rect(x, y, 34, h), "WAV") do file_export("wav")
@@ -427,6 +428,8 @@ overlay_draw :: proc() {
 		colour_picker_draw()
 	case .Mic:
 		mic_overlay_draw()
+	case .Save:
+		save_menu_draw()
 	}
 	// Whatever the overlay did not take, nobody underneath gets.
 	if g.ui.clicked || g.ui.right {
@@ -551,7 +554,7 @@ keys_update :: proc() {
 	if g.overlay != .None do return
 
 	if ctrl {
-		if rl.IsKeyPressed(.S) do file_save()
+		if rl.IsKeyPressed(.S) do save_menu_open(-1)
 		if rl.IsKeyPressed(.O) do open_overlay()
 		if rl.IsKeyPressed(.N) do file_new()
 		if rl.IsKeyPressed(.E) do file_export("wav")

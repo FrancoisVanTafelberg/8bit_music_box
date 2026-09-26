@@ -101,16 +101,20 @@ kb_hover :: proc() -> int {
 // The last `steps` steps of `t` up to the one starting at or before
 // `upto_tick` (or, with `upto_note` >= 0, up to the step holding that note),
 // oldest first. A step is a note, or notes starting together (a chord).
-kb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, steps: int, out: []Tracked) -> int {
+kb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, steps: int, out: []Tracked, ahead := 0) -> int {
 	if steps <= 0 || len(out) == 0 do return 0
 	ring: [TRAIL_CAP]Tracked
 	count, step := 0, 0
 	step_start: [TRACK_MAX + 1]int
+	cur, extra := -1, 0
 	i := 0
 	for i < len(t.notes) {
 		first := t.notes[i]
-		if upto_note < 0 && first.tick > upto_tick do break
-		if upto_note >= 0 && i > upto_note do break
+		beyond := upto_note < 0 ? first.tick > upto_tick : i > upto_note
+		if beyond {
+			if extra >= ahead do break
+			extra += 1
+		}
 		j := i + 1
 		for j < len(t.notes) && j - i < 10 {
 			nj := t.notes[j]
@@ -119,18 +123,14 @@ kb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, steps: int, ou
 		}
 		step_start[step % (TRACK_MAX + 1)] = count
 		for k in i ..< j {
-			ring[count % len(ring)] = {{}, music.pitch_midi(t.notes[k].pitch), k, step}
+			ring[count % len(ring)] = {{}, music.pitch_midi(t.notes[k].pitch), k, step, 0}
 			count += 1
 		}
+		if !beyond do cur = step
 		step += 1
 		i = j
 	}
-	if step == 0 do return 0
-	keep := min(steps, step, TRACK_MAX)
-	first_of_window := step_start[(step - keep) % (TRACK_MAX + 1)]
-	n := min(count - first_of_window, len(out), len(ring))
-	for k in 0 ..< n do out[k] = ring[(count - n + k) % len(ring)]
-	return n
+	return trail_finish(ring[:], count, step, cur, step_start[:], steps, ahead, out)
 }
 
 keyboard_draw :: proc() {
@@ -160,17 +160,13 @@ keyboard_draw :: proc() {
 	n_trail := fb_current_trail(trail[:])
 	first_step := n_trail > 0 ? trail[0].step : 0
 	steps := n_trail > 0 ? trail[n_trail - 1].step - first_step + 1 : 1
-	fade :: proc(c: rl.Color, rank, steps: int) -> rl.Color {
-		a := 0.35 + 0.65 * f32(rank + 1) / f32(steps)
-		return {c.r, c.g, c.b, u8(f32(c.a) * a)}
-	}
 	key_fill :: proc(m, target, here, selected: int, sounding: []int, trail: []Tracked, first_step, steps: int, base: rl.Color) -> rl.Color {
 		c := base
 		// Outside the filter's key: white keys go grey, black keys go white -
 		// a dark grey black key would look much like any other.
 		if !fb_in_key(m) do c = kb_is_black(m) ? rl.Color{214, 210, 198, 255} : rl.Color{120, 118, 112, 255}
 		for s in sounding do if s == m do c = COL_ACCENT
-		for tr in trail do if tr.midi == m do c = colour_mix(c, track_colour(tr.step), f32(fade({0, 0, 0, 255}, tr.step - first_step, steps).a) / 255)
+		for tr in trail do if tr.midi == m do c = colour_mix(c, track_colour(tr.step), trail_alpha(tr.rel))
 		if m == target || m == here do c = COL_ACCENT
 		return c
 	}
@@ -220,16 +216,25 @@ keyboard_draw :: proc() {
 		}
 		if from < 0 || trail[from].midi == b.midi do continue
 		a := trail[from]
-		ca := fade(track_colour(a.step), a.step - first_step, steps)
-		cb := fade(track_colour(b.step), b.step - first_step, steps)
-		pa, pb := kb_point(a.midi), kb_point(b.midi)
-		gradient_line(pa, pb, ca, cb, 3)
-		arrow_head(pa, pb, 6, cb)
+		// As on the fingerboard: Tracking points back at -1, Suggest on at
+		// +1; only that line full, with its arrow; every line numbered.
+		tail, head := a, b
+		about := b.rel
+		if !g.fb_suggest {
+			tail, head = b, a
+			about = a.rel
+		}
+		key := abs(about) == 1
+		al := trail_alpha(about)
+		pt, ph := kb_point(tail.midi), kb_point(head.midi)
+		gradient_line(pt, ph, faded(track_colour(tail.step), al), faded(track_colour(head.step), al), key ? 3 : 2)
+		if key do arrow_head(pt, ph, 6, faded(track_colour(head.step), al))
+		trail_label(pt, ph, about, al)
 	}
 	for it in trail[:n_trail] {
 		p := kb_point(it.midi)
-		rl.DrawCircleV(p, 5, fade(track_colour(it.step), it.step - first_step, steps))
-		if it.step == first_step + steps - 1 do rl.DrawCircleLines(i32(p.x), i32(p.y), 7, rl.WHITE)
+		rl.DrawCircleV(p, 5, faded(track_colour(it.step), trail_alpha(it.rel)))
+		if it.rel == 0 do rl.DrawCircleLines(i32(p.x), i32(p.y), 7, rl.WHITE)
 	}
 
 	// Input mode: the note being played, on its key, off-centre by its cents.
@@ -291,18 +296,18 @@ keyboard_controls :: proc(t: ^music.Track, lo, hi, here: int) {
 
 	label("TRACKING", x, y)
 	y += 13
-	if button(rect(x, y, 64, 18), g.fb_track ? "On" : "Off", g.fb_track) do g.fb_track = !g.fb_track
-	g.fb_track_n = int(stepper(rect(x + 68, y, w - 68, 18), f32(g.fb_track_n), 1, TRACK_MAX, 1, TRACK_DEFAULT_N, fmt.tprintf("%d notes", g.fb_track_n)))
+	if button(rect(x, y, 64, 18), track_show_name(), g.fb_track) do track_show_step()
+	g.fb_track_n = int(stepper(rect(x + 68, y, w - 68, 18), f32(g.fb_track_n), 1, TRACK_MAX - 1, 1, TRACK_DEFAULT_N, fmt.tprintf(g.fb_suggest ? "next %d" : "%d notes", g.fb_track_n)))
 	y += 22
 	// What the mic listens for: one note, or chords.
 	if button(rect(x, y, 64, 18), g.input.chords ? "Chords" : "Single", g.input.chords) do input_chords_toggle()
 	text(g.input.chords ? "mic: chords" : "mic: one note", x + 68, y + 4, COL_DIM)
 	y += 24
-	text("the last notes up to the", x, y, COL_FAINT)
+	text(g.fb_suggest ? "the next notes to play, from" : "the last notes up to the", x, y, COL_FAINT)
 	y += 11
-	text("playhead (or the selected", x, y, COL_FAINT)
+	text(g.fb_suggest ? "the playhead (the selected" : "playhead (or the selected", x, y, COL_FAINT)
 	y += 11
-	text("note), and the hand's path", x, y, COL_FAINT)
+	text(g.fb_suggest ? "note, or the cursor): +1 next" : "note): -1 the one before", x, y, COL_FAINT)
 	y += 22
 
 	// What is pointed at.

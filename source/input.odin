@@ -61,12 +61,14 @@ Mic_Device :: struct {
 
 Play_Scope :: enum u8 {
 	Song,
+	Scroll, // the song, the page gliding past the playhead (continuous)
 	Bar,
 	Page,
 }
 
 SCOPE_NAME := [Play_Scope]string {
-	.Song = "Song",
+	.Song   = "Song",
+	.Scroll = "Scroll",
 	.Bar  = "Bar",
 	.Page = "Page",
 }
@@ -431,7 +433,7 @@ input_y :: proc(midi: f32) -> (y: f32, step: int, cents: int) {
 input_sheet_draw :: proc() {
 	in_ := &g.input
 	col := input_colour()
-	ps := f32(page_start())
+	ps := view_start()
 	pe := ps + f32(page_ticks())
 	left, right := f32(bars_x()), f32(bars_x() + bars_w())
 
@@ -534,13 +536,15 @@ level_frac :: proc(rms: f32) -> f32 {
 
 // Song -> Page -> Bar -> Song (right-click: back).
 scope_step :: proc(dir: int) {
-	order := [3]Play_Scope{.Song, .Page, .Bar}
+	order := [4]Play_Scope{.Song, .Scroll, .Page, .Bar}
 	i := 0
 	for s, k in order do if s == g.input.scope do i = k
-	g.input.scope = order[(i + dir + 3) % 3]
+	g.input.scope = order[(i + dir + 4) % 4]
 	switch g.input.scope {
 	case .Song:
-		set_status("Play plays the whole song")
+		set_status("Play plays the whole song, a page at a time")
+	case .Scroll:
+		set_status("continuous: Play plays the whole song, the sheet scrolling past the playhead at the tempo")
 	case .Page:
 		set_status("Play plays the four bars on this page (from the cursor, if it is on it)")
 	case .Bar:

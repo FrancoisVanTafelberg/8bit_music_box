@@ -115,8 +115,26 @@ px_per_tick :: proc() -> f32 {
 	return f32(bars_w()) / f32(page_ticks())
 }
 
+// Where the sheet's left edge is, in (fractional) ticks: the page's start -
+// or, playing in the Scroll mode (player.odin), the playhead itself, so the
+// page glides past it at the tempo.
+view_start :: proc() -> f32 {
+	if scrolling() do return g.scroll_view
+	return f32(page_start())
+}
+
+scrolling :: proc() -> bool {
+	return g.player.playing && g.input.scope == .Scroll
+}
+
+// Is this tick on the sheet as shown?
+in_view :: proc(tick: i32) -> bool {
+	v := view_start()
+	return f32(tick) >= v && f32(tick) < v + f32(page_ticks())
+}
+
 tick_x :: proc(tick: i32) -> f32 {
-	return f32(bars_x()) + f32(tick - page_start()) * px_per_tick()
+	return f32(bars_x()) + (f32(tick) - view_start()) * px_per_tick()
 }
 
 // The layer being edited; nil if there is none (the metronome, layer 0,
@@ -147,7 +165,7 @@ sheet_hover :: proc() -> Hover {
 	h: Hover
 	h.ok = true
 	h.step = sheet_hi() - int((m.y - ROWS_Y) / row_h())
-	h.raw_tick = page_start() + i32((m.x - bars_x()) / px_per_tick())
+	h.raw_tick = i32(view_start() + (m.x - bars_x()) / px_per_tick())
 	h.tick = snap_tick(h.raw_tick)
 	return h
 }
@@ -195,8 +213,7 @@ sheet_draw :: proc() {
 	fill(rect(panel_w(), TOP_H, sheet_r() - panel_w(), 720 - TOP_H - STATUS_H), COL_SHEET)
 	t := active_track()
 	bt := music.bar_ticks(&g.song)
-	ps := page_start()
-	right := f32(bars_x() + bars_w())
+	left, right := f32(bars_x()), f32(bars_x() + bars_w())
 
 	// Rows the active instrument cannot play: shaded, so the playable band
 	// stands out as the lit part of the page.
@@ -250,11 +267,13 @@ sheet_draw :: proc() {
 	top, bottom := f32(ROWS_Y), f32(ROWS_Y + rows_h())
 	sn := current_snap()
 	beat := music.beat_ticks(&g.song)
-	for b in 0 ..< BARS_PER_PAGE {
-		bar := g.page * BARS_PER_PAGE + i32(b)
+	// Every bar in view (scrolling: a part of one at each edge).
+	first_bar := i32(view_start()) / bt
+	for bar := first_bar; f32(bar * bt) < view_start() + f32(page_ticks()); bar += 1 {
 		start := bar * bt
 		for k := i32(0); k < bt; k += 1 {
 			x := tick_x(start + k)
+			if x < left - 0.5 || x > right + 0.5 do continue
 			switch {
 			case k == 0:
 				rl.DrawLineEx({x, top}, {x, bottom}, 2, {170, 170, 214, 255})
@@ -266,7 +285,7 @@ sheet_draw :: proc() {
 		}
 		// Bar number, and past the song's end a note that it is empty room.
 		bx := tick_x(start)
-		text(fmt.tprintf("%d", bar + 1), bx + 8, BAR_NUM_Y, bar < g.song.bars ? COL_DIM : COL_FAINT)
+		if bx >= left - 1 && bx < right - 16 do text(fmt.tprintf("%d", bar + 1), bx + 8, BAR_NUM_Y, bar < g.song.bars ? COL_DIM : COL_FAINT)
 	}
 	rl.DrawLineEx({right, top}, {right, bottom}, 2, {170, 170, 214, 255})
 
@@ -299,7 +318,7 @@ sheet_draw :: proc() {
 	// The bar cursor, where Play will start (left/right arrows).
 	if !g.player.playing {
 		c := play_from()
-		if c >= ps && c < ps + page_ticks() {
+		if in_view(c) {
 			x := tick_x(c)
 			rl.DrawLineEx({x, top}, {x, bottom}, 2, with_alpha(COL_ACCENT, 110))
 			rl.DrawTriangle({x - 6, top - 8}, {x, top}, {x + 6, top - 8}, COL_ACCENT)
@@ -307,8 +326,9 @@ sheet_draw :: proc() {
 	}
 
 	// The playhead.
-	if g.player.playing && playing_tick >= ps && playing_tick < ps + page_ticks() {
-		x := tick_x(playing_tick)
+	if g.player.playing && (scrolling() || in_view(playing_tick)) {
+		// Scrolling, it stays at the left edge and the page moves.
+		x := scrolling() ? left + 1 : tick_x(playing_tick)
 		rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, COL_ACCENT)
 	}
 	// Bar or Page scope: where Play will stop - or, repeating, where it
@@ -317,11 +337,11 @@ sheet_draw :: proc() {
 		p := &g.player
 		end := p.stop_tick
 		if p.loop do end = p.from_tick + p.loop_ticks
-		if end > ps && end <= ps + page_ticks() {
+		if end > 0 && in_view(end - 1) {
 			x := tick_x(end)
 			rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, with_alpha(p.loop ? COL_GOOD : COL_BAD, 160))
 		}
-		if p.loop && p.from_tick >= ps && p.from_tick < ps + page_ticks() {
+		if p.loop && in_view(p.from_tick) {
 			x := tick_x(p.from_tick)
 			rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, with_alpha(COL_GOOD, 160))
 			rl.DrawTriangle({x, top - 8}, {x, top}, {x + 7, top - 4}, COL_GOOD)
@@ -351,8 +371,8 @@ sheet_draw :: proc() {
 @(private = "file")
 notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tracked = nil) {
 	base := track_color(t)
-	ps := page_start()
-	pe := ps + page_ticks()
+	ps := i32(view_start())
+	pe := ps + page_ticks() + 1
 	left, right := f32(bars_x()), f32(bars_x() + bars_w())
 	muted := !music.track_audible(&g.song, t)
 
@@ -372,8 +392,7 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tr
 		in_trail := false
 		for tr in trail {
 			if tr.index != i do continue
-			first := trail[0].step
-			col = colour_mix(base, track_colour(tr.step), trail_weight(tr.step - first, trail[len(trail) - 1].step - first + 1))
+			col = colour_mix(base, track_colour(tr.step), trail_alpha(tr.rel))
 			in_trail = true
 			break
 		}
@@ -520,12 +539,9 @@ strip_draw :: proc() {
 metronome_draw :: proc(playing_tick: i32) {
 	if len(g.song.tracks) == 0 || !g.song.tracks[0].metronome do return
 	t := &g.song.tracks[0]
-	ps := page_start()
-	pe := ps + page_ticks()
 	muted := !music.track_audible(&g.song, t)
 	for n in t.notes {
-		if n.tick >= pe do break
-		if n.tick < ps do continue
+		if !in_view(n.tick) do continue
 		x := tick_x(n.tick)
 		down := n.vel >= 110
 		h := f32(down ? 7 : 4)

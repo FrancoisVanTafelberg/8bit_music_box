@@ -216,6 +216,7 @@ Tracked :: struct {
 	midi:  int,
 	index: int, // the note, in the layer
 	step:  int, // which step (note or chord) of the layer: picks the colour
+	rel:   int, // steps from the current one: -1 the one before, +1 the next
 }
 
 // Notes starting this close together, all while the first still sounds, are
@@ -224,32 +225,37 @@ Tracked :: struct {
 // quarter of a beat.
 STRUM_TICKS :: 6
 
-// The last `steps` steps of `t` up to the one starting at or before
-// `upto_tick` - or, with `upto_note` >= 0, up to the step holding that note.
+// The last `steps` steps of `t` up to the current one - the one starting at
+// or before `upto_tick`, or with `upto_note` >= 0 the step holding that note -
+// or, with `ahead` > 0 (Suggest), the current step and the `ahead` after it.
 // Places are chosen from the start of the layer, so a note's place does not
-// change as the window moves on. Fills `out` with their notes, oldest first;
-// returns how many.
-fb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, mode: Track_Mode, steps: int, out: []Tracked) -> int {
+// change as the window moves on. Fills `out` with their notes, oldest first,
+// each with its distance from the current step (rel); returns how many.
+fb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, mode: Track_Mode, steps: int, out: []Tracked, ahead := 0) -> int {
 	if steps <= 0 || len(out) == 0 do return 0
 	ring: [TRAIL_CAP]Tracked
 	count := 0
 	step := 0
 	prev_buf: [music.BOARD_MAX_STRINGS]Fb_Pos
 	prev := prev_buf[:0]
-	first_note_of_window := 0 // ring index where the kept steps begin
 	step_start: [TRACK_MAX + 1]int // ring positions of recent step starts
+	cur := -1 // the current step
+	extra := 0 // steps taken past it
 	i := 0
 	for i < len(t.notes) {
 		// Gather the step.
 		first := t.notes[i]
-		if upto_note < 0 && first.tick > upto_tick do break
+		beyond := upto_note < 0 ? first.tick > upto_tick : i > upto_note
+		if beyond {
+			if extra >= ahead do break
+			extra += 1
+		}
 		j := i + 1
 		for j < len(t.notes) && j - i < fb_strings() {
 			nj := t.notes[j]
 			if nj.tick - first.tick > STRUM_TICKS || nj.tick >= first.tick + first.len do break
 			j += 1
 		}
-		if upto_note >= 0 && i > upto_note do break
 		midis: [music.BOARD_MAX_STRINGS]int
 		for k in i ..< j do midis[k - i] = music.pitch_midi(t.notes[k].pitch)
 		places: [music.BOARD_MAX_STRINGS]Fb_Pos
@@ -260,22 +266,34 @@ fb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, mode: Track_Mo
 			if n_placed == 0 {
 				step_start[step % (TRACK_MAX + 1)] = count
 			}
-			ring[count % len(ring)] = {places[k], midis[k], i + k, step}
+			ring[count % len(ring)] = {places[k], midis[k], i + k, step, 0}
 			count += 1
 			n_placed += 1
 		}
 		if n_placed > 0 {
 			prev = prev_buf[:0]
 			for k in 0 ..< j - i do if places[k].ok {prev_buf[len(prev)] = places[k]; prev = prev_buf[:len(prev) + 1]}
+			if !beyond do cur = step
 			step += 1
 		}
 		i = j
 	}
+	return trail_finish(ring[:], count, step, cur, step_start[:], steps, ahead, out)
+}
+
+// The window of a trail (fb_track, kb_track): the last `steps` steps up to
+// the current one, or (ahead > 0) the current one and those after it; with
+// each note's distance from the current step.
+trail_finish :: proc(ring: []Tracked, count, step, cur: int, step_start: []int, steps, ahead: int, out: []Tracked) -> int {
 	if step == 0 do return 0
-	keep := min(steps, step, TRACK_MAX)
-	first_note_of_window = step_start[(step - keep) % (TRACK_MAX + 1)]
-	n := min(count - first_note_of_window, len(out))
-	for k in 0 ..< n do out[k] = ring[(count - n + k) % len(ring)]
+	first := ahead > 0 ? max(cur, 0) : step - min(steps, step)
+	first = max(first, step - TRACK_MAX)
+	begin := step_start[first % len(step_start)]
+	n := min(count - begin, len(out), len(ring))
+	for k in 0 ..< n {
+		out[k] = ring[(count - n + k) % len(ring)]
+		out[k].rel = out[k].step - cur
+	}
 	return n
 }
 
@@ -318,24 +336,25 @@ arrow_head :: proc(from, to: rl.Vector2, back: f32, c: rl.Color) {
 	rl.DrawTriangle(tip, base + side * 4.5, base - side * 4.5, c)
 }
 
-// Draw the trail: lines first, then the notes on top. Older steps fainter.
-// Each note of a step gets one line in: from the note before; between chords
-// of the same size, voice by voice; otherwise from the nearest note of the
-// step before (a fan of lines into a chord, one line out of it).
+// Draw the trail: lines first, then the notes on top, each fainter the
+// further its step is from the current one.
+//
+//   Tracking   the steps up to the current one. The line to the one before
+//              (-1) is drawn full, with an arrow pointing at it; the lines
+//              further back fade, without arrows.
+//   Suggest    the current step and the next ones. The line to the next
+//              (+1) is drawn full, with an arrow pointing at it; +2, +3 ...
+//              fade.
+//
+// Every line is numbered with the step it leads to (-1, -2 ... / +1, +2 ...).
+// Each note of a step gets one line: between chords of the same size, voice
+// by voice; otherwise from the nearest note of the step before.
 fb_track_draw :: proc(list: []Tracked) {
 	n := len(list)
 	if n == 0 do return
-	first, last := list[0].step, list[n - 1].step
-	steps := last - first + 1
-	fade :: proc(c: rl.Color, rank, steps: int) -> rl.Color {
-		a := 0.35 + 0.65 * f32(rank + 1) / f32(steps)
-		return {c.r, c.g, c.b, u8(f32(c.a) * a)}
-	}
+	first := list[0].step
 	for b in list {
 		if b.step == first do continue
-		// Where it came from. Between two chords of the same size, voice by
-		// voice (lowest to lowest, and so on up); otherwise the nearest note
-		// of the step before.
 		size :: proc(list: []Tracked, step: int) -> int {
 			c := 0
 			for x in list do if x.step == step do c += 1
@@ -360,39 +379,80 @@ fb_track_draw :: proc(list: []Tracked) {
 		}
 		if from < 0 do continue
 		a := list[from]
-		if a.pos == b.pos do continue
-		ca := fade(track_colour(a.step), a.step - first, steps)
-		cb := fade(track_colour(b.step), b.step - first, steps)
-		pa, pb := fb_point(a.pos), fb_point(b.pos)
+		// Which way it points, and which step it is about.
+		tail, head := a, b
+		about := b.rel
+		if !g.fb_suggest {
+			tail, head = b, a
+			about = a.rel
+		}
+		if a.pos == b.pos {
+			// The same place again (a repeated note): no line to draw, but
+			// the -1 / +1 is still said, beside it.
+			if abs(about) == 1 {
+				p := fb_point(a.pos)
+				trail_label(p + {10, -14}, p + {26, -14}, about, 1)
+			}
+			continue
+		}
+		key := abs(about) == 1
+		al := trail_alpha(about)
+		ct := faded(track_colour(tail.step), al)
+		ch := faded(track_colour(head.step), al)
+		pt, ph := fb_point(tail.pos), fb_point(head.pos)
+		width := f32(key ? 3 : 2)
 		if a.pos.string == b.pos.string {
-			// Along the string: a line down the string itself, straight
-			// through the places on the way.
+			// Along the string: a line down the string itself.
 			s := a.pos.string
 			PIECES :: 24
 			for q in 0 ..< PIECES {
 				t0 := f32(q) / PIECES
 				t1 := f32(q + 1) / PIECES
-				y0 := pa.y + (pb.y - pa.y) * t0
-				y1 := pa.y + (pb.y - pa.y) * t1
-				rl.DrawLineEx({fb_x(s, y0), y0}, {fb_x(s, y1), y1}, 3, colour_mix(ca, cb, (t0 + t1) / 2))
+				y0 := pt.y + (ph.y - pt.y) * t0
+				y1 := pt.y + (ph.y - pt.y) * t1
+				rl.DrawLineEx({fb_x(s, y0), y0}, {fb_x(s, y1), y1}, width, colour_mix(ct, ch, (t0 + t1) / 2))
 			}
-			arrow_head(pa, pb, 7, cb)
 		} else {
-			// Across the strings: straight from one to the other.
-			gradient_line(pa, pb, ca, cb, 3)
-			arrow_head(pa, pb, 7, cb)
+			gradient_line(pt, ph, ct, ch, width)
 		}
+		if key do arrow_head(pt, ph, 7, ch)
+		trail_label(pt, ph, about, al)
 	}
 	for it in list {
 		p := fb_point(it.pos)
-		c := fade(track_colour(it.step), it.step - first, steps)
-		rl.DrawCircleV(p, 6.5, c)
-		if it.step == last do rl.DrawCircleLines(i32(p.x), i32(p.y), 8.5, rl.WHITE)
+		rl.DrawCircleV(p, 6.5, faded(track_colour(it.step), trail_alpha(it.rel)))
+		if it.rel == 0 do rl.DrawCircleLines(i32(p.x), i32(p.y), 8.5, rl.WHITE)
 		if !fb_in_view(it.pos.semis) {
 			// Further down than the board shows: pinned to its end, named.
 			text(fmt.tprintf("%s v", fb_name(it.midi)), p.x + 9, p.y - 5, COL_TEXT)
 		}
 	}
+}
+
+// How strongly a trail note, or the line to it, shows: the current step and
+// its neighbours fully, fading from two steps away.
+trail_alpha :: proc(rel: int) -> f32 {
+	d := abs(rel)
+	if d <= 1 do return 1
+	return max(0.4 - 0.07 * f32(d - 2), 0.12)
+}
+
+faded :: proc(c: rl.Color, a: f32) -> rl.Color {
+	return {c.r, c.g, c.b, u8(f32(c.a) * a)}
+}
+
+// A line's number: "-1", "+2" ... beside its middle.
+trail_label :: proc(a, b: rl.Vector2, rel: int, alpha: f32) {
+	if rel == 0 do return
+	s := fmt.tprintf("%+d", rel)
+	m := (a + b) / 2
+	d := b - a
+	l := max(math.sqrt(d.x * d.x + d.y * d.y), 1)
+	side := rl.Vector2{-d.y, d.x} / l * 9 // off the line, to one side
+	p := m + side
+	w := text_width(s) + 6
+	fill(rect(p.x - w / 2, p.y - 6, w, 12), {0, 0, 0, u8(200 * alpha)})
+	text(s, p.x - w / 2 + 3, p.y - 5, {255, 255, 255, u8(255 * alpha)})
 }
 
 // The trail as the fingerboard shows it now: the last N steps of the active
@@ -401,20 +461,44 @@ fb_track_draw :: proc(list: []Tracked) {
 fb_current_trail :: proc(out: []Tracked) -> int {
 	t := active_track()
 	if t == nil || !g.fb_track do return 0
-	if kb_board() != nil {
-		if g.player.playing do return kb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_n, out)
-		if g.selected >= 0 && g.selected < len(t.notes) do return kb_track(t, 0, g.selected, g.fb_track_n, out)
+	// Where "now" is: the playhead; stopped, the selected note - or, when
+	// suggesting, the bar cursor (the notes from it on are the next ones).
+	upto_tick := i32(-1)
+	upto_note := -1
+	ahead := g.fb_suggest ? clamp(g.fb_track_n, 1, TRACK_MAX - 1) : 0
+	switch {
+	case g.player.playing:
+		upto_tick = player_tick(&g.player, &g.song)
+	case g.selected >= 0 && g.selected < len(t.notes):
+		upto_note = g.selected
+	case g.fb_suggest:
+		upto_tick = play_from() - 1
+	case:
 		return 0
 	}
+	if kb_board() != nil do return kb_track(t, upto_tick, upto_note, g.fb_track_n, out, ahead)
 	if fb_board() == nil do return 0
-	if g.player.playing do return fb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_mode, g.fb_track_n, out)
-	if g.selected >= 0 && g.selected < len(t.notes) do return fb_track(t, 0, g.selected, g.fb_track_mode, g.fb_track_n, out)
-	return 0
+	return fb_track(t, upto_tick, upto_note, g.fb_track_mode, g.fb_track_n, out, ahead)
 }
 
-// How strongly a trail note shows its tracking colour (its step's rank among
-// the trail's, oldest 0): the newest fully, each older step a step less, as
-// on the board.
-trail_weight :: proc(rank, steps: int) -> f32 {
-	return f32(rank + 1) / f32(max(steps, 1))
+// Tracking's three states, one button: Off, Tracking (the notes up to now),
+// Suggest (the notes to play next).
+track_show_step :: proc() {
+	switch {
+	case !g.fb_track:
+		g.fb_track, g.fb_suggest = true, false
+		set_status("tracking: the notes up to now - the line to the one before is -1")
+	case !g.fb_suggest:
+		g.fb_suggest = true
+		set_status("suggest: the next notes to play - +1 is the next, +2 the one after")
+	case:
+		g.fb_track, g.fb_suggest = false, false
+		set_status("tracking off")
+	}
 }
+
+track_show_name :: proc() -> string {
+	if !g.fb_track do return "Off"
+	return g.fb_suggest ? "Suggest" : "Tracking"
+}
+

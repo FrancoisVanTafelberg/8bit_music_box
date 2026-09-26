@@ -176,7 +176,7 @@ repeat_toggle :: proc() {
 scope_end :: proc(from: i32) -> i32 {
 	bt := music.bar_ticks(&g.song)
 	switch g.input.scope {
-	case .Song:
+	case .Song, .Scroll:
 		return 0
 	case .Bar:
 		return (from / bt + 1) * bt

@@ -240,7 +240,11 @@ The playhead sweeps across, every sounding note is outlined and brightened in ev
 layer, and with **Follow** on the view flips to the next page as the playhead leaves this
 one. Mute and solo apply live to the next play.
 
-**Play mode** (beside Play): Song, Page (the four bars on the sheet) or Bar. Page and Bar
+**Play mode** (beside Play): Song, Scroll, Page (the four bars on the sheet) or Bar. Scroll
+plays the whole song with the sheet's left edge at the playhead: `view_start()` (sheet.odin)
+is `g.scroll_view`, the fractional playhead tick, instead of the page's start, and
+everything drawn or hit-tested goes through it (`tick_x`, `in_view`, the bar loop, the
+notes, the take); the page boxes follow. Page and Bar Page and Bar
 pass an end tick to the engine (`engine_start(.., to_tick)`: later notes left out,
 sounding ones cut at it, and a pass is exactly to that tick, notes or not), and the
 player stops when the playhead reaches it; the cursor does not move.
@@ -516,7 +520,13 @@ the cello's but whatever the selected layer's instrument file describes.
   pick the position, the wheel over the board steps through them. Changing to a layer with
   another board (`fb_board_changed`) goes to that board's default position.
 
-**Tracking** (`source/fingering.odin`). Every note of the active layer is given a place on
+**Tracking** (`source/fingering.odin`). Off / Tracking / Suggest (`g.fb_track`,
+`g.fb_suggest`; `track_show_step`). `fb_track` and `kb_track` take `ahead`: 0 keeps the last
+N steps up to the current one; > 0 (Suggest) the current one and the N after it
+(`trail_finish`); every note carries `rel`, its step's distance from the current one.
+Lines are numbered by `rel` (`trail_label`); only the ±1 line is full and has an arrow -
+Tracking's points back at -1, Suggest's on at +1 - the rest fade with distance
+(`trail_alpha`), and the sheet's trail colours fade the same way. Every note of the active layer is given a place on
 the board (a string and a semitone), in order from the start of the layer, each from the
 last: *Same string* keeps the string while it can play the note and otherwise takes the
 nearest place; *Nearest* always takes the physically nearest; the first note goes lowest
@@ -573,6 +583,13 @@ block is 1024 frames (23 ms) - about 70 ms of sound buffered in all.
 The hot-reload build is a debug build (`-debug`, no optimisation) and mixes several times
 slower than a release build; adding `-o:speed` to `build_hot_reload` trades stepping in a
 debugger for speed.
+
+**Saving** (`files.odin`): Save and Ctrl+S open the Save menu - Overwrite (`file_save`, to
+`g.path`) or Save new (`file_save_new`: a name typed in the menu, made file-safe, into the
+current file's folder - songs/, or the private folder for a private song - never over an
+existing file; the new file becomes `g.path`, so further saves go to it and the original
+is left as it was). The suggested name is the current file's with the first free `_2`,
+`_3` ...
 
 ## 5. The `.song` format
 

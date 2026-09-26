@@ -307,3 +307,122 @@ instruments_reload :: proc(first: bool) {
 		set_status("reloaded: %d instruments from instruments/, %d sound effects from sounds/", n, fx)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// The Save menu (the Save button, Ctrl+S): overwrite the file the song came
+// from, or save it as a new file beside it - so a song can be worked from
+// and kept as something new without touching the original.
+// ---------------------------------------------------------------------------
+
+// Where Save as new puts files: beside the current one, or in songs/ (the
+// private folder, for a private song).
+@(private = "file")
+save_dir :: proc() -> string {
+	if g.path != "" {
+		if k := strings.last_index_any(g.path, "/\\"); k >= 0 do return g.path[:k]
+	}
+	return join(g.private ? PRIVATE_DIR : "songs")
+}
+
+@(private = "file")
+save_path_for :: proc(name: string) -> string {
+	return strings.concatenate({save_dir(), "/", slug(name), music.SONG_EXT}, context.temp_allocator)
+}
+
+// The current file's name without folder or extension ("" for a new song).
+@(private = "file")
+current_base :: proc() -> string {
+	if g.path == "" do return ""
+	name := g.path
+	if k := strings.last_index_any(name, "/\\"); k >= 0 do name = name[k + 1:]
+	if k := strings.last_index_byte(name, '.'); k > 0 do name = name[:k]
+	return name
+}
+
+save_menu_open :: proc(x: f32) {
+	g.overlay = .Save
+	g.save_x = x
+	// A name for a new file: the current one's with _2 (or _3 ...) - one
+	// that is free - or, for a new song, its title's.
+	base := current_base()
+	if base == "" do base = slug(g.song.title)
+	name := base
+	for i := g.path == "" ? 1 : 2; i < 100; i += 1 {
+		name = i == 1 ? base : fmt.tprintf("%s_%d", base, i)
+		if !os.is_file(save_path_for(name)) do break
+	}
+	g.save_len = copy(g.save_name[:], name)
+}
+
+// Save as a new file, named `name` (made file-safe), beside the current one.
+// Never over an existing file. The new file is then the one being worked on.
+file_save_new :: proc(name: string) -> bool {
+	if len(strings.trim_space(name)) == 0 {
+		set_error("type a name for the new file")
+		return false
+	}
+	path := save_path_for(name)
+	if os.is_file(path) {
+		set_error("%s already exists - pick another name (or Overwrite)", path)
+		return false
+	}
+	if !music.song_save(&g.song, path) {
+		set_error("could not write %s", path)
+		return false
+	}
+	set_path(path)
+	g.dirty = false
+	remember_last(path)
+	set_status("saved as a new file: %s (the original is as it was)", path)
+	return true
+}
+
+save_menu_draw :: proc() {
+	W :: f32(330)
+	H :: f32(150)
+	x := g.save_x >= 0 ? clamp(g.save_x - 120, 8, 1280 - W - 8) : (1280 - W) / 2
+	r := rect(x, TOP_H + 2, W, H)
+	fill(r, COL_PANEL)
+	outline(r, COL_ACCENT)
+	y := r.y + 8
+	text("Save", r.x + 10, y, COL_TEXT, FONT_BIG)
+	y += 28
+
+	// Overwrite: the file it came from (a new song: its first file).
+	target := g.path != "" ? g.path : strings.concatenate({save_dir(), "/", slug(g.song.title), music.SONG_EXT}, context.temp_allocator)
+	short := target
+	if k := strings.last_index_any(short, "/\\"); k >= 0 do short = short[k + 1:]
+	if button(rect(r.x + 10, y, W - 20, 20), fit_text(fmt.tprintf("%s  %s", g.path != "" ? "Overwrite" : "Save", short), W - 30)) {
+		g.overlay = .None
+		file_save()
+		return
+	}
+	y += 30
+
+	// Save as a new file: its name, typed here.
+	text("Save as a new file:", r.x + 10, y, COL_DIM)
+	y += 14
+	box := rect(r.x + 10, y, W - 20 - 110, 20)
+	fill(box, COL_SHEET)
+	outline(box, COL_ACCENT)
+	for c := rl.GetCharPressed(); c != 0; c = rl.GetCharPressed() {
+		ok := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == ' '
+		if ok && g.save_len < len(g.save_name) {
+			g.save_name[g.save_len] = u8(c)
+			g.save_len += 1
+		}
+	}
+	if (rl.IsKeyPressed(.BACKSPACE) || rl.IsKeyPressedRepeat(.BACKSPACE)) && g.save_len > 0 do g.save_len -= 1
+	name := string(g.save_name[:g.save_len])
+	shown := fmt.tprintf("%s%s", name, (g.frames / 30) % 2 == 0 ? "_" : " ")
+	text(fit_text(shown, box.width - 10), box.x + 5, box.y + 5, COL_TEXT)
+	text(music.SONG_EXT, box.x + box.width + 4, box.y + 5, COL_DIM)
+	go := button(rect(r.x + W - 10 - 70, y, 70, 20), "Save new")
+	if go || rl.IsKeyPressed(.ENTER) || rl.IsKeyPressed(.KP_ENTER) {
+		if file_save_new(name) do g.overlay = .None
+	}
+	y += 26
+	text(fit_text(fmt.tprintf("into %s/  (Enter saves, Esc closes)", save_dir()), W - 20), r.x + 10, y, COL_FAINT)
+	if hovered(r) do ui_take_all()
+}
+
