@@ -57,6 +57,12 @@ App :: struct {
 	fit_range:  bool,
 	// The bar Play starts from (left/right arrows; player.odin, bar_step).
 	cursor_tick: i32,
+	// Input mode: the microphone, what it hears, the take (input.odin).
+	input:      Input,
+	// The metronome layer (metronome.odin): on or off, and what its clicks
+	// were last laid out for.
+	metronome:  bool,
+	metro_sig:  [4]i32,
 	sheet_lo:   int,
 	sheet_hi:   int,
 	row_h:      int,
@@ -137,6 +143,7 @@ game_init :: proc() {
 	g.key_lines = true
 	g.ratio_ref = -1
 	g.sfx_test = {count = 100, seconds = 2, volume = 1, spread = true}
+	input_init()
 	files_init()
 	music.mixer_init(&g.audio)
 	instruments_reload(true)
@@ -145,6 +152,7 @@ game_init :: proc() {
 		music.song_init(&g.song)
 		music.song_add_track(&g.song, CELLO_KEY when CELLO else music.DEFAULT_KEY)
 		when CELLO do cello_only()
+		metronome_sync()
 	}
 }
 
@@ -169,9 +177,11 @@ game_update :: proc() -> bool {
 	ui_begin()
 	sheet_range_update()
 	files_poll_dropped()
+	metronome_sync()
 	g.audio.mode = g.mode
 	perf_mark(.Logic)
 	player_update(&g.player, &g.song)
+	input_update()
 	perf_mark(.Audio)
 	if g.player.playing && g.follow {
 		per_page := music.bar_ticks(&g.song) * BARS_PER_PAGE
@@ -219,6 +229,7 @@ game_update :: proc() -> bool {
 
 @(export)
 game_shutdown :: proc() {
+	input_shutdown()
 	player_destroy(&g.player)
 	music.song_destroy(&g.song)
 	music.registry_bind(nil)

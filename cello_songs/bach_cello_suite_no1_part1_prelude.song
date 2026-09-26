@@ -1,7 +1,7 @@
 # 8-Bit Music Box song
 format 1
 title "bach_cello_suite_no1_part1_prelude"
-tempo 20
+tempo 80
 time 4/4
 key 1            # G major
 bars 44

@@ -139,9 +139,11 @@ after_load :: proc() {
 	g.cello_notice = false
 	g.ratio_ref = -1
 	g.cursor_tick = 0
+	input_reset()
 	when CELLO do cello_only()
 	music.song_fit_bars(&g.song, BARS_PER_PAGE)
 	g.active = 0
+	metronome_sync() // on top, so the first real layer is 1
 	g.page = 0
 	g.selected = -1
 	g.layer_scroll = 0
@@ -215,7 +217,11 @@ export_base :: proc() -> string {
 
 file_export :: proc(format: string) {
 	wav := strings.concatenate({export_base(), ".wav"}, context.temp_allocator)
+	// Not the metronome's clicks: they are for practising, not the song.
+	held: [dynamic]music.Note
+	for &t in g.song.tracks do if t.metronome {held = t.notes; t.notes = {}}
 	samples := music.render_song(&g.song, g.mode)
+	for &t in g.song.tracks do if t.metronome do t.notes = held
 	defer delete(samples)
 	music.normalize(samples)
 	if !music.write_wav(wav, samples) {
@@ -324,6 +330,7 @@ cello_only :: proc() {
 	changed, out := 0, 0
 	ins := music.inst_get(&g.song, cello)
 	for &t in g.song.tracks {
+		if t.metronome do continue
 		if t.inst != cello {
 			was := music.inst_get(&g.song, t.inst).name
 			name := fmt.aprintf("Cello (was %s)", t.name != "" ? t.name : was)

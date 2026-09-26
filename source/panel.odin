@@ -17,6 +17,7 @@ Overlay :: enum {
 	Open,
 	Sounds, // the sound effect tester (sound_test.odin)
 	Colour, // the colour picker for the active layer (Set colour)
+	Mic, // the microphone: device, level, gate, latency (input.odin)
 }
 
 overlay_none :: proc() -> bool {
@@ -175,7 +176,7 @@ panel_draw :: proc() {
 	compact :: CELLO
 
 	label("LAYERS", x, y)
-	text(fmt.tprintf("%d", len(g.song.tracks)), x + w - 12, y, COL_FAINT)
+	text(fmt.tprintf("%d", real_layers()), x + w - 12, y, COL_FAINT)
 	y += 14
 
 	list := rect(x, y, w, LAYER_ROWS * LAYER_H)
@@ -192,6 +193,20 @@ panel_draw :: proc() {
 		fill(r, on ? COL_PANEL_HI : (hovered(r) ? COL_BUTTON : COL_SHEET))
 		if on do outline(r, COL_ACCENT)
 		audible := music.track_audible(&g.song, t)
+		if t.metronome {
+			// The metronome: click the row (or K) to turn it on or off; M
+			// mutes it without losing its clicks.
+			tick_c := g.metronome ? COL_ACCENT : COL_FAINT
+			fill(rect(r.x + 3, r.y + 4, 3, 11), tick_c)
+			fill(rect(r.x + 8, r.y + 8, 2, 7), tick_c)
+			name := g.metronome ? "Metronome" : "Metronome off"
+			when compact do name = "Metro"
+			text(fit_text(name, w - 55), r.x + 13, r.y + 5, g.metronome && audible ? COL_TEXT : COL_FAINT)
+			if button(rect(r.x + w - 40, r.y + 2, 18, 15), "M", t.mute) do t.mute = !t.mute
+			if button(rect(r.x + w - 20, r.y + 2, 18, 15), g.metronome ? "on" : "-", g.metronome) do metronome_toggle()
+			if ui_take_click(r) do metronome_toggle()
+			continue
+		}
 		when compact {
 			// A thin stripe of the layer's colour: more room for the name.
 			fill(rect(r.x + 1, r.y + 2, 3, r.height - 4), track_color(t))
@@ -224,22 +239,22 @@ panel_draw :: proc() {
 	}
 	y += 24
 	// The active layer's colour on the sheet.
-	if button(rect(x, y, w, 20), compact ? "Set colour" : "Set layer colour", false, n > 0) {
+	if button(rect(x, y, w, 20), compact ? "Set colour" : "Set layer colour", false, active_track() != nil) {
 		g.overlay = .Colour
 		g.colour_y = y
 	}
-	if n > 0 {
+	if t := active_track(); t != nil {
 		sw := rect(x + w - 9, y + 6, 6, 8)
-		fill(sw, track_color(&g.song.tracks[g.active]))
+		fill(sw, track_color(t))
 		outline(sw, COL_EDGE)
 	}
 	y += 24
-	if button(rect(x, y, w, 20), compact ? "Remove" : "Remove layer", false, n > 0) {
+	if button(rect(x, y, w, 20), compact ? "Remove" : "Remove layer", false, active_track() != nil) {
 		if confirmed("remove-layer", fmt.tprintf("Remove the %s layer and its notes?", g.song.tracks[g.active].name)) {
 			// The engine counts layers by position: stop before they shift.
 			player_stop(&g.player)
 			music.song_remove_track(&g.song, g.active)
-			g.active = clamp(g.active, 0, len(g.song.tracks) - 1)
+			g.active = clamp(g.active, 1, len(g.song.tracks) - 1)
 			g.selected = -1
 			undo_clear()
 			g.dirty = true
@@ -325,7 +340,7 @@ panel_draw :: proc() {
 }
 
 select_layer :: proc(i: int) {
-	if i < 0 || i >= len(g.song.tracks) do return
+	if i < 0 || i >= len(g.song.tracks) || is_metronome(i) do return
 	if i != g.active do g.selected = -1
 	g.active = i
 	if i < g.layer_scroll do g.layer_scroll = i
@@ -408,6 +423,8 @@ overlay_draw :: proc() {
 		sound_test_draw()
 	case .Colour:
 		colour_picker_draw()
+	case .Mic:
+		mic_overlay_draw()
 	}
 	// Whatever the overlay did not take, nobody underneath gets.
 	if g.ui.clicked || g.ui.right {
@@ -552,9 +569,19 @@ keys_update :: proc() {
 	}
 	if rl.IsKeyPressed(.PERIOD) do g.mod = g.mod == .Dotted ? .None : .Dotted
 	if rl.IsKeyPressed(.T) do g.mod = g.mod == .Triplet ? .None : .Triplet
-	if rl.IsKeyPressed(.TAB) && len(g.song.tracks) > 0 {
-		select_layer((g.active + (shift ? len(g.song.tracks) - 1 : 1)) % len(g.song.tracks))
+	if rl.IsKeyPressed(.TAB) && real_layers() > 1 {
+		// Round the layers, stepping over the metronome.
+		n := len(g.song.tracks)
+		i := g.active
+		for _ in 0 ..< n {
+			i = (i + (shift ? n - 1 : 1)) % n
+			if !is_metronome(i) do break
+		}
+		select_layer(i)
 	}
+	// Practice: I listens to the microphone, K the metronome.
+	if rl.IsKeyPressed(.I) do input_toggle()
+	if rl.IsKeyPressed(.K) do metronome_toggle()
 
 	// Pages.
 	if rl.IsKeyPressed(.PAGE_DOWN) || rl.IsKeyPressed(.RIGHT_BRACKET) do g.page = min(g.page + 1, page_count() - 1)
@@ -603,7 +630,7 @@ snapshot :: proc(track: int) -> Undo {
 }
 
 undo_push :: proc() {
-	if g.active < 0 || g.active >= len(g.song.tracks) do return
+	if active_track() == nil do return
 	append(&g.undo, snapshot(g.active))
 	if len(g.undo) > UNDO_MAX {
 		delete(g.undo[0].notes)
@@ -703,8 +730,8 @@ LAYER_PALETTE := [?][3]u8 {
 
 @(private = "file")
 colour_picker_draw :: proc() {
-	if g.active < 0 || g.active >= len(g.song.tracks) {g.overlay = .None; return}
-	t := &g.song.tracks[g.active]
+	t := active_track()
+	if t == nil {g.overlay = .None; return}
 	COLS :: 6
 	SW :: f32(22)
 	rows := (len(LAYER_PALETTE) + COLS - 1) / COLS

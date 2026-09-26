@@ -35,6 +35,7 @@ Player :: struct {
 	start_time: f64,
 	base_sent:  int, // the mixer's frame count when Play was pressed
 	end_sent:   int, // ...when the song ended in the mixer; 0 while it plays
+	stop_tick:  i32, // the Bar and Page play scopes stop here; 0 = the song's end
 	preview:    music.Sfx_Handle,
 }
 
@@ -53,7 +54,8 @@ player_play :: proc(p: ^Player, song: ^music.Song, from_tick: i32) {
 	if !g.out.open do return
 	player_stop(p)
 	g.audio.mode = g.mode
-	p.song = music.mixer_play_song(&g.audio, song, loop = false, from_tick = from_tick)
+	p.stop_tick = scope_end(from_tick)
+	p.song = music.mixer_play_song(&g.audio, song, loop = false, from_tick = from_tick, to_tick = p.stop_tick > 0 ? p.stop_tick : -1)
 	p.from_tick = from_tick
 	// Where in the stream the song begins: after everything mixed so far,
 	// including what is mixed ahead and not yet handed over.
@@ -89,16 +91,41 @@ player_update :: proc(p: ^Player, song: ^music.Song) {
 	now := rl.GetTime() - p.start_time
 	if abs(now - heard) > 3 * LATENCY do p.start_time = rl.GetTime() - max(heard, 0)
 
-	if p.end_sent > 0 && now > f64(p.end_sent) / music.SAMPLE_RATE {
+	if p.stop_tick > 0 {
+		// A scope ends at its bar line, not where the last note stops.
+		if player_tick(p, song) >= p.stop_tick do player_stop(p)
+	} else if p.end_sent > 0 && now > f64(p.end_sent) / music.SAMPLE_RATE {
 		p.song = 0
 		p.playing = false
 	}
+}
+
+// Where the play scope (input.odin) ends, playing from `from`: the end of
+// its bar, or of its page; 0 for the whole song.
+scope_end :: proc(from: i32) -> i32 {
+	bt := music.bar_ticks(&g.song)
+	switch g.input.scope {
+	case .Song:
+		return 0
+	case .Bar:
+		return (from / bt + 1) * bt
+	case .Page:
+		per := bt * BARS_PER_PAGE
+		return (from / per + 1) * per
+	}
+	return 0
 }
 
 // The tick under the playhead right now.
 player_tick :: proc(p: ^Player, song: ^music.Song) -> i32 {
 	t := max(rl.GetTime() - p.start_time - LATENCY, 0)
 	return p.from_tick + i32(t / music.tick_seconds(song))
+}
+
+// The (fractional) tick that was being heard at `time` (the frame clock).
+player_tick_at :: proc(p: ^Player, song: ^music.Song, time: f64) -> f32 {
+	t := time - p.start_time - LATENCY
+	return f32(p.from_tick) + f32(t / music.tick_seconds(song))
 }
 
 // One note, now: what you hear when you place or click a note. The previous
@@ -115,6 +142,8 @@ toggle_play :: proc(from_start: bool) {
 		player_stop(&g.player)
 		return
 	}
+	// A new take: what was drawn last time goes.
+	input_reset()
 	player_play(&g.player, &g.song, from_start ? 0 : play_from())
 }
 

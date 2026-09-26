@@ -240,6 +240,55 @@ The playhead sweeps across, every sounding note is outlined and brightened in ev
 layer, and with **Follow** on the view flips to the next page as the playhead leaves this
 one. Mute and solo apply live to the next play.
 
+**Scope** (under the sheet): Song, Bar or Page. Bar and Page pass an end tick to the
+engine (`engine_start(.., to_tick)`: later notes left out, sounding ones cut at it), and
+the player stops when the playhead reaches it; the cursor does not move.
+
+### 3.6 The metronome
+
+Layer 0 of every song, made by the editor (`Track.metronome`, `source/metronome.odin`),
+kept there by `metronome_sync` every frame: inserted if missing, its clicks laid out
+again when the time signature, the bar count or Metro change - one note a beat,
+downbeat C7 velocity 120, the rest G6 velocity 85, on the `metronome` instrument
+(`instruments/percussion.inst`). Being a real layer, it plays through the same engine
+as the song, sample-exact. Special cases: `active_track()` never returns it (so it is
+never edited, selected or removed), `song_to_string` skips it, export takes its notes
+out for the render, `track_audible` ignores solo for it, `song_end_tick` does not count
+it (or its clicks would keep adding bars), and `cello_only` leaves it alone. Toggling it
+while playing restarts playback at the playhead, because the engine copies the notes at
+Play.
+
+### 3.7 Input mode (the microphone)
+
+Play along on a real instrument and see what was played (`source/input.odin`).
+
+- **Capture** (`mic_windows.odin`): winmm `waveIn`, 22 050 Hz mono 16-bit, `WAVE_MAPPED`
+  so Windows converts from the device's own rate. 8 buffers of 512 samples, no callback:
+  the frame polls `WHDR_DONE` and re-queues, so a hot reload can never unload code a
+  driver thread is about to call, and the buffers live in `App` so they do not move.
+  Every device from `waveInGetNumDevs` is listed. Other platforms: `mic_other.odin`, a
+  stub that says so.
+- **Detection** (`music/pitch.odin`, headless): a 4th-order high-pass a fifth below the
+  instrument's lowest note and a low-pass above its top note's 2nd harmonic; an RMS
+  noise gate whose floor is learned only from readings that are not notes (quick down,
+  slow up), threshold `floor × sensitivity` (2 = 6 dB) with hysteresis; YIN (cumulative
+  mean normalised difference, threshold 0.15, parabolic interpolation) over lags within
+  the instrument's range ±2 semitones, window twice the longest period; median of the
+  last three readings. A reading every 256 samples (12 ms; 512 for very low ranges).
+  `tools/pitch_test` renders a cello part (32-bit bowed and 16-bit), adds hiss, 50 Hz
+  hum, fan rumble and a murmur of voices, and checks it: 99-100 % of readings right,
+  ~6 cents mean error, no notes in the noise; with the room 12 dB louder, 96 %.
+- **Timing**: each reading carries its delay (half the analysed stretch plus the
+  median's lag) and the Latency setting adds the driver's; `player_tick_at` turns the
+  moment it was heard into a fractional tick.
+- **Display**: the live dot (hue of the layer's colour turned 180°) at the playhead or
+  the bar cursor, displaced from the row's middle by the cents; the take, a line
+  through the readings recorded while playing (broken at silences), cleared by Play and
+  Reset; in the Cello Helper a marker on the fingerboard at the place `fb_choose` picks
+  in the current tracking mode, slid along the string by the cents.
+
+Playing along through speakers, the mic hears the song too: headphones.
+
 ## 4. Code layout
 
 Same shape as Animal Kingdoms, trimmed to what a tool needs:
@@ -254,6 +303,7 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `source/music/` | package `music` — **no raylib**. Theory (pitches, keys, lengths), the song model, the `.song` format, the instrument table, the synth engine, sound effects, the Mixer, WAV writing and MIDI import. Headless, so `tools/render` can use it, and so can any other program (§4.2) |
 | `source/music_rl/` | package `music_rl`: the Mixer's sound out through a raylib `AudioStream`. The only raylib-facing piece of the engine |
 | `tools/render/` | CLI: render a `.song` or `.mid` straight to WAV, or sound effects (`-- sfx cannon`, `-- sfx all`) |
+| `tools/pitch_test/` | checks the input mode's pitch detection on a rendered cello part in a noisy room (`-- -noisy` for a louder one) |
 | `examples/battle_demo/` | the engine inside another program: a march with layers toggled live, battle sounds on keys |
 | `instruments/` | the orchestra, `.inst` files |
 | `sounds/` | sound effects, `.sfx` files |
@@ -508,7 +558,8 @@ Honest expectation: turning a mixed orchestral recording into exact notes is an 
 research problem. What is realistic, in order of effort:
 
 1. **Monophonic** (one melody line, e.g. a solo): YIN/pYIN pitch tracking + onset
-   detection → very usable.
+   detection → very usable. The YIN half now exists (`music/pitch.odin`, input mode §3.7);
+   a file import would add onsets and note segmentation on top.
 2. **Polyphonic draft**: constant-Q spectrogram → peak-pick per 16th-note slice → notes,
    tempo from onset autocorrelation. Gives a sketch to fix by hand on the sheet; the sheet
    is exactly the tool for that clean-up.

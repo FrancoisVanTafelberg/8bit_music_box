@@ -117,8 +117,11 @@ tick_x :: proc(tick: i32) -> f32 {
 	return f32(BARS_X) + f32(tick - page_start()) * px_per_tick()
 }
 
+// The layer being edited; nil if there is none (the metronome, layer 0,
+// never is).
 active_track :: proc() -> ^music.Track {
 	if g.active < 0 || g.active >= len(g.song.tracks) do return nil
+	if g.song.tracks[g.active].metronome do return nil
 	return &g.song.tracks[g.active]
 }
 
@@ -255,7 +258,7 @@ sheet_draw :: proc() {
 		}
 		// Bar number, and past the song's end a note that it is empty room.
 		bx := tick_x(start)
-		text(fmt.tprintf("%d", bar + 1), bx + 3, BAR_NUM_Y, bar < g.song.bars ? COL_DIM : COL_FAINT)
+		text(fmt.tprintf("%d", bar + 1), bx + 8, BAR_NUM_Y, bar < g.song.bars ? COL_DIM : COL_FAINT)
 	}
 	rl.DrawLineEx({right, top}, {right, bottom}, 2, {170, 170, 214, 255})
 
@@ -268,7 +271,8 @@ sheet_draw :: proc() {
 	trail: [TRACK_MAX * 4]Tracked
 	n_trail := 0
 	when CELLO do n_trail = fb_current_trail(trail[:])
-	for &tr, i in g.song.tracks do if i != g.active do notes_draw(&tr, false, playing_tick)
+	for &tr, i in g.song.tracks do if i != g.active && !tr.metronome do notes_draw(&tr, false, playing_tick)
+	metronome_draw(playing_tick)
 	if t != nil do notes_draw(t, true, playing_tick, trail[:n_trail])
 
 	// The ghost of the note a click would place.
@@ -299,6 +303,14 @@ sheet_draw :: proc() {
 		x := tick_x(playing_tick)
 		rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, COL_ACCENT)
 	}
+	// Bar or Page scope: where Play will stop.
+	if g.player.playing && g.player.stop_tick > ps && g.player.stop_tick <= ps + page_ticks() {
+		x := tick_x(g.player.stop_tick)
+		rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, with_alpha(COL_BAD, 160))
+	}
+
+	// What the microphone hears (input.odin): the take, and the live dot.
+	input_sheet_draw()
 
 	// Instrument rows only: say how many notes of this layer are out of
 	// sight above or below (switch to the piano range to edit them).
@@ -441,7 +453,8 @@ gutter_draw :: proc(hov: Hover) {
 strip_draw :: proc() {
 	n := page_count()
 	text(fmt.tprintf("%d/%d", g.page + 1, n), PANEL_W + 4, STRIP_Y + 4, COL_DIM)
-	w := min(f32(BARS_W - 30) / f32(n), 48)
+	// The practice controls (input.odin) have the right-hand end.
+	w := min(f32(BARS_W - 30 - PRACTICE_W - 8) / f32(n), 48)
 	play_page := g.player.playing ? player_tick(&g.player, &g.song) / page_ticks() : -1
 	for i in 0 ..< n {
 		r := rect(BARS_X + f32(i) * w, STRIP_Y, w - 2, STRIP_H)
@@ -468,6 +481,31 @@ strip_draw :: proc() {
 		g.song.bars = (page_count() + 1) * BARS_PER_PAGE
 		g.page = page_count() - 1
 		g.dirty = true
+	}
+	practice_draw()
+}
+
+// The metronome's clicks (metronome.odin): not on the staff - they have no
+// pitch worth reading - but as ticks along the top of the rows, beside the
+// bar numbers: tall on the first beat of a bar, short on the rest, lit as
+// they play.
+@(private = "file")
+metronome_draw :: proc(playing_tick: i32) {
+	if len(g.song.tracks) == 0 || !g.song.tracks[0].metronome do return
+	t := &g.song.tracks[0]
+	ps := page_start()
+	pe := ps + page_ticks()
+	muted := !music.track_audible(&g.song, t)
+	for n in t.notes {
+		if n.tick >= pe do break
+		if n.tick < ps do continue
+		x := tick_x(n.tick)
+		down := n.vel >= 110
+		h := f32(down ? 7 : 4)
+		c := down ? rl.Color{200, 200, 220, 255} : rl.Color{130, 134, 170, 255}
+		if muted do c = COL_FAINT
+		if playing_tick >= n.tick && playing_tick < n.tick + music.beat_ticks(&g.song) && !muted do c = COL_ACCENT
+		fill(rect(x + 1, f32(ROWS_Y) - h - 1, down ? 4 : 3, h), c)
 	}
 }
 

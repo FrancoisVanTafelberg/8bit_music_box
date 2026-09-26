@@ -184,6 +184,7 @@ mixer_play_song_file :: proc(
 // Play a song that is already in memory. The mixer takes what it needs at this
 // moment: later edits to `song` are not heard (except through mixer_sync_song).
 // `from_tick` starts part-way in; a looping song then loops back to there.
+// `to_tick` > 0 ends it there (a loop then goes round from_tick..to_tick).
 mixer_play_song :: proc(
 	m: ^Mixer,
 	song: ^Song,
@@ -191,9 +192,10 @@ mixer_play_song :: proc(
 	volume: f32 = 1,
 	fade_in: f32 = 0,
 	from_tick: i32 = 0,
+	to_tick: i32 = -1,
 ) -> Song_Handle {
 	slot := slot_take(m)
-	engine_start(&slot.engine, song, from_tick, m.mode)
+	engine_start(&slot.engine, song, from_tick, m.mode, to_tick)
 	engine_set_loop(&slot.engine, loop)
 	slot.title = strings.clone(song.title)
 	for &t in song.tracks {

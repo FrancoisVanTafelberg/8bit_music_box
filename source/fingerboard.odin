@@ -480,6 +480,7 @@ fingerboard_draw :: proc() {
 	}
 
 	fb_track_draw(trail[:n_trail])
+	fb_input_draw()
 
 	// Click a circle: hear it.
 	if here.ok && ui_take_click(rect(FB_X, FB_OPEN_Y - 12, FB_W, FB_END_Y - FB_OPEN_Y + 24)) {
@@ -490,6 +491,44 @@ fingerboard_draw :: proc() {
 			player_preview(&g.player, t.inst, music.pitch_from_midi(m, fb_spell_key()))
 		}
 	}
+}
+
+// Input mode (input.odin): where the note the microphone hears is played -
+// the place the tracking mode would choose, coming from the last one - slid
+// along the string by how sharp or flat it is, so a finger a little too far
+// up shows a little too far up.
+@(private = "file")
+fb_input_draw :: proc() {
+	in_ := &g.input
+	if !in_.on || in_.midi <= 0 do return
+	m := int(math.round(in_.midi))
+	if m != in_.fb_midi || !in_.fb_pos.ok {
+		pos := fb_choose(m, in_.fb_pos, g.fb_track_mode)
+		in_.fb_midi = m
+		if pos.ok do in_.fb_pos = pos
+	}
+	p := in_.fb_pos
+	if !p.ok || fb_midi(p) != m do return
+	cents := in_.midi - f32(m)
+	y := fb_in_view(p.semis) ? fb_y(p.semis) : FB_END_Y + 4
+	if fb_in_view(p.semis) {
+		if cents > 0 && p.semis > 0 && fb_in_view(p.semis + 1) {
+			y += (fb_y(p.semis + 1) - y) * cents
+		} else if cents < 0 && p.semis > 1 {
+			y += (y - fb_y(p.semis - 1)) * cents
+		}
+	}
+	x := fb_x(p.string, y)
+	r := fb_radius(p.semis) + 5
+	col := input_colour()
+	rl.DrawCircleV({x, y}, r + 2, {0, 0, 0, 160})
+	rl.DrawCircleV({x, y}, r, col)
+	rl.DrawCircleLines(i32(x), i32(y), r + 2, rl.WHITE)
+	c := int(math.round(cents * 100))
+	s := fmt.tprintf("%s %s%d", fb_name(m), c >= 0 ? "+" : "", c)
+	lx := x - r - 8 - text_width(s)
+	fill(rect(lx - 3, y - 7, text_width(s) + 6, 14), {0, 0, 0, 190})
+	text(s, lx, y - 5, abs(c) <= 10 ? COL_GOOD : (abs(c) <= 25 ? COL_ACCENT : COL_BAD))
 }
 
 // The status line while the mouse is on the board.

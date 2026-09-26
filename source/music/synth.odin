@@ -154,7 +154,9 @@ Engine :: struct {
 
 // Flatten `song` from `from_tick` onwards. Notes already sounding at
 // `from_tick` are started, shortened, so starting mid-phrase is not silent.
-engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, mode := DEFAULT_MODE) {
+// `to_tick` > 0 stops there: notes from it on are left out, and notes still
+// sounding are cut short (the editor's Bar and Page play scopes).
+engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, mode := DEFAULT_MODE, to_tick: i32 = -1) {
 	engine_destroy(e)
 	e.mode = mode
 	spt := tick_seconds(song)
@@ -167,6 +169,10 @@ engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, mode := DEFAUL
 		for n, ni in t.notes {
 			end := n.tick + n.len
 			if end <= from_tick do continue
+			if to_tick > 0 {
+				if n.tick >= to_tick do break
+				end = min(end, to_tick)
+			}
 			start := max(n.tick, from_tick)
 			secs := f64(end - start) * spt
 			// A little air between repeated notes, or two quarter notes on
@@ -189,6 +195,7 @@ engine_start :: proc(e: ^Engine, song: ^Song, from_tick: i32 = 0, mode := DEFAUL
 	// One pass: from `from_tick` to the end of the last note's bar.
 	bt := bar_ticks(song)
 	end := (song_end_tick(song) + bt - 1) / bt * bt
+	if to_tick > 0 do end = min(end, to_tick)
 	e.loop_len = int(f64(max(end - from_tick, 0)) * spt * SAMPLE_RATE)
 }
 

@@ -34,6 +34,7 @@ song_to_string :: proc(s: ^Song, allocator := context.allocator) -> string {
 		inst_write(w, &d)
 	}
 	for &t in s.tracks {
+		if t.metronome do continue // the editor makes it; not part of the song
 		fmt.sbprintln(w)
 		fmt.sbprintfln(w, "track %q", t.name)
 		fmt.sbprintfln(w, "instrument %s", inst_get(s, t.inst).key)

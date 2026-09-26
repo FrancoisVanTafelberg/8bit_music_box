@@ -31,6 +31,9 @@ Track :: struct {
 	solo:   bool,
 	// The layer's own colour on the sheet; alpha 0 = its instrument's.
 	color:  [4]u8,
+	// Made by the program, not written: the editor's metronome. Never saved,
+	// never exported, heard even when another layer is soloed.
+	metronome: bool,
 }
 
 Song :: struct {
@@ -93,10 +96,11 @@ tick_seconds :: proc(s: ^Song) -> f64 {
 	return 60.0 / (f64(max(s.tempo, 1)) * TPQ)
 }
 
-// Where the last note of any track ends.
+// Where the last note of any track ends (the metronome's clicks do not
+// count: they fill the bars there are, and must not make more).
 song_end_tick :: proc(s: ^Song) -> i32 {
 	end: i32
-	for t in s.tracks do for n in t.notes do end = max(end, n.tick + n.len)
+	for t in s.tracks do if !t.metronome do for n in t.notes do end = max(end, n.tick + n.len)
 	return end
 }
 
@@ -169,6 +173,7 @@ song_any_solo :: proc(s: ^Song) -> bool {
 
 track_audible :: proc(s: ^Song, t: ^Track) -> bool {
 	if t.mute do return false
+	if t.metronome do return true // solo a part and still keep time
 	if song_any_solo(s) do return t.solo
 	return true
 }
