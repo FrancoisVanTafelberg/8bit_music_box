@@ -30,7 +30,6 @@ files_init :: proc() {
 		p := join(d)
 		if !os.is_dir(p) do _ = os.make_directory(p)
 	}
-	when CELLO do if !os.is_dir(join(CELLO_DIR)) do _ = os.make_directory(join(CELLO_DIR))
 	g.has_ffmpeg = ffmpeg_available()
 }
 
@@ -66,8 +65,8 @@ files_scan :: proc() {
 		slice.sort(names[:])
 		for n in names do append(&g.open_files, strings.clone(join(dir, n)))
 	}
-	when CELLO do scan(CELLO_DIR, {music.SONG_EXT})
 	scan("songs", {music.SONG_EXT})
+	scan(CELLO_DIR, {music.SONG_EXT}) // the old Cello Helper's, if there are any
 	scan("imports", {".mid", ".midi"})
 	scan(PRIVATE_DIR, {music.SONG_EXT, ".mid", ".midi"})
 }
@@ -77,7 +76,7 @@ file_new :: proc() {
 	player_stop(&g.player)
 	music.song_destroy(&g.song)
 	music.song_init(&g.song)
-	music.song_add_track(&g.song, CELLO_KEY when CELLO else music.DEFAULT_KEY)
+	music.song_add_track(&g.song, music.DEFAULT_KEY)
 	set_path("")
 	after_load()
 	g.private = false
@@ -98,9 +97,7 @@ file_open :: proc(path: string) {
 		set_path(path)
 		after_load()
 		g.private = strings.contains(path, PRIVATE_DIR)
-		if g.cello_notice {
-			// cello_only() has already said what it changed.
-		} else if len(rep.errors) > 0 {
+		if len(rep.errors) > 0 {
 			set_error("opened with %d problem(s): %s", len(rep.errors), rep.errors[0])
 		} else if len(rep.warnings) > 0 {
 			set_status("opened %s (%d warning(s): %s)", path, len(rep.warnings), rep.warnings[0])
@@ -121,7 +118,7 @@ file_open :: proc(path: string) {
 		after_load()
 		g.private = private
 		g.dirty = true
-		if !g.cello_notice do set_status(
+		set_status(
 			"imported %d notes into %d layers%s - Save to keep it as a .song",
 			rep.notes,
 			rep.layers,
@@ -136,11 +133,9 @@ file_open :: proc(path: string) {
 
 @(private = "file")
 after_load :: proc() {
-	g.cello_notice = false
 	g.ratio_ref = -1
 	g.cursor_tick = 0
 	input_reset()
-	when CELLO do cello_only()
 	music.song_fit_bars(&g.song, BARS_PER_PAGE)
 	g.active = 0
 	metronome_sync() // on top, so the first real layer is 1
@@ -181,17 +176,8 @@ slug :: proc(s: string) -> string {
 file_save :: proc() {
 	path := g.path
 	if path == "" {
-		dir := g.private ? PRIVATE_DIR : ("songs" when !CELLO else CELLO_DIR)
+		dir := g.private ? PRIVATE_DIR : "songs"
 		path = join(dir, strings.concatenate({slug(g.song.title), music.SONG_EXT}, context.temp_allocator))
-	}
-	when CELLO {
-		// Opened from songs/: save a cello copy in cello_songs/, never over
-		// the original (its layers were other instruments).
-		if !g.private && !strings.contains(path, CELLO_DIR) {
-			name := path
-			if k := strings.last_index_any(name, "/\\"); k >= 0 do name = name[k + 1:]
-			path = join(CELLO_DIR, name)
-		}
 	}
 	if !music.song_save(&g.song, path) {
 		set_error("could not write %s", path)
@@ -319,33 +305,5 @@ instruments_reload :: proc(first: bool) {
 		set_status("instruments: %d from files (%s)", n, rep.warnings[0])
 	case !first:
 		set_status("reloaded: %d instruments from instruments/, %d sound effects from sounds/", n, fx)
-	}
-}
-
-// The Cello Helper plays nothing but cellos: every layer of a song that
-// opens here becomes a cello layer. Notes the cello cannot reach stay where
-// they are, drawn in red, and are counted in the status line.
-cello_only :: proc() {
-	cello := music.inst_or_default(&g.song, CELLO_KEY)
-	changed, out := 0, 0
-	ins := music.inst_get(&g.song, cello)
-	for &t in g.song.tracks {
-		if t.metronome do continue
-		if t.inst != cello {
-			was := music.inst_get(&g.song, t.inst).name
-			name := fmt.aprintf("Cello (was %s)", t.name != "" ? t.name : was)
-			delete(t.name)
-			t.name = name
-			t.inst = cello
-			changed += 1
-		}
-		for n in t.notes {
-			m := i32(music.pitch_midi(n.pitch))
-			if m < ins.lo || m > ins.hi do out += 1
-		}
-	}
-	if changed > 0 || out > 0 {
-		set_error("%d layer(s) turned into cellos%s - Save keeps this as a copy in %s/", changed, out > 0 ? fmt.tprintf(", %d note(s) outside the cello's range (red)", out) : "", CELLO_DIR)
-		g.cello_notice = true
 	}
 }

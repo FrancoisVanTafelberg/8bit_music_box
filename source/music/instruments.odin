@@ -91,6 +91,8 @@ Instrument :: struct {
 	bow_position: f32,
 	resonances:   [MAX_RESONANCES]Resonance,
 	n_resonances: u8,
+	// The fingerboard, for the Helper (board.odin); n_strings 0 = none.
+	board:        Board,
 	// Where this definition came from - shown in the panel, and what decides
 	// whether its strings belong to someone to free.
 	origin:     Origin,

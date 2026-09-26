@@ -254,7 +254,7 @@ downbeat C7 velocity 120, the rest G6 velocity 85, on the `metronome` instrument
 as the song, sample-exact. Special cases: `active_track()` never returns it (so it is
 never edited, selected or removed), `song_to_string` skips it, export takes its notes
 out for the render, `track_audible` ignores solo for it, `song_end_tick` does not count
-it (or its clicks would keep adding bars), and `cello_only` leaves it alone. Toggling it
+it (or its clicks would keep adding bars). Toggling it
 while playing restarts playback at the playhead, because the engine copies the notes at
 Play.
 
@@ -284,7 +284,7 @@ Play along on a real instrument and see what was played (`source/input.odin`).
 - **Display**: the live dot (hue of the layer's colour turned 180°) at the playhead or
   the bar cursor, displaced from the row's middle by the cents; the take, a line
   through the readings recorded while playing (broken at silences), cleared by Play and
-  Reset; in the Cello Helper a marker on the fingerboard at the place `fb_choose` picks
+  Reset; with the Helper on, a marker on the fingerboard at the place `fb_choose` picks
   in the current tracking mode, slid along the string by the cents.
 
 Playing along through speakers, the mic hears the song too: headphones.
@@ -298,7 +298,7 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `main_hot_reload/` | the hot-reload host, unchanged apart from names: owns the window, swaps `build/hot_reload/game.dll` |
 | `main_release/` | shipping entry point |
 | `source/` | package `app` — one package, one file per concern. All state in one `App` block (`g`) so hot reload keeps the song you are editing |
-| `source/mode.odin` | music box or Cello Helper: `-define:CELLO=true` (§4.3) |
+| `source/helper.odin` | the Helper: the selected string layer's fingerboard (§4.3) |
 | `source/rlu/` | virtual resolution, vendored from Animal Kingdoms (canvas 1280 × 720) |
 | `source/music/` | package `music` — **no raylib**. Theory (pitches, keys, lengths), the song model, the `.song` format, the instrument table, the synth engine, sound effects, the Mixer, WAV writing and MIDI import. Headless, so `tools/render` can use it, and so can any other program (§4.2) |
 | `source/music_rl/` | package `music_rl`: the Mixer's sound out through a raylib `AudioStream`. The only raylib-facing piece of the engine |
@@ -393,73 +393,80 @@ instruments of their own that stay out of the editor's list (see `sounds/README.
 long rumble), a distant cannon, a musket and a ragged volley, a sword clash (inharmonic
 sine partials over metallic noise), a sword being drawn, a ship's bell and a splash.
 
-### 4.3 The Cello Helper
+### 4.3 The Helper (fingerboards)
 
-A second program, `cello_helper.exe`, built from the same `source/` package with
-`-define:CELLO=true` (`source/mode.odin`). Everything is shared — the sheet, layers, undo,
-files, the Mixer — and `when CELLO` switches the differences:
+A mode of the music box (`g.helper`, the **Helper** button or `H`; `source/helper.odin`).
+It used to be a separate program, the Cello Helper, built with `-define:CELLO=true`; the
+37 compile-time switches are now this one runtime flag, and the fingerboard is no longer
+the cello's but whatever the selected layer's instrument file describes.
 
-* **Only the cello.** "+ Add cello layer" instead of the instrument picker; a song opened
-  here has every layer turned into a cello ("Cello (was Violin)"), out-of-range notes
-  shown red and counted. Saves go to `cello_songs/`, so an orchestral song in `songs/`
-  is never overwritten by its cello version.
-* **Only the cello's rows, by default:** the range button (in both apps: "piano" / "inst",
-  `g.fit_range`, `sheet_range_update`) shows either the piano's 52 rows of 12 px or only
-  the active instrument's compass, the rows as tall as fit (up to 36 px) with bigger note
-  heads - C2 to C6 in 29 rows of 21 px for the cello. The music box starts on piano, the
-  Cello Helper on inst. Notes outside the instrument's range are drawn red (piano range)
-  or counted at the sheet's top and bottom edge (inst range); they cannot be added, but can
-  be deleted, dragged into range, or octave-copied into range.
-* **Four bars to a page**, as in the music box: the left panel is half as wide (104 px,
-  laid out compact - stacked rows, short labels) and the sheet runs to the fingerboard
-  (748 px).
-* **The Cello Fingerboard** (`source/fingerboard.odin`), a 348 px panel down the right:
-  just the board (drawn three quarters of its first width), the note names beside it,
-  the 8va marks to its left, the finger labels at the edge, and the key and hand-position
-  buttons above.
-  Player's view: nut at the top, strings C G D A left to right, 29 semitones per string
-  to the end of the fingerboard. Semitone *n* sits at `1 - 2^(-n/12)` of the string, so
-  positions crowd together down the board as they do under the hand; the octave (half
-  the string) and two octaves (three quarters) are marked. Lit: the note under the mouse
-  on the sheet — at every place it can be played — the active layer's sounding notes
-  while playing, the selected note, and the circle under the mouse here (its row is lit
-  on the sheet too). Click to hear. The key filter (All, 15 keys, Song) hides positions
-  whose note is not in the key's major scale (= its relative minor); lit notes always
-  show. Positions above the cello's range (C6) are drawn as empty rings.
-* **Hand positions.** Lines across the board where each finger stops the strings in the
-  chosen position, labelled f1–f4 (and T for the thumb) at the right-hand edge of the
-  screen; buttons pick the position (default 1st), the mouse wheel over the board steps
-  through them. Semitones above the open string, the same on every string
-  (`HAND_POSITIONS` in `fingerboard.odin`): half 1-2-3-4, 1st 2-3-4-5, 1st extended
-  2-4-5-6, lower 2nd 3-6, 2nd 4-7, 3rd 5-8, upper 3rd 6-9, 4th 7-10 (closed hand, a
-  semitone between fingers, so 1 to 4 spans a minor third); 5th, a three-finger position,
-  9-10-12 (F♯ G A on the A string); 1st thumb position, thumb on the octave (12) and
-  1-2-3 on 14-16-17 (B C♯ D). 6th and 7th are left out until checked against a method
-  book: sources disagree on where they sit.
+* **Layout follows the flag:** `panel_w()`, `bars_x()`, `bars_w()`, `sheet_r()` (sheet.odin)
+  are procs. Helper on: the left panel is half as wide (104 px, laid out compact - stacked
+  rows, short labels), the sheet runs to the fingerboard (748 px, still four bars) and the
+  348 px panel on the right shows the board. Turning it on switches the sheet to the
+  instrument's rows (`g.fit_range`, the "piano" / "inst" button: only the active
+  instrument's compass, rows as tall as fit, up to 36 px); turning it off restores what
+  was there. Notes outside the instrument's range are drawn red (piano range) or counted
+  at the sheet's edges (inst range); they cannot be added, but can be deleted, dragged or
+  octave-copied into range.
+* **Boards are data** (`music/board.odin`, parsed with the instrument): `board` (open
+  strings, lowest first, up to 6), `board_mm` (string length, outer-string spread at nut
+  and bridge), `board_semis` (length of the board, and its reach: how far Fixed shows and
+  the tracker goes before "too far"), `frets 1`, up to 10 `position` lines (name, short
+  label, fingers 1-4 in semitones above open, 0 = unused, optional thumb) and
+  `board_default`. Embedded instruments carry them (`board_write`). As shipped
+  (`instruments/strings.inst`):
+
+  | | strings | mm (length, nut, bridge) | semis / reach | positions |
+  |---|---|---|---|---|
+  | Violin | G3 D4 A4 E5 | 328, 16.5, 34 | 29 / 20 | ½, 1st-7th, major frame (2-4-5-7 in 1st) |
+  | Viola | C3 G3 D4 A4 | 375, 17.5, 37 | 29 / 20 | as the violin |
+  | Cello | C2 G2 D3 A3 | 695, 23, 47 | 29 / 20 | ½, 1st, 1st ext., 2nd-, 2nd, 3rd, 3rd+, 4th, 5th (3 fingers), thumb |
+  | Contrabass | E1 A1 D2 G2 | 1060, 30, 80 | 26 / 20 | Simandl: ½ to 6th (fingers 1-2-4, a tone), thumb |
+  | Guitar | E2 A2 D3 G3 B3 E4 | 650, 42, 58 | 19 / 19, fretted | open, 2nd-5th, 7th, 9th, 12th (a finger a fret) |
+
+  The harp and everything else has no board: the panel says "Fingerboard not implemented"
+  and lists the instruments that have one.
+* **The board** (`source/fingerboard.odin`): the player's view, nut at the top, lowest
+  string left; N strings spread over the board's width (six strings on a board 1.3× as
+  wide). Semitone *n* sits at `1 - 2^(-n/12)` of the string, so positions crowd together
+  down the board as under the hand; the octave and two octaves are marked - or, fretted,
+  the frets and inlay dots are drawn and each note's circle sits between its fret and
+  the one before. Lit: the note under the mouse on the sheet at every place it can be
+  played, the active layer's sounding notes while playing, the selected note, the circle
+  under the mouse (its row is lit on the sheet too). Click to hear. The key filter (All,
+  15 keys, Song) hides positions whose note is not in the key's major scale; lit notes
+  always show. Positions outside the instrument's range are empty rings.
+* **Hand positions:** lines across the board where each finger stops the strings in the
+  chosen position, labelled f1–f4 (T for the thumb) at the screen's right edge; buttons
+  pick the position, the wheel over the board steps through them. Changing to a layer with
+  another board (`fb_board_changed`) goes to that board's default position.
 
 **Tracking** (`source/fingering.odin`). Every note of the active layer is given a place on
 the board (a string and a semitone), in order from the start of the layer, each from the
 last: *Same string* keeps the string while it can play the note and otherwise takes the
 nearest place; *Nearest* always takes the physically nearest; the first note goes lowest
-on the neck. Physical distance uses a full-size cello: strings 695 mm nut to bridge, 23 mm
-outer to outer at the nut and 47 mm at the bridge (Hans Johannsson's cello measurements),
-semitone *n* at 695·(1 − 2^(−n/12)) mm from the nut; the distances between all 120 places
-are worked out once into a table. The last N notes up to the playhead (or the selected
+on the neck. Physical distance uses the instrument's `board_mm` (the cello's from Hans
+Johannsson's measurements: 695 mm nut to bridge, 23 mm outer to outer at the nut, 47 at
+the bridge), semitone *n* at L·(1 − 2^(−n/12)) mm from the nut; the distances between
+all places are worked out once per board into a table. The last N notes up to the playhead (or the selected
 note) are drawn: each note filled in a colour cycled note by note (eight colours; older
 notes fainter, the newest ringed), and between them either a line straight down the string
 (the places on the way left as they are), blending from one colour to the next, or a blended arrow straight across.
 *Best* (a third mode, and the default) always takes the place nearest the nut - the open string if there is
 one ([C string, F2] → G2 is the open G string). **Steps:** notes that start within 6 ticks
 of each other while the first still sounds (double stops, chords, strums) are one step;
-their places are chosen together, on different strings, at the least total cost (every
-assignment tried, at most 4^4); the colour and the N count go by step. Each note gets one
+their places are chosen together, on different strings, at the least total cost (a
+depth-first search that drops any branch already dearer than the best; up to as many
+notes as strings, so a six-note guitar chord gets all six); the colour and the N count go
+by step. Each note gets one
 line in: voice by voice (lowest to lowest) between chords of the same size, otherwise from
-the nearest note of the step before. Places past the thumb position's reach are used only
-when a note has no other.
+the nearest note of the step before. Places past the board's reach are used only when a
+note has no other.
 
-**The board's length** is **Fixed** by default - down to the thumb position's reach (20
-semitones) - or, with the **Dynamic** button, follows the hand position: it shows from the nut to three semitones
-past the last finger (at least 7, at most 20 - the thumb position's reach), gliding to a
+**The board's length** is **Fixed** by default - down to the board's reach - or, with the
+**Dynamic** button, follows the hand position: it shows from the nut to three semitones
+past the last finger (at least 7, at most the reach), gliding to a
 new length when the position changes; notes are spaced over what is shown, so they get
 bigger in the low positions. A tracked note past what is shown is pinned to the board's
 end and named.
@@ -469,10 +476,6 @@ own colour is no longer used on the board. On the sheet, the active layer's note
 trail are drawn in their tracking colour blended with the layer's: the k-th of n (oldest
 first) at weight (k+1)/n, so the newest shows the full colour and each fades back a step
 per note - the same steps as their fading on the board.
-
-Its own hot-reload library (`build/hot_reload/cello.dll`, the host built with
-`-define:GAME_NAME=cello`) and its own `last_cello_song.txt`, so it can run beside the
-music box.
 
 ### 4.4 Performance
 

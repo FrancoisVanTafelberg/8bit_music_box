@@ -22,6 +22,8 @@ package music
         color 255 200 80
         model bowed 0.5 0.13             # 32-bit only: a simulated bowed string (bowed.odin)
         resonance 190 4 4                # 32-bit only: a body resonance, Hz Q dB (up to 4)
+        board C2 G2 D3 A3                # the fingerboard, for the Helper: see board.odin
+        board_mm 695 23 47               #   (board_semis, frets, position, board_default too)
         end
 
     Every line after the first is optional. A block starts from, in order: its
@@ -116,6 +118,7 @@ inst_block_build :: proc(
 	}
 	ins.key = b.key
 	name_set := false
+	fresh_positions := false
 
 	bad :: proc(rep: ^Load_Report, where_: string, no: int, msg: string) {
 		append(&rep.errors, fmt.aprintf("%s:%d: %s", where_, no, msg))
@@ -192,6 +195,8 @@ inst_block_build :: proc(
 			}
 			ins.resonances[ins.n_resonances] = r
 			ins.n_resonances += 1
+		case "board", "board_mm", "board_semis", "frets", "position", "board_default":
+			if msg := board_line(&ins.board, l.cmd, a, &fresh_positions); msg != "" do bad(rep, where_, l.no, msg)
 		case "color", "colour":
 			if len(a) < 3 {bad(rep, where_, l.no, "color: r g b"); continue}
 			for k in 0 ..< 3 {
@@ -248,6 +253,7 @@ inst_write :: proc(w: ^strings.Builder, ins: ^Instrument) {
 	fmt.sbprintfln(w, "color %d %d %d", ins.color[0], ins.color[1], ins.color[2])
 	if ins.model == .Bowed do fmt.sbprintfln(w, "model bowed %v %v", ins.bow_pressure, ins.bow_position)
 	for r in ins.resonances[:ins.n_resonances] do fmt.sbprintfln(w, "resonance %v %v %v", r.freq, r.q, r.gain_db)
+	board_write(w, &ins.board)
 	fmt.sbprintln(w, "end")
 }
 

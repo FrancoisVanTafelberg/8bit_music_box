@@ -21,45 +21,49 @@ you are editing survives. `F5` forces a reload, `F6` restarts.
     build_release.bat             (or ./build_release.sh)
     build\8bit_music_box.exe
 
-## Cello Helper
+## The Helper (fingerboards)
 
-A second program from the same code: the editor with only the cello (as many cello
-layers as you like), a half-width side panel, four bars to a page showing only the cello's
-compass by default (C2 to C6, in taller rows; the **inst** / **piano** button switches), and
-the **Cello Fingerboard** down the right-hand side.
+**Helper** in the top bar (or `H`): a practice view for string players. The layer panel
+narrows, the sheet shows only the selected layer's instrument's rows (the **inst** range;
+turning the Helper off puts back what was there), and the right-hand side shows that
+instrument's **fingerboard**. Select another layer and the board changes with it. Boards
+come from the instrument files: the **violin**, **viola**, **cello**, **contrabass** and
+**guitar** have one; for any other instrument the panel says the fingerboard is not
+implemented for it yet. (This replaces the separate Cello Helper program.)
 
-    run_cello_dev.bat               hot reload, like run_dev.bat
-    build_cello_release.bat         build\cello_helper.exe   (or ./build_cello_release.sh)
-
-The fingerboard is the player's view down the neck: nut at the top, C string on the
+The fingerboard is the player's view down the neck: nut at the top, lowest string on the
 left, every place a finger can stop a string from the open string to the end of the
-board, spaced as they really are (closer together further down). Point at a note on the
-sheet and every place it can be played lights up; while playing, the current layer's
-sounding notes light up; click a circle to hear it. The key buttons show only the notes
-of that key (**All** shows every position, **Song** picks the song's key). The position
-buttons (or the mouse wheel over the board) choose a hand position, 1st by default, and
-draw a line across the board for each finger, labelled f1–f4 at the right edge.
+board, spaced as they really are (closer together further down). On the guitar the frets
+and the inlay dots are drawn, and each note sits between its fret and the one before,
+where the finger goes. Point at a note on the sheet and every place it can be played
+lights up; while playing, the current layer's sounding notes light up; click a circle to
+hear it. The key buttons show only the notes of that key (**All** shows every position,
+**Song** picks the song's key). The position buttons (or the mouse wheel over the board)
+choose a hand position - the instrument's own: semitone-apart fingers on the cello, the
+violin and viola's frame, Simandl on the double bass, a finger per fret on the guitar -
+and draw a line across the board for each finger, labelled f1–f4 at the right edge.
 
 **Tracking** (on by default) follows the layer note by note: the last N notes (8 by
 default; Shift/Ctrl for 10/100 on the -/+) up to the playhead - or up to the selected note
 when stopped - each filled in its own colour, with the way between them drawn: along the
 string, as a line straight down it blending from one note's colour to the next, or as an arrow straight across the board to another string. Three
 modes: **Same string** stays on the string while it can play the note; **Nearest** goes to
-whichever place is physically closest on a real cello; **Best** (the default) always takes
-the place nearest the nut (the open string when there is one). Notes played together - double stops,
+whichever place is physically closest on the real instrument (its string length and
+spacing are in its instrument file); **Best** (the default) always takes the place nearest
+the nut (the open string when there is one). Notes played together - double stops,
 chords, strums (starting within 6 ticks, while the first still sounds) - go on different
 strings and each gets its own line: voice by voice from a chord of the same size, otherwise
-from the nearest note before.
+from the nearest note before. A guitar chord of six notes takes all six strings.
 
 The **Fixed** / **Dynamic** button next to the mode sets the board's length. **Fixed** (the
-default) always shows it down to the thumb position. **Dynamic** shows only as much as the
-hand position needs - from the nut to a little past the last finger - so 1st position fills
-the panel with big notes, and changing position glides to the new length. On the sheet, the same notes take
-the same colours - the newest fully - and fade back to the layer's colour a step per note,
-at the rate they fade on the board.
+default) always shows it down to the instrument's reach (a cello's thumb position, the
+guitar's last fret). **Dynamic** shows only as much as the hand position needs - from the
+nut to a little past the last finger - so 1st position fills the panel with big notes, and
+changing position glides to the new length. On the sheet, the same notes take the same
+colours - the newest fully - and fade back to the layer's colour a step per note, at the
+rate they fade on the board.
 
-It saves to `cello_songs\`. It can open anything in `songs\` or `imports\` too: every
-layer becomes a cello, and Save puts the result in `cello_songs\`, never over the original.
+Songs the old Cello Helper saved in `cello_songs\` still show in Open, marked [cello].
 
 ## Using it
 
@@ -68,7 +72,7 @@ layer becomes a cello, and Save puts the result in `cello_songs\`, never over th
 | **Place a note** | pick a length on the left (`1`–`6`, `.` dotted, `T` triplet), click a slot |
 | **Sharps / flats** | the key signature decides; hold `Shift` for ♯, `Ctrl` for ♭, or use the accidental buttons |
 | **Edit** | drag to move, right-click to delete, mouse wheel on a note = up/down a semitone |
-| **Range** | the **piano** / **inst** button next to the key: the whole piano range, or only the selected layer's instrument (taller rows). The music box starts on piano, the Cello Helper on inst. Notes outside the range are red on the piano range and counted at the sheet's edge on inst - switch to piano to move or delete them |
+| **Range** | the **piano** / **inst** button next to the key: the whole piano range, or only the selected layer's instrument (taller rows). Starts on piano; the Helper switches to inst while it is on. Notes outside the range are red on the piano range and counted at the sheet's edge on inst - switch to piano to move or delete them |
 | **Key lines** | the **lines** button next to the key: rows the key signature sharpens or flattens are tinted and named (F#, Bb) in the note column, and the rows of the key's home chord are marked - tonic brightest, 3rd and 5th fainter. Each row also shows its frequency ratio to a reference note (the tonic at or below the layer's first note): with C5 as 1:1, C6 is 2:1, G5 3:2, E5 5:4, C4 1:2. Right-click a row's name to make it the reference; right-click it again for automatic. On by default |
 | **Sound effects** | the **SFX** button (top right): every sound effect in `sounds/`, click to hear; "many at once" fires N of one over a few seconds (the -/+ take Shift for 10 and Ctrl for 100 at a time, the wheel works too, right-click resets), bunched on a bell curve (e.g. 100 muskets in 2 s), with a chart of when each fell |
 | **Octave copy** | `Ctrl`+click a note: a copy of it an octave lower, same place and length; `Shift`+click: an octave higher |
@@ -76,11 +80,12 @@ layer becomes a cello, and Save puts the result in `cello_songs\`, never over th
 | **Bars** | `←` back to the start of the bar (at its start already: the bar before), `→` the start of the next bar - while playing it jumps there; stopped, it moves the bar cursor (the gold marker) that Play starts from |
 | **Volume** | `↑` / `↓` the overall volume, 5% a press (`Shift`: 20%) |
 | **Fine grid** | hold `Alt` to snap to 32nds |
+| **Helper** | `H` or the **Helper** button: the selected string layer's fingerboard on the right (see above) |
 | **Layers** | `+ Add instrument`; click a layer to edit it; `M` mute, `S` solo (live, even mid-song); `Tab` next layer; **Set colour** picks the selected layer's colour on the sheet (saved in the song) |
 | **Play** | `Space` from the bar cursor (or this page's start, if the cursor is on another page), `Shift+Space` from the start. **Follow** turns pages with the playhead |
 | **Play scope** | the **Song / Bar / Page** button under the sheet (right of the page boxes): the whole song, one bar from the cursor, or to the end of the page. Bar and Page stop at their end (a red line marks it) and leave the cursor where it was, so Play goes round the same bar again; `→` moves on. Right-click steps back |
 | **Metronome** | the top layer is always the **Metronome**. **Metro** under the sheet (or `K`, or its `on` button) fills every bar with a click a beat, the first beat of each bar higher; they follow the time signature and the number of bars, and go again when it is switched off. It plays in time with the song, keeps going when another layer is soloed, has its own `M` mute, and is never saved or exported. Its clicks show as ticks along the top of the sheet |
-| **Input mode** | **Mic** under the sheet (or `I`) listens to a microphone and shows the note you play: a big dot on the sheet, in the colour opposite the layer's, on that note's row - above or below the row's middle when sharp or flat, with the name and cents beside it (green in tune, gold within 25 cents, red beyond). Stopped, it sits on the bar cursor; playing, it rides the playhead and leaves a line behind it - the take - which stays until Play or **Reset**. In the Cello Helper it also shows where the note is on the fingerboard. Listens for the selected layer's range. Works in both apps; Windows only for now |
+| **Input mode** | **Mic** under the sheet (or `I`) listens to a microphone and shows the note you play: a big dot on the sheet, in the colour opposite the layer's, on that note's row - above or below the row's middle when sharp or flat, with the name and cents beside it (green in tune, gold within 25 cents, red beyond). Stopped, it sits on the bar cursor; playing, it rides the playhead and leaves a line behind it - the take - which stays until Play or **Reset**. With the Helper on it also shows where the note is on the fingerboard. Listens for the selected layer's range. Windows only for now |
 | **Microphone** | the **v** button beside Mic: pick any input device (or the system default), watch the level (the white mark is the noise gate), set **ignore noise** (how far above the room's own noise a note must be: x2 / 6 dB by default; raise it in a noisy room) and **latency** (raise it if the take lags the notes). The room's noise is learned by itself while you are not playing. Use headphones when playing along - the mic hears the speakers too |
 | **Pages** | `PgUp`/`PgDn`, `[` `]`, or click the page strip |
 | **Undo** | `Ctrl+Z`, `Ctrl+Y` / `Ctrl+Shift+Z` |
@@ -107,7 +112,7 @@ Rows the active instrument cannot play are shaded and refuse clicks.
 | `instruments/` | every instrument, as text files (`.inst`): add or change them without a rebuild, F7 reloads. See `instruments/README.txt` |
 | `sounds/` | sound effects that are not music (cannon, musket, sword clash...), as text files (`.sfx`). See `sounds/README.txt` |
 | `songs/` | saved songs (plain text, hand-editable) |
-| `cello_songs/` | the Cello Helper's songs |
+| `cello_songs/` | songs the old Cello Helper saved (still listed in Open) |
 | `imports/` | MIDI files to open |
 | `exports/` | rendered audio |
 | `songs_that_cannot_be_used_for_legal_reasons/` | songs and MIDI of music that is **not** public domain: playable here, never copied to the repo or committed |

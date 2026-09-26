@@ -1,7 +1,7 @@
 package app
 
 /*
-    Tracking (Cello Helper): where on the fingerboard each note of the layer is
+    Tracking (the Helper): where on the fingerboard each note of the layer is
     played, and the path the hand takes from one to the next.
 
     Every note of the active layer is given a place on the board - a string,
@@ -15,12 +15,13 @@ package app
 
     The first note goes wherever it sits lowest on the neck.
 
-    "Physically closest" is measured on a real cello, not on the drawing: a
-    full-size cello's strings are 695 mm long, nut to bridge; they are 23 mm
-    apart outer to outer at the nut and 47 mm at the bridge (from a luthier's
-    measurement chart), and semitone n is stopped 695 * (1 - 2^(-n/12)) mm
-    from the nut. From that, the distance between every pair of places on the
-    board is worked out once (fb_dist, a 120 x 120 table).
+    "Physically closest" is measured on the real instrument, not on the
+    drawing, from its instrument file's board_mm: a full-size cello's strings
+    are 695 mm long, nut to bridge, 23 mm apart outer to outer at the nut and
+    47 mm at the bridge (from a luthier's measurement chart); semitone n is
+    stopped 695 * (1 - 2^(-n/12)) mm from the nut. From that, the distance
+    between every pair of places on the board is worked out once per board
+    (fb_dist).
 
     The fingerboard then draws the last N notes up to the playhead (or up to
     the selected note, when stopped): each note filled with its own colour -
@@ -47,9 +48,8 @@ TRACK_MODE_NAME := [Track_Mode]string {
 	.Best        = "Best",
 }
 
-// Places further down than this (the thumb position's reach) are used only
-// when a note has no other.
-TRACK_LIMIT :: FB_VIEW_MAX
+// Room for a trail: every step can be a chord across all the strings.
+TRAIL_CAP :: TRACK_MAX * music.BOARD_MAX_STRINGS
 
 TRACK_DEFAULT_N :: 8
 TRACK_MAX :: 64
@@ -74,39 +74,48 @@ track_colour :: proc(note_index: int) -> rl.Color {
 // The board, in millimetres
 // ---------------------------------------------------------------------------
 
-CELLO_STRING_MM :: f32(695)
-CELLO_NUT_SPREAD_MM :: f32(23) // C string to A string, at the nut
-CELLO_BRIDGE_SPREAD_MM :: f32(47) // ...and at the bridge
+// Every place on any board: string s, semitone n is index s * FB_STRIDE + n.
+FB_STRIDE :: music.BOARD_MAX_SEMIS + 1
+FB_MAX_PLACES :: music.BOARD_MAX_STRINGS * FB_STRIDE
 
-FB_PLACES :: 4 * (FB_SEMIS + 1)
-
-// Where a place is: across the board (mm from the middle) and down it (mm
-// from the nut).
-fb_place_mm :: proc(s, semis: int) -> [2]f32 {
-	down := CELLO_STRING_MM * (1 - math.pow(2, -f32(semis) / 12))
-	spread := CELLO_NUT_SPREAD_MM + (CELLO_BRIDGE_SPREAD_MM - CELLO_NUT_SPREAD_MM) * down / CELLO_STRING_MM
-	return {(f32(s) - 1.5) / 3 * spread, down}
+// Where a place is on board `b`: across it (mm from the middle) and down it
+// (mm from the nut). From the instrument file's board_mm: the string length,
+// and how far apart the outer strings are at the nut and at the bridge.
+fb_place_mm :: proc(b: ^music.Board, s, semis: int) -> [2]f32 {
+	down := b.length_mm * (1 - math.pow(2, -f32(semis) / 12))
+	spread := b.nut_mm + (b.bridge_mm - b.nut_mm) * down / b.length_mm
+	half := f32(max(int(b.n_strings) - 1, 1)) / 2
+	return {(f32(s) - half) / (2 * half) * spread, down}
 }
 
+// The distances for the board they were worked out for (a cache: rebuilt
+// when another instrument's board is asked about).
 @(private = "file")
-fb_dist_table: [FB_PLACES][FB_PLACES]f32
+fb_dist_table: [FB_MAX_PLACES][FB_MAX_PLACES]f32
+@(private = "file")
+fb_dist_for: music.Board
 @(private = "file")
 fb_dist_ready: bool
 
-// Millimetres between two places on the board.
+// Millimetres between two places on the active layer's board.
 fb_dist :: proc(a, b: Fb_Pos) -> f32 {
-	if !fb_dist_ready {
-		for i in 0 ..< FB_PLACES {
-			pi := fb_place_mm(i / (FB_SEMIS + 1), i % (FB_SEMIS + 1))
-			for j in 0 ..< FB_PLACES {
-				pj := fb_place_mm(j / (FB_SEMIS + 1), j % (FB_SEMIS + 1))
+	bd := fb_board()
+	if bd == nil do return 0
+	same := fb_dist_ready && fb_dist_for.n_strings == bd.n_strings && fb_dist_for.strings == bd.strings && fb_dist_for.length_mm == bd.length_mm && fb_dist_for.nut_mm == bd.nut_mm && fb_dist_for.bridge_mm == bd.bridge_mm
+	if !same {
+		n := int(bd.n_strings)
+		for i in 0 ..< n * FB_STRIDE {
+			pi := fb_place_mm(bd, i / FB_STRIDE, i % FB_STRIDE)
+			for j in 0 ..< n * FB_STRIDE {
+				pj := fb_place_mm(bd, j / FB_STRIDE, j % FB_STRIDE)
 				d := pi - pj
 				fb_dist_table[i][j] = math.sqrt(d.x * d.x + d.y * d.y)
 			}
 		}
+		fb_dist_for = bd^
 		fb_dist_ready = true
 	}
-	return fb_dist_table[a.string * (FB_SEMIS + 1) + a.semis][b.string * (FB_SEMIS + 1) + b.semis]
+	return fb_dist_table[a.string * FB_STRIDE + a.semis][b.string * FB_STRIDE + b.semis]
 }
 
 // ---------------------------------------------------------------------------
@@ -117,8 +126,9 @@ fb_dist :: proc(a, b: Fb_Pos) -> f32 {
 // for the first note): lower is better.
 @(private = "file")
 place_cost :: proc(p: Fb_Pos, prev: []Fb_Pos, mode: Track_Mode) -> f32 {
-	// Beyond thumb position is beyond this app: only if nothing else will do.
-	cost: f32 = p.semis > TRACK_LIMIT ? 100000 : 0
+	// Beyond the board's reach (a cello's thumb position) is beyond this
+	// app: only if nothing else will do.
+	cost: f32 = p.semis > fb_reach() ? 100000 : 0
 	if len(prev) == 0 || mode == .Best {
 		// As near the nut as it goes: the open string, or the lowest
 		// position. (Best, always; the others, for the first note.) A hair
@@ -145,46 +155,46 @@ place_cost :: proc(p: Fb_Pos, prev: []Fb_Pos, mode: Track_Mode) -> f32 {
 
 // Places for the notes of one step (one note, or a chord: a double stop, a
 // strum), each on its own string, at the least total cost. Notes that are not
-// on the board get none (ok false).
+// on the board get none (ok false). Searched depth first, giving up on any
+// branch that already costs more than the best found.
 fb_choose_step :: proc(midis: []int, prev: []Fb_Pos, mode: Track_Mode, out: []Fb_Pos) {
-	n := min(len(midis), 4, len(out))
-	for &o in out do o = {}
-	// Every way of putting the notes on different strings (at most 4^4).
-	best_cost := f32(1e30)
-	pick: [4]int
-	best_pick: [4]int
-	found := false
-	total := 1
-	for _ in 0 ..< n do total *= 5 // 4 strings, or "not on the board"
-	for combo in 0 ..< total {
-		c := combo
-		used: [4]bool
-		cost: f32
-		ok := true
-		for k in 0 ..< n {
-			s := c % 5 - 1
-			c /= 5
-			pick[k] = s
-			if s < 0 {
-				// Leaving a note off costs more than any place, so it only
-				// happens when there is no string for it.
-				cost += 1e9
-				continue
-			}
-			semis := midis[k] - FB_OPEN[s]
-			if semis < 0 || semis > FB_SEMIS || used[s] {ok = false; break}
-			used[s] = true
-			cost += place_cost({true, s, semis}, prev, mode)
-		}
-		if ok && cost < best_cost {
-			best_cost = cost
-			best_pick = pick
-			found = true
-		}
+	Search :: struct {
+		midis:      []int,
+		prev:       []Fb_Pos,
+		mode:       Track_Mode,
+		n, strings: int,
+		pick, best: [music.BOARD_MAX_STRINGS]int,
+		best_cost:  f32,
+		found:      bool,
 	}
-	if !found do return
-	for k in 0 ..< n {
-		if best_pick[k] >= 0 do out[k] = {true, best_pick[k], midis[k] - FB_OPEN[best_pick[k]]}
+	walk :: proc(st: ^Search, k: int, used: u8, cost: f32) {
+		if cost >= st.best_cost do return
+		if k == st.n {
+			st.best_cost = cost
+			st.best = st.pick
+			st.found = true
+			return
+		}
+		for s in 0 ..< st.strings {
+			if used & (1 << u8(s)) != 0 do continue
+			semis := st.midis[k] - fb_open(s)
+			if semis < 0 || semis > fb_semis() do continue
+			st.pick[k] = s
+			walk(st, k + 1, used | (1 << u8(s)), cost + place_cost({true, s, semis}, st.prev, st.mode))
+		}
+		// Leaving a note off costs more than any place, so it only happens
+		// when there is no string for it.
+		st.pick[k] = -1
+		walk(st, k + 1, used, cost + 1e9)
+	}
+	for &o in out do o = {}
+	st := Search{midis = midis, prev = prev, mode = mode, strings = fb_strings(), best_cost = 1e30}
+	st.n = min(len(midis), st.strings, len(out))
+	if st.n == 0 do return
+	walk(&st, 0, 0, 0)
+	if !st.found do return
+	for k in 0 ..< st.n {
+		if st.best[k] >= 0 do out[k] = {true, st.best[k], midis[k] - fb_open(st.best[k])}
 	}
 }
 
@@ -221,10 +231,10 @@ STRUM_TICKS :: 6
 // returns how many.
 fb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, mode: Track_Mode, steps: int, out: []Tracked) -> int {
 	if steps <= 0 || len(out) == 0 do return 0
-	ring: [TRACK_MAX * 4]Tracked
+	ring: [TRAIL_CAP]Tracked
 	count := 0
 	step := 0
-	prev_buf: [4]Fb_Pos
+	prev_buf: [music.BOARD_MAX_STRINGS]Fb_Pos
 	prev := prev_buf[:0]
 	first_note_of_window := 0 // ring index where the kept steps begin
 	step_start: [TRACK_MAX + 1]int // ring positions of recent step starts
@@ -234,15 +244,15 @@ fb_track :: proc(t: ^music.Track, upto_tick: i32, upto_note: int, mode: Track_Mo
 		first := t.notes[i]
 		if upto_note < 0 && first.tick > upto_tick do break
 		j := i + 1
-		for j < len(t.notes) && j - i < 4 {
+		for j < len(t.notes) && j - i < fb_strings() {
 			nj := t.notes[j]
 			if nj.tick - first.tick > STRUM_TICKS || nj.tick >= first.tick + first.len do break
 			j += 1
 		}
 		if upto_note >= 0 && i > upto_note do break
-		midis: [4]int
+		midis: [music.BOARD_MAX_STRINGS]int
 		for k in i ..< j do midis[k - i] = music.pitch_midi(t.notes[k].pitch)
-		places: [4]Fb_Pos
+		places: [music.BOARD_MAX_STRINGS]Fb_Pos
 		fb_choose_step(midis[:j - i], prev, mode, places[:])
 		n_placed := 0
 		for k in 0 ..< j - i {
@@ -392,7 +402,7 @@ fb_track_draw :: proc(list: []Tracked) {
 // when tracking is off. Oldest first.
 fb_current_trail :: proc(out: []Tracked) -> int {
 	t := active_track()
-	if t == nil || !g.fb_track do return 0
+	if t == nil || !g.fb_track || fb_board() == nil do return 0
 	if g.player.playing do return fb_track(t, player_tick(&g.player, &g.song), -1, g.fb_track_mode, g.fb_track_n, out)
 	if g.selected >= 0 && g.selected < len(t.notes) do return fb_track(t, 0, g.selected, g.fb_track_mode, g.fb_track_n, out)
 	return 0

@@ -10,6 +10,19 @@
 #
 # The format is described in README.txt in this folder. Ranges are sounding
 # pitch (what you hear), not the written pitch of transposing instruments.
+#
+# FINGERBOARDS (the editor's Helper): `board` gives the open strings, lowest
+# first; `board_mm` the string length nut to bridge and how far apart the
+# outer strings are at the nut and at the bridge, from full-size instruments;
+# `board_semis` how far up the board goes and how far the Helper shows and
+# tracks; `position` the hand positions - where fingers 1 to 4 stop the
+# string, in semitones above the open string (0 = that finger is not used),
+# and optionally the thumb. The positions are the usual teaching ones; edit
+# them to match your own fingering.
+#
+# Violin and viola positions are for the common "major" hand frame (tone,
+# tone, semitone: on the A string in 1st position B C# D E); in other keys
+# the 2nd or 3rd finger moves a semitone.
 
 define_instrument violin
 name "Violin"
@@ -32,6 +45,20 @@ resonance 280 3 4
 resonance 480 3 4
 resonance 2500 1.2 4
 resonance 6500 0.7 -8
+# Fingerboard: 328 mm strings, 16.5 mm outer to outer at the nut, 34 at the
+# bridge; the board runs about two and a half octaves up the E string.
+board G3 D4 A4 E5
+board_mm 328 16.5 34
+board_semis 29 20
+position "Half position" 1/2 1 3 4 6
+position "1st position" 1st 2 4 5 7
+position "2nd position" 2nd 4 5 7 9
+position "3rd position" 3rd 5 7 9 10
+position "4th position" 4th 7 9 10 12
+position "5th position" 5th 9 10 12 14
+position "6th position" 6th 10 12 14 15
+position "7th position" 7th 12 14 15 17
+board_default 1st
 end
 
 define_instrument viola
@@ -55,6 +82,21 @@ resonance 230 3 4
 resonance 400 3 4
 resonance 2000 1.2 3
 resonance 5500 0.7 -8
+# Fingerboard: a 16-inch viola's 375 mm strings, 17.5 mm outer to outer at
+# the nut, 37 at the bridge. The same hand frame as the violin, a little
+# wider.
+board C3 G3 D4 A4
+board_mm 375 17.5 37
+board_semis 29 20
+position "Half position" 1/2 1 3 4 6
+position "1st position" 1st 2 4 5 7
+position "2nd position" 2nd 4 5 7 9
+position "3rd position" 3rd 5 7 9 10
+position "4th position" 4th 7 9 10 12
+position "5th position" 5th 9 10 12 14
+position "6th position" 6th 10 12 14 15
+position "7th position" 7th 12 14 15 17
+board_default 1st
 end
 
 # Range: the cello's full compass, C2 (open C string) to C6, two octaves above
@@ -83,6 +125,26 @@ resonance 105 3 5
 resonance 200 3 4
 resonance 2200 1.2 3
 resonance 5000 0.7 -9
+# Fingerboard: 695 mm strings, 23 mm outer to outer at the nut, 47 at the
+# bridge (a luthier's measurement chart). Closed hand in the neck positions:
+# the fingers a semitone apart, 1 to 4 a minor third (1st position on the A
+# string: B C C# D). "1st x" is the forward extension, a whole tone between 1
+# and 2. From 5th position the hand plays with three fingers; in thumb
+# position the thumb lies across the strings at the octave.
+board C2 G2 D3 A3
+board_mm 695 23 47
+board_semis 29 20
+position "Half position" 1/2 1 2 3 4
+position "1st position" 1st 2 3 4 5
+position "1st position, extended" "1st x" 2 4 5 6
+position "Lower 2nd position" 2nd- 3 4 5 6
+position "2nd position" 2nd 4 5 6 7
+position "3rd position" 3rd 5 6 7 8
+position "Upper 3rd position" 3rd+ 6 7 8 9
+position "4th position" 4th 7 8 9 10
+position "5th position (three fingers)" 5th 9 10 12 0
+position "1st thumb position" Thumb 14 16 17 0 12
+board_default 1st
 end
 
 define_instrument contrabass
@@ -106,6 +168,24 @@ resonance 60 3 5
 resonance 110 3 4
 resonance 1200 1.2 3
 resonance 3500 0.7 -8
+# Fingerboard: a 3/4 bass's 1060 mm strings, tuned in fourths, 30 mm outer
+# to outer at the nut, 80 at the bridge. Simandl fingering: 1, 2 and 4 (the
+# 3rd finger only helps the 4th), a whole tone from 1 to 4 in each position;
+# thumb position at the octave.
+board E1 A1 D2 G2
+board_mm 1060 30 80
+board_semis 26 20
+position "Half position" 1/2 1 2 0 3
+position "1st position" 1st 2 3 0 4
+position "2nd position" 2nd 3 4 0 5
+position "2nd-and-a-half position" 2.5 4 5 0 6
+position "3rd position" 3rd 5 6 0 7
+position "3rd-and-a-half position" 3.5 6 7 0 8
+position "4th position" 4th 7 8 0 9
+position "5th position" 5th 9 10 0 11
+position "6th position" 6th 10 11 0 12
+position "Thumb position" Thumb 14 15 16 0 12
+board_default 1st
 end
 
 define_instrument harp
@@ -123,4 +203,40 @@ metallic 0
 gain 0.7
 pan -0.6
 color 246 190 120
+end
+
+# The classical guitar: nylon strings, plucked. Sounds an octave below where
+# its part is written; this range is what you hear, open low E to the 19th
+# fret of the high E.
+define_instrument guitar
+name "Guitar"
+family strings
+range E2 B5
+wave triangle
+layer pulse 0.18 12
+envelope 0.002 1.4 0 0.25
+vibrato 0 0 0
+sweep 0 0
+breath 0
+tone 0.45
+metallic 0
+gain 0.8
+pan -0.15
+color 214 176 110
+# Fingerboard: 650 mm scale, 42 mm outer to outer at the nut, 58 at the
+# saddle, 19 frets. One finger to a fret: in 5th position finger 1 plays
+# the 5th fret, finger 4 the 8th.
+board E2 A2 D3 G3 B3 E4
+board_mm 650 42 58
+board_semis 19 19
+frets 1
+position "Open position" Open 1 2 3 4
+position "2nd position" 2nd 2 3 4 5
+position "3rd position" 3rd 3 4 5 6
+position "4th position" 4th 4 5 6 7
+position "5th position" 5th 5 6 7 8
+position "7th position" 7th 7 8 9 10
+position "9th position" 9th 9 10 11 12
+position "12th position" 12th 12 13 14 15
+board_default Open
 end

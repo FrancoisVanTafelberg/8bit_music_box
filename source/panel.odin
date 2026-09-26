@@ -44,7 +44,7 @@ topbar_draw :: proc() {
 	h := f32(20)
 
 	// Title: click to type.
-	tr := rect(8, y, 196, h)
+	tr := rect(8, y, 150, h)
 	fill(tr, g.editing_title ? COL_PANEL_HI : COL_SHEET)
 	outline(tr, g.editing_title ? COL_ACCENT : COL_EDGE)
 	title := g.editing_title ? string(g.title_buf[:g.title_len]) : g.song.title
@@ -55,7 +55,7 @@ topbar_draw :: proc() {
 	if !g.editing_title && ui_take_click(tr) do title_begin()
 
 	// Tempo.
-	x := f32(214)
+	x := f32(168)
 	label("tempo", x, y + 5)
 	x += 34
 	step := rl.IsKeyDown(.LEFT_SHIFT) ? f32(10) : f32(1)
@@ -97,6 +97,9 @@ topbar_draw :: proc() {
 		set_status(g.fit_range ? "rows: only the instrument's range (notes outside it are counted at the sheet's edges)" : "rows: the whole piano range")
 	}
 	x += 46
+	// The Helper: the selected string layer's fingerboard (helper.odin).
+	if button(rect(x, y, 42, h), "Helper", g.helper) do helper_toggle()
+	x += 46
 
 	// Transport.
 	if button(rect(x, y, 56, h), g.player.playing ? "Stop" : "Play", g.player.playing) do toggle_play(rl.IsKeyDown(.LEFT_SHIFT))
@@ -134,10 +137,8 @@ topbar_draw :: proc() {
 		if button(rect(x, y, 36, h), strings.to_upper(fmt_name, context.temp_allocator), false, g.has_ffmpeg) do file_export(fmt_name)
 		x += 40
 	}
-	when !CELLO {
-		x += 8
-		if button(rect(x, y, 40, h), "SFX") do g.overlay = .Sounds
-	}
+	x += 8
+	if button(rect(x, y, 40, h), "SFX") do g.overlay = .Sounds
 }
 
 @(private = "file")
@@ -162,29 +163,30 @@ title_end :: proc(keep: bool) {
 // Left panel
 // ---------------------------------------------------------------------------
 
-// One row fewer in the Cello Helper, for the Set colour button below.
-LAYER_ROWS :: 11 when CELLO else 12
+// One row fewer with the Helper on: its panel's buttons stack taller.
+layer_rows :: proc() -> int {return g.helper ? 11 : 12}
 LAYER_H :: 20
 
 panel_draw :: proc() {
-	fill(rect(0, TOP_H, PANEL_W, 720 - TOP_H - STATUS_H), COL_PANEL)
-	rl.DrawLine(PANEL_W - 1, TOP_H, PANEL_W - 1, 720 - STATUS_H, COL_EDGE)
+	fill(rect(0, TOP_H, panel_w(), 720 - TOP_H - STATUS_H), COL_PANEL)
+	rl.DrawLine(i32(panel_w()) - 1, TOP_H, i32(panel_w()) - 1, 720 - STATUS_H, COL_EDGE)
 	x := f32(8)
-	w := f32(PANEL_W - 16)
+	w := f32(panel_w() - 16)
 	y := f32(TOP_H + 8)
-	// The Cello Helper's panel is half as wide: shorter labels, stacked rows.
-	compact :: CELLO
+	// With the Helper on the panel is half as wide: shorter labels, stacked
+	// rows.
+	compact := g.helper
 
 	label("LAYERS", x, y)
 	text(fmt.tprintf("%d", real_layers()), x + w - 12, y, COL_FAINT)
 	y += 14
 
-	list := rect(x, y, w, LAYER_ROWS * LAYER_H)
+	list := rect(x, y, w, f32(layer_rows() * LAYER_H))
 	fill(list, COL_SHEET)
 	n := len(g.song.tracks)
 	if wh := ui_take_wheel(list); wh != 0 do g.layer_scroll -= int(wh)
-	g.layer_scroll = clamp(g.layer_scroll, 0, max(n - LAYER_ROWS, 0))
-	for row in 0 ..< LAYER_ROWS {
+	g.layer_scroll = clamp(g.layer_scroll, 0, max(n - layer_rows(), 0))
+	for row in 0 ..< layer_rows() {
 		i := g.layer_scroll + row
 		if i >= n do break
 		t := &g.song.tracks[i]
@@ -200,14 +202,14 @@ panel_draw :: proc() {
 			fill(rect(r.x + 3, r.y + 4, 3, 11), tick_c)
 			fill(rect(r.x + 8, r.y + 8, 2, 7), tick_c)
 			name := g.metronome ? "Metronome" : "Metronome off"
-			when compact do name = "Metro"
+			if compact do name = "Metro"
 			text(fit_text(name, w - 55), r.x + 13, r.y + 5, g.metronome && audible ? COL_TEXT : COL_FAINT)
 			if button(rect(r.x + w - 40, r.y + 2, 18, 15), "M", t.mute) do t.mute = !t.mute
 			if button(rect(r.x + w - 20, r.y + 2, 18, 15), g.metronome ? "on" : "-", g.metronome) do metronome_toggle()
 			if ui_take_click(r) do metronome_toggle()
 			continue
 		}
-		when compact {
+		if compact {
 			// A thin stripe of the layer's colour: more room for the name.
 			fill(rect(r.x + 1, r.y + 2, 3, r.height - 4), track_color(t))
 			text(fit_text(t.name, w - 48), r.x + 7, r.y + 5, audible ? COL_TEXT : COL_FAINT)
@@ -221,22 +223,12 @@ panel_draw :: proc() {
 		if button(sr, "S", t.solo) {t.solo = !t.solo; g.dirty = true}
 		if ui_take_click(r) do select_layer(i)
 	}
-	if n > LAYER_ROWS {
-		text(fmt.tprintf(compact ? "%d-%d/%d" : "%d-%d of %d  (wheel)", g.layer_scroll + 1, min(g.layer_scroll + LAYER_ROWS, n), n), x, y + list.height + 2, COL_FAINT)
+	if n > layer_rows() {
+		text(fmt.tprintf(compact ? "%d-%d/%d" : "%d-%d of %d  (wheel)", g.layer_scroll + 1, min(g.layer_scroll + layer_rows(), n), n), x, y + list.height + 2, COL_FAINT)
 	}
 	y += list.height + 14
 
-	when CELLO {
-		// The Cello Helper has one instrument: another layer is another cello.
-		if button(rect(x, y, w, 20), "+ Cello layer") {
-			i := music.song_add_track(&g.song, music.inst_or_default(&g.song, CELLO_KEY))
-			select_layer(i)
-			g.dirty = true
-			set_status("added %s", g.song.tracks[i].name)
-		}
-	} else {
-		if button(rect(x, y, w, 20), "+ Add instrument") do g.overlay = .Instruments
-	}
+	if button(rect(x, y, w, 20), compact ? "+ Add layer" : "+ Add instrument") do g.overlay = .Instruments
 	y += 24
 	// The active layer's colour on the sheet.
 	if button(rect(x, y, w, 20), compact ? "Set colour" : "Set layer colour", false, active_track() != nil) {
@@ -271,7 +263,7 @@ panel_draw :: proc() {
 		if button(r, music.LENGTH_LABEL[l], g.length == l) do g.length = l
 	}
 	y += 48
-	when compact {
+	if compact {
 		// One above the other: "Triplet" does not fit in half of 88 px.
 		if button(rect(x, y, w, 20), "Dotted", g.mod == .Dotted) do g.mod = g.mod == .Dotted ? .None : .Dotted
 		y += 24
@@ -287,7 +279,7 @@ panel_draw :: proc() {
 	label(compact ? "ACCIDENTAL" : "ACCIDENTAL  (Shift #  Ctrl b)", x, y)
 	y += 14
 	names := [Acc_Mode]string{.Key = "key", .Sharp = "#", .Flat = "b", .Natural = "nat"}
-	when compact {
+	if compact {
 		// Two by two.
 		qw := (w - 4) / 2
 		for m, i in Acc_Mode {
@@ -303,7 +295,7 @@ panel_draw :: proc() {
 	y += 30
 
 	// The active instrument.
-	when compact {
+	if compact {
 		if t := active_track(); t != nil do instrument_box_compact(t, x, y, w)
 		return
 	}
@@ -344,7 +336,7 @@ select_layer :: proc(i: int) {
 	if i != g.active do g.selected = -1
 	g.active = i
 	if i < g.layer_scroll do g.layer_scroll = i
-	if i >= g.layer_scroll + LAYER_ROWS do g.layer_scroll = i - LAYER_ROWS + 1
+	if i >= g.layer_scroll + layer_rows() do g.layer_scroll = i - layer_rows() + 1
 }
 
 @(private = "file")
@@ -381,7 +373,7 @@ statusbar_draw :: proc() {
 	msg := status_text()
 	age := rl.GetTime() - g.status_time
 	fb_msg, on_board := "", false
-	when CELLO do fb_msg, on_board = fingerboard_status()
+	if g.helper && fb_board() != nil do fb_msg, on_board = fingerboard_status()
 	if on_board {
 		text(fb_msg, 8, y + 5, COL_TEXT)
 		return
@@ -403,7 +395,7 @@ statusbar_draw :: proc() {
 		)
 	}
 	hint := "click place   drag move   right-click delete   wheel sharp/flat   Ctrl/Shift+click note: octave copy down/up   Space play   Ctrl+Z undo"
-	when CELLO do hint = "click place   right-click delete   Ctrl/Shift+click note: octave copy down/up   Space play   click the board to hear"
+	if g.helper do hint = "click place   right-click delete   Ctrl/Shift+click note: octave copy down/up   Space play   click the board to hear"
 	text(hint, 1280 - text_width(hint) - 8, y + 5, COL_FAINT)
 }
 
@@ -436,7 +428,7 @@ overlay_draw :: proc() {
 
 @(private = "file")
 instruments_overlay :: proc() {
-	r := rect(PANEL_W + 20, TOP_H + 20, 1280 - PANEL_W - 40, 520)
+	r := rect(panel_w() + 20, TOP_H + 20, 1280 - panel_w() - 40, 520)
 	fill(rect(0, 0, 1280, 720), {0, 0, 0, 150})
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
@@ -488,16 +480,12 @@ open_overlay :: proc() {
 
 @(private = "file")
 open_overlay_draw :: proc() {
-	r := rect(PANEL_W + 20, TOP_H + 20, 1280 - PANEL_W - 40, 560)
+	r := rect(panel_w() + 20, TOP_H + 20, 1280 - panel_w() - 40, 560)
 	fill(rect(0, 0, 1280, 720), {0, 0, 0, 150})
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Open", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
-	when CELLO {
-		text("[cello] = cello_songs/, where this saves. Songs from songs/ and MIDI open with every layer turned into a cello, and save to cello_songs/.", r.x + 12, r.y + 34, COL_DIM)
-	} else {
-		text("Songs from songs/, MIDI from imports/, [private] = not public domain. Or drag a .song / .mid onto the window.", r.x + 12, r.y + 34, COL_DIM)
-	}
+	text("Songs from songs/, MIDI from imports/, [private] = not public domain, [cello] = the old Cello Helper's cello_songs/. Or drag a .song / .mid onto the window.", r.x + 12, r.y + 34, COL_DIM)
 	if len(g.open_files) == 0 {
 		text("Nothing here yet. Save a song, or put a .mid file in imports/.", r.x + 12, r.y + 70, COL_TEXT)
 	}
@@ -513,7 +501,7 @@ open_overlay_draw :: proc() {
 		is_midi := !strings.has_suffix(name, music.SONG_EXT)
 		shown := is_midi ? fmt.tprintf("[midi] %s", name) : name
 		if strings.contains(f, PRIVATE_DIR) do shown = fmt.tprintf("[private] %s", shown)
-		when CELLO do if strings.contains(f, CELLO_DIR) do shown = fmt.tprintf("[cello] %s", shown)
+		if strings.contains(f, CELLO_DIR) do shown = fmt.tprintf("[cello] %s", shown)
 		if button(rect(cx, cy, colw - 8, 20), shown) {
 			if !g.dirty || confirmed(f, "Unsaved changes will be lost") {
 				g.overlay = .None
@@ -542,7 +530,7 @@ keys_update :: proc() {
 		if (rl.IsKeyPressed(.BACKSPACE) || rl.IsKeyPressedRepeat(.BACKSPACE)) && g.title_len > 0 do g.title_len -= 1
 		if rl.IsKeyPressed(.ENTER) || rl.IsKeyPressed(.KP_ENTER) do title_end(true)
 		if rl.IsKeyPressed(.ESCAPE) do title_end(false)
-		if g.ui.clicked && !hovered(rect(8, 6, 196, 20)) do title_end(true)
+		if g.ui.clicked && !hovered(rect(8, 6, 150, 20)) do title_end(true)
 		return
 	}
 
@@ -582,6 +570,7 @@ keys_update :: proc() {
 	// Practice: I listens to the microphone, K the metronome.
 	if rl.IsKeyPressed(.I) do input_toggle()
 	if rl.IsKeyPressed(.K) do metronome_toggle()
+	if rl.IsKeyPressed(.H) do helper_toggle()
 
 	// Pages.
 	if rl.IsKeyPressed(.PAGE_DOWN) || rl.IsKeyPressed(.RIGHT_BRACKET) do g.page = min(g.page + 1, page_count() - 1)
@@ -735,7 +724,7 @@ colour_picker_draw :: proc() {
 	COLS :: 6
 	SW :: f32(22)
 	rows := (len(LAYER_PALETTE) + COLS - 1) / COLS
-	r := rect(PANEL_W + 4, clamp(g.colour_y - 30, TOP_H + 4, 720 - STATUS_H - 200), 12 + COLS * (SW + 4), 64 + f32(rows) * (SW + 4))
+	r := rect(panel_w() + 4, clamp(g.colour_y - 30, TOP_H + 4, 720 - STATUS_H - 200), 12 + COLS * (SW + 4), 64 + f32(rows) * (SW + 4))
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text(fit_text(fmt.tprintf("Colour: %s", t.name), r.width - 16), r.x + 8, r.y + 8, COL_TEXT)

@@ -235,7 +235,7 @@ input_sheet_draw :: proc() {
 	col := input_colour()
 	ps := f32(page_start())
 	pe := ps + f32(page_ticks())
-	left, right := f32(BARS_X), f32(BARS_X + BARS_W)
+	left, right := f32(bars_x()), f32(bars_x() + bars_w())
 
 	// The take: a line through the readings, broken where nothing was played
 	// (or where readings are more than a sixteenth apart).
@@ -289,7 +289,7 @@ PRACTICE_W :: 256
 practice_draw :: proc() {
 	y := f32(STRIP_Y)
 	h := f32(STRIP_H)
-	x := f32(BARS_X + BARS_W - PRACTICE_W)
+	x := f32(bars_x() + bars_w() - PRACTICE_W)
 	if button(rect(x, y, 48, h), "Metro", g.metronome) do metronome_toggle()
 	x += 52
 	{
@@ -348,7 +348,7 @@ mic_overlay_draw :: proc() {
 	W :: f32(340)
 	rows := in_.n_devices + 1
 	H := 200 + f32(rows) * 22
-	r := rect(f32(BARS_X + BARS_W) - W, f32(STRIP_Y) - H - 4, W, H)
+	r := rect(f32(bars_x() + bars_w()) - W, f32(STRIP_Y) - H - 4, W, H)
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	x := r.x + 10

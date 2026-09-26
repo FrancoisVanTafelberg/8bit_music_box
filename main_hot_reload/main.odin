@@ -43,9 +43,9 @@ when ODIN_OS == .Windows {
 	DLL_EXT :: ".so"
 }
 
-// Which library this host runs: "game" for the 8-Bit Music Box, "cello" for
-// the Cello Helper (build_cello_hot_reload builds it with -define:GAME_NAME=cello).
-// Both are the same source/ package, compiled with and without -define:CELLO.
+// Which library this host runs: build/hot_reload/game.dll. (-define:GAME_NAME
+// picks another name; the Cello Helper used to be one, and is now the
+// music box's Helper mode.)
 GAME_NAME :: #config(GAME_NAME, "game")
 
 GAME_DLL_DIR :: "build/hot_reload/"

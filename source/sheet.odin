@@ -22,15 +22,17 @@ import rl "vendor:raylib"
 
 TOP_H :: 32
 STATUS_H :: 20
-// The Cello Helper's panel is half as wide (panel.odin lays it out compact).
-PANEL_W :: 104 when CELLO else 208
 // Clef marks, the frequency ratios of the key lines (key_ratio), note names.
 GUTTER_W :: 72
 GUTTER_NAME_X :: GUTTER_W - 24 // where the note names start
-BARS_X :: PANEL_W + GUTTER_W
-// In the Cello Helper the fingerboard takes the right of the screen.
-BARS_W :: FB_X_CELLO - 8 - BARS_X when CELLO else 1280 - BARS_X - 8
-SHEET_R :: BARS_X + BARS_W + 8 // the sheet's right edge
+
+// The layout follows the Helper (helper.odin): with it on, the panel is half
+// as wide (panel.odin lays it out compact) and the fingerboard takes the
+// right of the screen.
+panel_w :: proc() -> f32 {return g.helper ? 104 : 208}
+bars_x :: proc() -> f32 {return panel_w() + GUTTER_W}
+bars_w :: proc() -> f32 {return g.helper ? FB_X - 8 - bars_x() : 1280 - bars_x() - 8}
+sheet_r :: proc() -> f32 {return bars_x() + bars_w() + 8} // the sheet's right edge
 BAR_NUM_Y :: TOP_H + 2
 ROWS_Y :: TOP_H + 18
 // The rows the sheet shows (sheet_range_update, every frame): the whole
@@ -110,11 +112,11 @@ page_count :: proc() -> i32 {
 }
 
 px_per_tick :: proc() -> f32 {
-	return f32(BARS_W) / f32(page_ticks())
+	return f32(bars_w()) / f32(page_ticks())
 }
 
 tick_x :: proc(tick: i32) -> f32 {
-	return f32(BARS_X) + f32(tick - page_start()) * px_per_tick()
+	return f32(bars_x()) + f32(tick - page_start()) * px_per_tick()
 }
 
 // The layer being edited; nil if there is none (the metronome, layer 0,
@@ -141,11 +143,11 @@ snap_tick :: proc(tick: i32) -> i32 {
 
 sheet_hover :: proc() -> Hover {
 	m := g.ui.mouse
-	if m.x < BARS_X || m.x >= BARS_X + BARS_W || m.y < ROWS_Y || m.y >= ROWS_Y + rows_h() do return {}
+	if m.x < bars_x() || m.x >= bars_x() + bars_w() || m.y < ROWS_Y || m.y >= ROWS_Y + rows_h() do return {}
 	h: Hover
 	h.ok = true
 	h.step = sheet_hi() - int((m.y - ROWS_Y) / row_h())
-	h.raw_tick = page_start() + i32((m.x - BARS_X) / px_per_tick())
+	h.raw_tick = page_start() + i32((m.x - bars_x()) / px_per_tick())
 	h.tick = snap_tick(h.raw_tick)
 	return h
 }
@@ -190,11 +192,11 @@ in_range :: proc(inst: music.Inst_Id, p: music.Pitch) -> bool {
 // ---------------------------------------------------------------------------
 
 sheet_draw :: proc() {
-	fill(rect(PANEL_W, TOP_H, SHEET_R - PANEL_W, 720 - TOP_H - STATUS_H), COL_SHEET)
+	fill(rect(panel_w(), TOP_H, sheet_r() - panel_w(), 720 - TOP_H - STATUS_H), COL_SHEET)
 	t := active_track()
 	bt := music.bar_ticks(&g.song)
 	ps := page_start()
-	right := f32(BARS_X + BARS_W)
+	right := f32(bars_x() + bars_w())
 
 	// Rows the active instrument cannot play: shaded, so the playable band
 	// stands out as the lit part of the page.
@@ -202,7 +204,7 @@ sheet_draw :: proc() {
 		for step in sheet_lo() ..= sheet_hi() {
 			p := music.Pitch{i8(step), music.key_alter(int(g.song.key), step)}
 			if !in_range(t.inst, p) {
-				fill(rect(BARS_X, row_y(step), BARS_W, row_h()), {8, 9, 16, 255})
+				fill(rect(bars_x(), row_y(step), bars_w(), row_h()), {8, 9, 16, 255})
 			}
 		}
 	}
@@ -211,14 +213,14 @@ sheet_draw :: proc() {
 
 	// The hovered row, faintly, all the way across.
 	hov := sheet_hover()
-	if hov.ok do fill(rect(PANEL_W, row_y(hov.step), SHEET_R - PANEL_W, row_h()), {255, 255, 255, 10})
-	// ...and in the Cello Helper, the row of the fingerboard note under the
+	if hov.ok do fill(rect(panel_w(), row_y(hov.step), sheet_r() - panel_w(), row_h()), {255, 255, 255, 10})
+	// ...and with the Helper on, the row of the fingerboard note under the
 	// mouse, so a position on the board can be found on the staff.
-	when CELLO {
+	if g.helper && fb_board() != nil {
 		if fh := fb_hover(); fh.ok && overlay_none() {
 			step := int(music.pitch_from_midi(fb_midi(fh), fb_spell_key()).step)
 			if step >= sheet_lo() && step <= sheet_hi() {
-				fill(rect(PANEL_W, row_y(step), SHEET_R - PANEL_W, row_h()), with_alpha(COL_ACCENT, 40))
+				fill(rect(panel_w(), row_y(step), sheet_r() - panel_w(), row_h()), with_alpha(COL_ACCENT, 40))
 			}
 		}
 	}
@@ -229,12 +231,12 @@ sheet_draw :: proc() {
 		y := row_center(step)
 		switch {
 		case music.step_is_grand_staff(step):
-			rl.DrawLineEx({BARS_X, y}, {right, y}, 1, {150, 156, 196, 255})
+			rl.DrawLineEx({bars_x(), y}, {right, y}, 1, {150, 156, 196, 255})
 		case step == 28:
 			// Middle C: dashed, the ledger line between the staves.
-			for x := f32(BARS_X); x < right; x += 8 do rl.DrawLineEx({x, y}, {min(x + 4, right), y}, 1, {120, 124, 170, 255})
+			for x := f32(bars_x()); x < right; x += 8 do rl.DrawLineEx({x, y}, {min(x + 4, right), y}, 1, {120, 124, 170, 255})
 		case:
-			rl.DrawLineEx({BARS_X, y}, {right, y}, 1, {40, 44, 70, 255})
+			rl.DrawLineEx({bars_x(), y}, {right, y}, 1, {40, 44, 70, 255})
 		}
 	}
 
@@ -266,11 +268,11 @@ sheet_draw :: proc() {
 
 	// Notes: the other layers first and dim, the active one last and bright.
 	playing_tick := g.player.playing ? player_tick(&g.player, &g.song) : -1
-	// Cello Helper, tracking on: the active layer's notes in the trail take
-	// the fingerboard's colours, fading back to the layer's as it moves on.
-	trail: [TRACK_MAX * 4]Tracked
+	// Helper, tracking on: the active layer's notes in the trail take the
+	// fingerboard's colours, fading back to the layer's as it moves on.
+	trail: [TRAIL_CAP]Tracked
 	n_trail := 0
-	when CELLO do n_trail = fb_current_trail(trail[:])
+	if g.helper do n_trail = fb_current_trail(trail[:])
 	for &tr, i in g.song.tracks do if i != g.active && !tr.metronome do notes_draw(&tr, false, playing_tick)
 	metronome_draw(playing_tick)
 	if t != nil do notes_draw(t, true, playing_tick, trail[:n_trail])
@@ -321,12 +323,12 @@ sheet_draw :: proc() {
 			if st > sheet_hi() do above += 1
 			if st < sheet_lo() do below += 1
 		}
-		if above > 0 do text(fmt.tprintf("^ %d note%s above - piano range to edit", above, above == 1 ? "" : "s"), BARS_X + 4, ROWS_Y + 2, COL_BAD)
-		if below > 0 do text(fmt.tprintf("v %d note%s below - piano range to edit", below, below == 1 ? "" : "s"), BARS_X + 4, ROWS_Y + rows_h() - 12, COL_BAD)
+		if above > 0 do text(fmt.tprintf("^ %d note%s above - piano range to edit", above, above == 1 ? "" : "s"), bars_x() + 4, ROWS_Y + 2, COL_BAD)
+		if below > 0 do text(fmt.tprintf("v %d note%s below - piano range to edit", below, below == 1 ? "" : "s"), bars_x() + 4, ROWS_Y + rows_h() - 12, COL_BAD)
 	}
 
 	strip_draw()
-	when CELLO do fingerboard_draw()
+	if g.helper do helper_draw()
 }
 
 @(private = "file")
@@ -334,7 +336,7 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tr
 	base := track_color(t)
 	ps := page_start()
 	pe := ps + page_ticks()
-	left, right := f32(BARS_X), f32(BARS_X + BARS_W)
+	left, right := f32(bars_x()), f32(bars_x() + bars_w())
 	muted := !music.track_audible(&g.song, t)
 
 	for n, i in t.notes {
@@ -398,7 +400,7 @@ notes_draw :: proc(t: ^music.Track, active: bool, playing_tick: i32, trail: []Tr
 // the clef marks.
 @(private = "file")
 gutter_draw :: proc(hov: Hover) {
-	x := f32(PANEL_W)
+	x := f32(panel_w())
 	fill(rect(x, ROWS_Y, GUTTER_W, rows_h()), COL_PANEL)
 	for step in sheet_lo() ..= sheet_hi() {
 		y := row_y(step)
@@ -440,8 +442,8 @@ gutter_draw :: proc(hov: Hover) {
 	clef :: proc(step: int, s: string) {
 		if step < sheet_lo() || step > sheet_hi() do return // not on the rows shown
 		y := row_center(step)
-		fill(rect(PANEL_W + 3, y - 6, 12, 12), COL_ACCENT)
-		text(s, PANEL_W + 6, y - 4, COL_BG)
+		fill(rect(panel_w() + 3, y - 6, 12, 12), COL_ACCENT)
+		text(s, panel_w() + 6, y - 4, COL_BG)
 	}
 	clef(32, "G")
 	clef(28, "C")
@@ -452,12 +454,12 @@ gutter_draw :: proc(hov: Hover) {
 @(private = "file")
 strip_draw :: proc() {
 	n := page_count()
-	text(fmt.tprintf("%d/%d", g.page + 1, n), PANEL_W + 4, STRIP_Y + 4, COL_DIM)
+	text(fmt.tprintf("%d/%d", g.page + 1, n), panel_w() + 4, STRIP_Y + 4, COL_DIM)
 	// The practice controls (input.odin) have the right-hand end.
-	w := min(f32(BARS_W - 30 - PRACTICE_W - 8) / f32(n), 48)
+	w := min(f32(bars_w() - 30 - PRACTICE_W - 8) / f32(n), 48)
 	play_page := g.player.playing ? player_tick(&g.player, &g.song) / page_ticks() : -1
 	for i in 0 ..< n {
-		r := rect(BARS_X + f32(i) * w, STRIP_Y, w - 2, STRIP_H)
+		r := rect(bars_x() + f32(i) * w, STRIP_Y, w - 2, STRIP_H)
 		c := COL_BUTTON
 		if i == g.page do c = COL_BUTTON_ON
 		fill(r, hovered(r) ? COL_BUTTON_HOT : c)
@@ -476,7 +478,7 @@ strip_draw :: proc() {
 		if w >= 16 do text_centered(fmt.tprintf("%d", i + 1), r, i == g.page ? COL_ACCENT : COL_DIM)
 		if ui_take_click(r) do g.page = i
 	}
-	add := rect(BARS_X + f32(n) * w, STRIP_Y, 26, STRIP_H)
+	add := rect(bars_x() + f32(n) * w, STRIP_Y, 26, STRIP_H)
 	if button(add, "+") {
 		g.song.bars = (page_count() + 1) * BARS_PER_PAGE
 		g.page = page_count() - 1
@@ -530,7 +532,7 @@ sheet_input :: proc() {
 
 	// The piano gutter: click to hear a row; right-click makes it the
 	// reference note the ratios count from (again: back to automatic).
-	gut := rect(PANEL_W, ROWS_Y, GUTTER_W, rows_h())
+	gut := rect(panel_w(), ROWS_Y, GUTTER_W, rows_h())
 	if ui_take_click(gut) {
 		step := sheet_hi() - int((g.ui.mouse.y - ROWS_Y) / row_h())
 		player_preview(&g.player, t.inst, placed_pitch(step))
@@ -547,7 +549,7 @@ sheet_input :: proc() {
 	}
 
 	if !hov.ok do return
-	area := rect(BARS_X, ROWS_Y, BARS_W, rows_h())
+	area := rect(bars_x(), ROWS_Y, bars_w(), rows_h())
 	under := music.track_note_at(t, hov.step, hov.raw_tick)
 
 	if ui_take_click(area) {
@@ -754,7 +756,7 @@ key_tonic_letter :: proc() -> int {
 key_lines_draw :: proc() {
 	tonic := key_tonic_letter()
 	for step in sheet_lo() ..= sheet_hi() {
-		r := rect(BARS_X, row_y(step), BARS_W, row_h())
+		r := rect(bars_x(), row_y(step), bars_w(), row_h())
 		switch music.key_alter(int(g.song.key), step) {
 		case 1:
 			fill(r, KEY_SHARP_ROW)

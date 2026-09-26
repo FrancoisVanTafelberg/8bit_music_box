@@ -34,7 +34,7 @@ Sound_Test :: struct {
 
 sound_test_draw :: proc() {
 	st := &g.sfx_test
-	r := rect(PANEL_W + 20, TOP_H + 20, 1280 - PANEL_W - 40, 600)
+	r := rect(panel_w() + 20, TOP_H + 20, 1280 - panel_w() - 40, 600)
 	fill(rect(0, 0, 1280, 720), {0, 0, 0, 150})
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)

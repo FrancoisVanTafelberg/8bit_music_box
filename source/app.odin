@@ -29,13 +29,16 @@ App :: struct {
 	// Came from the not-public-domain folder: saves go back there, never to
 	// songs/, so an import cannot leak into the repo by being saved.
 	private:    bool,
-	// Cello Helper: the song just opened had layers turned into cellos, and
-	// the status line says so (not overwritten by "opened ...").
-	cello_notice: bool,
-	// Cello Helper: the fingerboard's key filter. Off = every position.
+	// The Helper (helper.odin): on or off, and whether the rows were on the
+	// instrument's range before it came on.
+	helper:     bool,
+	helper_fit: bool,
+	// The fingerboard's key filter. Off = every position.
 	fb_filter:  bool,
 	fb_key:     i8,
-	fb_hand:    i8, // index into HAND_POSITIONS
+	fb_hand:    i8, // index into the board's hand positions
+	fb_inst:    music.Inst_Id, // whose board that is (fb_board_changed)
+	fb_inst_ok: bool,
 	// Tracking on the fingerboard (fingering.odin).
 	fb_track:      bool,
 	fb_track_n:    int,
@@ -134,11 +137,9 @@ game_init :: proc() {
 	g.mode = music.DEFAULT_MODE
 	g.length = .Quarter
 	g.selected = -1
-	g.fb_hand = HAND_DEFAULT
 	g.fb_track = true
 	g.fb_track_n = TRACK_DEFAULT_N
 	g.fb_track_mode = .Best
-	g.fit_range = CELLO // the Cello Helper starts on the cello's rows
 	sheet_range_update()
 	g.key_lines = true
 	g.ratio_ref = -1
@@ -150,8 +151,7 @@ game_init :: proc() {
 	player_init(&g.player)
 	if !open_last_song() {
 		music.song_init(&g.song)
-		music.song_add_track(&g.song, CELLO_KEY when CELLO else music.DEFAULT_KEY)
-		when CELLO do cello_only()
+		music.song_add_track(&g.song, music.DEFAULT_KEY)
 		metronome_sync()
 	}
 }
@@ -176,6 +176,7 @@ game_update :: proc() -> bool {
 
 	ui_begin()
 	sheet_range_update()
+	fb_board_changed()
 	files_poll_dropped()
 	metronome_sync()
 	g.audio.mode = g.mode

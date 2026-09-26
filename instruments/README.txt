@@ -40,6 +40,18 @@ The format, one block per instrument:
                                    #   (bow pressure 0..1, bow position 0..0.5 from the bridge)
   resonance 200 3 4                # 32-bit mode only: a body resonance, Hz Q dB (up to 4
                                    #   lines; "resonance none" clears them)
+  board C2 G2 D3 A3                # a fingerboard for the Helper: the open strings,
+                                   #   lowest first, up to 6 ("board none" removes it)
+  board_mm 695 23 47               # string length nut to bridge; outer strings' spread
+                                   #   at the nut and at the bridge (mm)
+  board_semis 29 20                # semitones on the board; how far the Helper shows
+                                   #   and tracks (a cello's thumb position)
+  frets 0                          # 1 = fretted (the guitar): frets drawn, notes
+                                   #   between them
+  position "1st position" 1st 2 3 4 5   # a hand position: name, button label, where
+                                   #   fingers 1-4 stop (semitones above open, 0 =
+                                   #   unused), and optionally the thumb (up to 10)
+  board_default 1st                # the position the Helper starts in
   end
 
 Every line inside a block is optional. A block starts from:
