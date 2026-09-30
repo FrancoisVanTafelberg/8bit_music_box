@@ -1,0 +1,469 @@
+# Musket shots: ten of them, to pick from (the SFX tester's < > on the Musket
+# button) or to mix in a volley so no two shots sound alike.
+#
+# Modelled on a recording of muskets firing (.temp/samples/muskets firing.m4a,
+# not kept in the repo): each of shots 1-8 was fitted, voice by voice, to one
+# shot in it - the second it is at is given - by rendering candidates through
+# this synth and matching the real shot's loudness in eight octave bands every
+# 4 ms. 9 and 10 are built from them. The long roll after each is kept at about
+# the level the clean shots in the recording die away at.
+#
+# What a musket shot is made of, and the voices here:
+#   flash  the priming powder in the pan going up, a hiss just before the
+#          charge (flintlocks only: shots 6 and 10)
+#   crack  the first instant: bright noise, a few milliseconds
+#   boom   the pressure wave: two or three cycles of a very low sine (50-75 Hz)
+#          that falls in pitch as it goes - most of a shot's weight
+#   body   the blast: noise, mid to dark, a tenth of a second or so
+#   tail   the roll of the report off the field and the trees: dark, slow
+#
+# Every shot has its own instruments (msN_...), as each needs its own decay.
+# All in group "musket", with the original musket in battle.sfx.
+
+# --- 1: close and heavy: a big, slow boom (modelled on the shot at 68.8 s) ---
+
+define_instrument ms1_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.0081 0 0.005
+tone 0.2
+end
+
+define_instrument ms1_boom
+family percussion
+gain 1
+wave sine
+envelope 0.006 0.13 0 0.02
+sweep 23 0.007
+end
+
+define_instrument ms1_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.069 0 0.02
+tone 0.035
+end
+
+define_instrument ms1_tail
+family percussion
+gain 1
+wave noise
+envelope 0.06 0.89 0 0.05
+tone 0.18
+end
+
+define_sfx musket_shot_1
+name "Musket 1"
+group musket
+voice ms1_crack  D#7   0      0.01 2.4
+voice ms1_boom   69hz  0      0.01 1.3
+voice ms1_body   G8    0      0.01 1.1
+voice ms1_tail   G8    0.0089 0.01 0.46
+end
+
+# --- 2: dark: all thump, little crack (modelled on the shot at 60.5 s) ---
+
+define_instrument ms2_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.031 0 0.005
+tone 0.29
+end
+
+define_instrument ms2_boom
+family percussion
+gain 1
+wave sine
+envelope 0.0052 0.37 0 0.02
+sweep 19 0.013
+end
+
+define_instrument ms2_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.074 0 0.02
+tone 0.028
+end
+
+define_instrument ms2_tail
+family percussion
+gain 1
+wave noise
+envelope 0.014 1.2 0 0.05
+tone 0.096
+end
+
+define_sfx musket_shot_2
+name "Musket 2"
+group musket
+voice ms2_crack  B5    0      0.01 0.81
+voice ms2_boom   67hz  0      0.01 0.77
+voice ms2_body   G8    0      0.01 3
+voice ms2_tail   G8    0.021  0.01 0.39
+end
+
+# --- 3: crisp: a sharp crack over the boom (modelled on the shot at 47.1 s) ---
+
+define_instrument ms3_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.043 0 0.005
+tone 0.4
+end
+
+define_instrument ms3_boom
+family percussion
+gain 1
+wave sine
+envelope 0.00096 0.11 0 0.02
+sweep 24 0.0052
+end
+
+define_instrument ms3_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.19 0 0.02
+tone 0.096
+end
+
+define_instrument ms3_tail
+family percussion
+gain 1
+wave noise
+envelope 0.0056 1.2 0 0.05
+tone 0.035
+end
+
+define_sfx musket_shot_3
+name "Musket 3"
+group musket
+voice ms3_crack  C8    0      0.01 0.16
+voice ms3_boom   68hz  0      0.01 1.1
+voice ms3_body   G8    0      0.01 2.3
+voice ms3_tail   G8    0.027  0.01 0.81
+end
+
+# --- 4: the heaviest boom, bright crack (modelled on the shot at 58.8 s) ---
+
+define_instrument ms4_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.016 0 0.005
+tone 0.6
+end
+
+define_instrument ms4_boom
+family percussion
+gain 1
+wave sine
+envelope 0.00062 0.17 0 0.02
+sweep 24 0.0044
+end
+
+define_instrument ms4_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.17 0 0.02
+tone 0.048
+end
+
+define_instrument ms4_tail
+family percussion
+gain 1
+wave noise
+envelope 0.06 1.2 0 0.05
+tone 0.028
+end
+
+define_sfx musket_shot_4
+name "Musket 4"
+group musket
+voice ms4_crack  G#6   0      0.01 0.24
+voice ms4_boom   71hz  0      0.01 1.3
+voice ms4_body   G8    0      0.01 0.7
+voice ms4_tail   G8    0.025  0.01 0.93
+end
+
+# --- 5: lighter: a smaller charge (modelled on the shot at 62.3 s) -----
+
+define_instrument ms5_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.0047 0 0.005
+tone 0.82
+end
+
+define_instrument ms5_boom
+family percussion
+gain 1
+wave sine
+envelope 0.0032 0.34 0 0.02
+sweep 23 0.013
+end
+
+define_instrument ms5_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.03 0 0.02
+tone 0.024
+end
+
+define_instrument ms5_tail
+family percussion
+gain 1
+wave noise
+envelope 0.0023 0.4 0 0.05
+tone 0.14
+end
+
+define_sfx musket_shot_5
+name "Musket 5"
+group musket
+voice ms5_crack  G#5   0      0.01 0.41
+voice ms5_boom   80hz  0      0.01 0.44
+voice ms5_body   G8    0      0.01 3.9
+voice ms5_tail   G8    0.0067 0.01 0.84
+end
+
+# --- 6: flintlock: the pan flashes, then the charge 30 ms later (modelled on the shot at 60.9 s) ---
+
+define_instrument ms6_flash
+family percussion
+gain 1
+wave noise
+envelope 0.0021 0.013 0 0.02
+tone 0.18
+end
+
+define_instrument ms6_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.056 0 0.005
+tone 0.21
+end
+
+define_instrument ms6_boom
+family percussion
+gain 1
+wave sine
+envelope 0.00053 0.15 0 0.02
+sweep 14 0.01
+end
+
+define_instrument ms6_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.074 0 0.02
+tone 0.55
+end
+
+define_instrument ms6_tail
+family percussion
+gain 1
+wave noise
+envelope 0.06 0.84 0 0.05
+tone 0.2
+end
+
+define_sfx musket_shot_6
+name "Musket 6"
+group musket
+voice ms6_flash  B7    0      0.01 2.4
+voice ms6_crack  G#6   0.031  0.01 2.2
+voice ms6_boom   55hz  0.031  0.01 0.7
+voice ms6_body   G8    0.031  0.01 0.39
+voice ms6_tail   G8    0.042  0.01 0.58
+end
+
+# --- 7: in the thick of it: fizzing, long roll (modelled on the shot at 12.7 s) ---
+
+define_instrument ms7_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.0041 0 0.005
+tone 0.53
+end
+
+define_instrument ms7_boom
+family percussion
+gain 1
+wave sine
+envelope 0.00053 0.4 0 0.02
+sweep 11 0.022
+end
+
+define_instrument ms7_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.41 0 0.02
+tone 0.08
+end
+
+define_instrument ms7_tail
+family percussion
+gain 1
+wave noise
+envelope 0.018 1.2 0 0.05
+tone 0.14
+end
+
+define_sfx musket_shot_7
+name "Musket 7"
+group musket
+voice ms7_crack  C8    0      0.01 0.66
+voice ms7_boom   67hz  0      0.01 0.42
+voice ms7_body   G8    0      0.01 2.7
+voice ms7_tail   G8    0.031  0.01 0.61
+end
+
+# --- 8: bright and ringing (modelled on the shot at 54.0 s) ------------
+
+define_instrument ms8_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.012 0 0.005
+tone 0.56
+end
+
+define_instrument ms8_boom
+family percussion
+gain 1
+wave sine
+envelope 0.0013 0.4 0 0.02
+sweep 13 0.0071
+end
+
+define_instrument ms8_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.33 0 0.02
+tone 0.19
+end
+
+define_instrument ms8_tail
+family percussion
+gain 1
+wave noise
+envelope 0.06 1.2 0 0.05
+tone 0.17
+end
+
+define_sfx musket_shot_8
+name "Musket 8"
+group musket
+voice ms8_crack  E7    0      0.01 0.32
+voice ms8_boom   85hz  0      0.01 0.64
+voice ms8_body   G8    0      0.01 1.4
+voice ms8_tail   G8    0.039  0.01 0.38
+end
+
+# --- 9: far off: the crack lost, a dull thud and a long roll (built from the shots above) ---
+
+define_instrument ms9_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.0047 0 0.005
+tone 0.3
+end
+
+define_instrument ms9_boom
+family percussion
+gain 1
+wave sine
+envelope 0.0032 0.44 0 0.02
+sweep 23 0.013
+end
+
+define_instrument ms9_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.03 0 0.02
+tone 0.0098
+end
+
+define_instrument ms9_tail
+family percussion
+gain 1
+wave noise
+envelope 0.03 1.4 0 0.05
+tone 0.05
+end
+
+define_sfx musket_shot_9
+name "Musket 9"
+group musket
+voice ms9_crack  G#5   0      0.01 0.049
+voice ms9_boom   80hz  0      0.01 0.28
+voice ms9_body   G8    0      0.01 2.1
+voice ms9_tail   G8    0.0067 0.01 0.53
+end
+
+# --- 10: a slow lock: a hiss in the pan, then the bang 90 ms later (built from the shots above) ---
+
+define_instrument ms10_flash
+family percussion
+gain 1
+wave noise
+envelope 0.0021 0.013 0 0.02
+tone 0.18
+end
+
+define_instrument ms10_crack
+family percussion
+gain 1
+wave noise
+envelope 0.0005 0.043 0 0.005
+tone 0.4
+end
+
+define_instrument ms10_boom
+family percussion
+gain 1
+wave sine
+envelope 0.00096 0.11 0 0.02
+sweep 24 0.0052
+end
+
+define_instrument ms10_body
+family percussion
+gain 1
+wave noise
+envelope 0.001 0.19 0 0.02
+tone 0.096
+end
+
+define_instrument ms10_tail
+family percussion
+gain 1
+wave noise
+envelope 0.0056 1.2 0 0.05
+tone 0.035
+end
+
+define_sfx musket_shot_10
+name "Musket 10"
+group musket
+voice ms10_flash B7    0      0.01 2.4
+voice ms10_crack C8    0.09   0.01 0.16
+voice ms10_boom  68hz  0.09   0.01 1.1
+voice ms10_body  G8    0.09   0.01 2.3
+voice ms10_tail  G8    0.12   0.01 0.81
+end

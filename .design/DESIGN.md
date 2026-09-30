@@ -427,6 +427,7 @@ music.mixer_set_instrument(&m, march, "trumpet", false)  // every layer playing 
 music.mixer_solo_layer(&m, march, "Trumpet 2")           // only this layer
 music.mixer_set_all_layers(&m, march, true)              // everything back
 music.mixer_play_sfx(&m, "cannon", pan = -0.4, vary = 1)
+music.mixer_play_sfx_at(&m, "cannon", x = 0.1)            // where it is on screen, 0..1
 music.mixer_stop_song(&m, march, fade_out = 3)
 
 // every frame:
@@ -437,8 +438,8 @@ music_rl.output_update(&out, &m)
 |---|---|
 | **Songs** | `mixer_play_song_file` / `mixer_play_song` (a `Song` already in memory) → a `Song_Handle`. Up to 4 at once (the music, a fanfare over it). Loop, fade in, `mixer_stop_song` with a fade out, `mixer_set_song_volume` over time, `mixer_song_playing`, `mixer_song_time` |
 | **Layers** | by layer name ("Trumpet 1"): `mixer_set_layer`, `mixer_set_layer_gain`, `mixer_solo_layer`, `mixer_layer_on`. By instrument key, reaching every layer that plays it ("trumpet"): `mixer_set_instrument`, `mixer_set_instrument_gain`, `mixer_solo_instrument`, `mixer_instrument_on`. `mixer_set_all_layers` for everything. Names ignore case; setters return how many layers they changed. `mixer_layer_count` / `mixer_layer_name` list them for a menu |
-| **Bursts** | `mixer_play_sfx_burst(key, count, seconds, volume, pan_spread, vary)`: many of one effect, start times drawn from a normal distribution (σ = seconds/6, redrawn if outside), each shot with its own pitch, loudness and pan; the group scaled by 1/√(shots in the busiest 50 ms) so it does not clip. One handle for all. The editor's SFX tester uses it |
-| **Sound effects** | `mixer_play_sfx(key, volume, pan, pitch, vary)` → a `Sfx_Handle`; `vary` shifts each shot by a random amount so ten muskets are not one musket ten times; `mixer_stop_sfx`. `mixer_play_note(inst_key, midi)` plays a single orchestra note (a UI blip, a stinger) |
+| **Bursts** | `mixer_play_sfx_burst(key, count, seconds, volume, pan_spread, vary, pan)`: many of one effect, start times drawn from a normal distribution (σ = seconds/6, redrawn if outside), each shot with its own pitch, loudness and pan (`pan` ± `pan_spread`); the group scaled by 1/√(shots in the busiest 50 ms) so it does not clip. One handle for all. `mixed = true`: each shot a random member of the key's group. The editor's SFX tester uses it |
+| **Sound effects** | `mixer_play_sfx(key, volume, pan, pitch, vary)` → a `Sfx_Handle`; `vary` shifts each shot by a random amount so ten muskets are not one musket ten times; `mixer_stop_sfx`. **Pan is a balance, not a pan law:** p = (pan+1)/2, left = min(1, 2(1-p)), right = min(1, 2p) - the near ear stays at full level and only the far ear drops (pan -1: left only; 0: both full; +1: right only). `mixer_play_sfx_at(key, x, ...)` takes a screen position instead (0 left edge, 0.5 middle, 1 right edge; `screen_pan(x)` converts), so a cannon on the left of the screen sounds from the left. Music keeps its constant-power pan. The SFX tester's **position** slider (with a meter per ear) tries it. `mixer_play_sfx_group(group, ...)`: a random one of a group (below). `mixer_play_note(inst_key, midi)` plays a single orchestra note (a UI blip, a stinger) |
 | **Levels** | `master`, `music_volume`, `sfx_volume`: plain fields, the options-menu sliders |
 | **Output** | `mixer_render(&m, block)` fills any block of stereo f32 at 44.1 kHz. `music_rl` does it for raylib; any other audio API works the same way |
 
@@ -457,6 +458,31 @@ instruments of their own that stay out of the editor's list (see `sounds/README.
 `sounds/battle.sfx` has a cannon (a falling triangle thump, dark noise, a bright crack and a
 long rumble), a distant cannon, a musket and a ragged volley, a sword clash (inharmonic
 sine partials over metallic noise), a sword being drawn, a ship's bell and a splash.
+
+**Groups.** `group <name>` in a `define_sfx` makes it one of a set of variations. The SFX
+tester shows a group as one button with **<** **>** either side to step through it;
+`mixer_play_sfx_group(group, ...)` plays a random member; `mixer_play_sfx_burst(..., mixed =
+true)` makes every shot of a burst a random member of the key's group (the tester's
+**all mixed** / **this one only** toggle). A key always plays that one effect, so
+`"musket"` the key is the original and `"musket"` the group is any of eleven.
+
+**The musket shots** (`sounds/musket_shots.sfx`, `musket_shot_1` .. `_10`, group
+`musket` with the original) were modelled on a recording of muskets firing (kept out of
+the repo, in `.temp/samples/`). From it, a musket shot is: a few ms of bright crack; then
+the pressure wave - two or three cycles of 50-75 Hz, by far the most energy, falling a
+little in pitch; a burst of mid-to-dark noise for a tenth of a second; and the report
+rolling off the field for most of a second, 12-20 dB down. Flintlocks can show the pan
+flash, a hiss 25-110 ms before the charge. So each shot is four voices (five with a
+flash): crack (noise), boom (a sine with a downward sweep), body and tail (noise). Shots
+1-8 were each fitted to one clean shot in the recording: candidates rendered through
+this synth (the render tool), scored on loudness in eight octave bands every 4 ms against
+the real shot plus the background before it, refined by an evolutionary search. The tail
+level was then set from the clean shots (the recording is a dense battle, so every tail
+there has other shots in it), and the heads levelled to the original musket's. 9 (far
+off) and 10 (a slow lock: 90 ms from pan to charge) are built from them. The body and
+tail noise run the noise channel at G8 (clocked above the sample rate: white) and take
+their colour from `tone` alone - a slow-clocked LFSR under a long tail sounds as a faint
+whistle at the clock rate.
 
 ### 4.3 The Helper (fingerboards)
 

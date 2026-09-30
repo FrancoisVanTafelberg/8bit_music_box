@@ -42,6 +42,7 @@ Ui_State :: struct {
 	right:   bool,
 	wheel:   f32,
 	down:    bool,
+	slider:  rawptr, // the value a slider is being dragged for (slider)
 }
 
 ui_begin :: proc() {
@@ -171,3 +172,30 @@ stepper :: proc(r: rl.Rectangle, value, lo, hi, unit, reset: f32, shown: string)
 	v = f32(int(v / unit + (v >= 0 ? 0.5 : -0.5))) * unit
 	return clamp(v, lo, hi)
 }
+
+// A slider along `r` for `value` (lo .. hi): click or drag anywhere on it;
+// the wheel nudges it by `step`; right-click puts it back to `reset`. The
+// drag carries on while the button is held, off the slider or not.
+slider :: proc(r: rl.Rectangle, value: ^f32, lo, hi, step, reset: f32) {
+	if ui_take_click(r) do g.ui.slider = value
+	if g.ui.slider == value {
+		if g.ui.down {
+			t := clamp((g.ui.mouse.x - r.x) / r.width, 0, 1)
+			v := lo + (hi - lo) * t
+			value^ = f32(int(v / step + 0.5)) * step // whole steps
+		} else {
+			g.ui.slider = nil
+		}
+	}
+	if w := ui_take_wheel(r); w != 0 do value^ = value^ + (w > 0 ? step : -step)
+	if ui_take_right(r) do value^ = reset
+	value^ = clamp(value^, lo, hi)
+	// The track, and the knob.
+	mid := r.y + r.height / 2
+	fill(rect(r.x, mid - 2, r.width, 4), COL_BUTTON)
+	kx := r.x + (value^ - lo) / (hi - lo) * r.width
+	fill(rect(r.x, mid - 2, kx - r.x, 4), with_alpha(COL_ACCENT, 120))
+	fill(rect(kx - 5, r.y, 10, r.height), g.ui.slider == value || hovered(r) ? COL_ACCENT : lighten(COL_BUTTON_ON, 0.3))
+	outline(rect(kx - 5, r.y, 10, r.height), COL_EDGE)
+}
+

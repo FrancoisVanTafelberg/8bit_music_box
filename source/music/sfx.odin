@@ -17,6 +17,7 @@ package music
         define_sfx cannon
         name "Cannon"
         volume 1
+        group cannons   # optional: variations of one sound, stepped through with < >
         # voice <instrument> <pitch> <start s> <length s> [volume] [pan]
         voice boom  A1   0     0.8
         voice blast C3   0     0.5  0.9
@@ -58,6 +59,10 @@ Sfx :: struct {
 	key:    string,
 	name:   string,
 	volume: f32,
+	// Variations of one sound share a group ("musket"): the SFX tester shows
+	// them as one button with < > to step through them, and a game can pick
+	// one at random (mixer_play_sfx_group). "" = on its own.
+	group:  string,
 	voices: [dynamic]Sfx_Voice,
 	source: string, // the .sfx file
 }
@@ -139,6 +144,9 @@ sfx_bank_load_dir :: proc(b: ^Sfx_Bank, orchestra: ^Registry, dir: string, rep: 
 			switch l.cmd {
 			case "name":
 				if len(a) >= 1 do name = a[0]
+			case "group":
+				if len(a) >= 1 do fx.group = own(b, a[0])
+				else do append(&rep.errors, fmt.aprintf("%s:%d: group needs a name", where_, l.no))
 			case "volume":
 				if v, ok := num(a, 0, 1); ok && len(a) > 0 do fx.volume = v
 				else do append(&rep.errors, fmt.aprintf("%s:%d: volume needs a number", where_, l.no))
@@ -214,6 +222,7 @@ sfx_event :: proc(sv: Sfx_Voice, volume, pan, pitch: f32, at: int) -> Event {
 		midi  = sv.midi + pitch,
 		amp   = sv.volume * volume * sv.ins.gain,
 		pan   = clamp(sv.pan + pan, -1, 1),
+		balance = true,
 		track = -1,
 	}
 }

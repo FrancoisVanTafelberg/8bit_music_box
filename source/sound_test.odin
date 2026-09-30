@@ -4,12 +4,22 @@ package app
     The sound effect tester: the SFX button in the top bar (music box only).
 
     Every sound effect in sounds/ as a button - click one to hear it (with a
-    little random pitch, as a game would play it). Below, "many at once":
+    little random pitch, as a game would play it). A group of variations
+    (`group musket` in the .sfx files: the musket shots) is one button, with
+    < > either side to step through them, each played as it comes up. Below, "many at once":
     fire N of the selected sound over a stretch of seconds, bunched along a
     bell curve - a shot or two alone at first, most of them together in the
     middle, stragglers at the end - through music.mixer_play_sfx_burst, the
     same call a game would make. The histogram shows when each shot fell, with
-    the playhead moving across it.
+    the playhead moving across it. For a grouped sound, "all mixed" makes
+    each shot a random one of the group (mixer_play_sfx_burst's `mixed`).
+
+    Where on the screen: the position slider, 0 % the left edge, 50 % the
+    middle, 100 % the right edge. A balance, not a pan: in the middle both
+    ears hear it at full; moving it left turns the right ear down (to nothing
+    at the edge), never the left up - a cannon at 10 % is 100 % left, 20 %
+    right. Clicks and bursts both play there (music.mixer_play_sfx_at /
+    screen_pan, what a game would call with the cannon's x on its screen).
 */
 
 import "core:fmt"
@@ -23,7 +33,12 @@ Sound_Test :: struct {
 	count:    int,
 	seconds:  f32,
 	volume:   f32,
-	spread:   bool, // across the stereo field, or all in the middle
+	spread:   bool, // across the stereo field, or all at one place
+	mixed:    bool, // a burst of a grouped sound: every shot any of the group
+	// Which member each group's button is showing, by the button's place
+	// among the buttons (a group's buttons steps through them with < >).
+	group_pick: [64]i32,
+	position: f32, // where on the screen: 0 left edge .. 0.5 middle .. 1 right edge
 	// The last burst, for the histogram.
 	times:    [SOUND_TEST_MAX]f32,
 	n:        int,
@@ -49,27 +64,96 @@ sound_test_draw :: proc() {
 	}
 	st.selected = clamp(st.selected, 0, len(list) - 1)
 
-	// The effects.
+	// The effects: one button each, or one for a whole group of variations
+	// (the musket shots) with < > either side to step through them.
 	cols := 4
 	bw := (r.width - 24 - f32(cols - 1) * 8) / f32(cols)
+	slot := 0
 	for fx, i in list {
-		br := rect(r.x + 12 + f32(i % cols) * (bw + 8), r.y + 58 + f32(i / cols) * 26, bw, 22)
-		if button(br, fmt.tprintf("%s  (%s)", fx.name, fx.key), i == st.selected) {
-			st.selected = i
-			music.mixer_play_sfx(&g.audio, fx.key, vary = 0.7)
+		if fx.group != "" && sfx_group_first(list, fx.group) != i do continue // shown on its group's button
+		br := rect(r.x + 12 + f32(slot % cols) * (bw + 8), r.y + 58 + f32(slot / cols) * 26, bw, 22)
+		if fx.group == "" {
+			if button(br, fmt.tprintf("%s  (%s)", fx.name, fx.key), i == st.selected) {
+				st.selected = i
+				music.mixer_play_sfx_at(&g.audio, fx.key, st.position, vary = 0.7)
+			}
+		} else {
+			// The member showing: the selected one if it is in this group,
+			// else the one it showed last.
+			pick := &st.group_pick[min(slot, len(st.group_pick) - 1)]
+			if list[st.selected].group == fx.group do pick^ = i32(st.selected)
+			if int(pick^) >= len(list) || list[pick^].group != fx.group do pick^ = i32(i)
+			cur := int(pick^)
+			in_group := list[st.selected].group == fx.group
+			step := 0
+			if button(rect(br.x, br.y, 20, br.height), "<", in_group) do step = -1
+			if button(rect(br.x + br.width - 20, br.y, 20, br.height), ">", in_group) do step = 1
+			mid := rect(br.x + 24, br.y, br.width - 48, br.height)
+			n, at := sfx_group_place(list, cur)
+			play := button(mid, fmt.tprintf("%s  (%s)", list[cur].name, list[cur].key), in_group)
+			if step != 0 {
+				cur = sfx_group_step(list, cur, step)
+				pick^ = i32(cur)
+				play = true
+				n, at = sfx_group_place(list, cur)
+			}
+			if play {
+				st.selected = cur
+				music.mixer_play_sfx_at(&g.audio, list[cur].key, st.position, vary = 0.7)
+				set_status("%s: %d of %d (< > for the others)", list[cur].name, at + 1, n)
+			}
 		}
+		slot += 1
 	}
-	y := r.y + 58 + f32((len(list) + cols - 1) / cols) * 26 + 16
+	y := r.y + 58 + f32((slot + cols - 1) / cols) * 26 + 12
+
+	// Where on the screen it happens.
+	{
+		x := r.x + 12
+		label("position", x, y + 5)
+		sr := rect(x + 60, y, 360, 20)
+		// The screen, as the slider's backdrop: its edges and middle marked.
+		fill(rect(sr.x - 6, sr.y - 2, sr.width + 12, sr.height + 4), COL_SHEET)
+		for m in ([3]f32{0, 0.5, 1}) {
+			mx := sr.x + m * sr.width
+			rl.DrawLineEx({mx, sr.y - 2}, {mx, sr.y + sr.height + 2}, 1, COL_FAINT)
+		}
+		slider(sr, &st.position, 0, 1, 0.01, 0.5)
+		text("left edge", sr.x - 6, sr.y + sr.height + 4, COL_FAINT)
+		text("middle", sr.x + sr.width / 2 - text_width("middle") / 2, sr.y + sr.height + 4, COL_FAINT)
+		text("right edge", sr.x + sr.width + 6 - text_width("right edge"), sr.y + sr.height + 4, COL_FAINT)
+		// What each ear hears.
+		p := st.position
+		left, right := min(1, 2 * (1 - p)), min(1, 2 * p)
+		tx := sr.x + sr.width + 20
+		text(fmt.tprintf("%d%%", int(p * 100 + 0.5)), tx, y + 5, COL_TEXT)
+		ear :: proc(name: string, v: f32, x, y: f32) {
+			text(name, x, y + 5, COL_DIM)
+			b := rect(x + 36, y + 4, 80, 12)
+			fill(b, COL_SHEET)
+			fill(rect(b.x, b.y, b.width * v, b.height), COL_GOOD)
+			outline(b, COL_EDGE)
+			text(fmt.tprintf("%d%%", int(v * 100 + 0.5)), b.x + b.width + 6, y + 5, COL_TEXT)
+		}
+		ear("left", left, tx + 44, y)
+		ear("right", right, tx + 210, y)
+		y += 40
+	}
 
 	// Many at once.
 	fx := &list[st.selected]
 	rl.DrawLine(i32(r.x + 12), i32(y), i32(r.x + r.width - 12), i32(y), COL_EDGE)
 	y += 10
-	text(fmt.tprintf("Many at once: %s", fx.name), r.x + 12, y, COL_TEXT, FONT_BIG)
+	grouped := fx.group != ""
+	mixed := grouped && st.mixed
+	n_group, _ := sfx_group_place(list, st.selected)
+	text(mixed ? fmt.tprintf("Many at once: all %d of the %s group, mixed", n_group, fx.group) : fmt.tprintf("Many at once: %s", fx.name), r.x + 12, y, COL_TEXT, FONT_BIG)
 	y += 30
 	// A burst can hold at most this many shots of this effect (the mixer's
 	// voice limit, shared by every voice of every shot).
-	most := clamp(music.MAX_SFX_VOICES / max(len(fx.voices), 1), 1, SOUND_TEST_MAX)
+	voices := len(fx.voices)
+	if mixed do for o in list do if o.group == fx.group do voices = max(voices, len(o.voices))
+	most := clamp(music.MAX_SFX_VOICES / max(voices, 1), 1, SOUND_TEST_MAX)
 	st.count = clamp(st.count, 1, most)
 
 	x := r.x + 12
@@ -85,20 +169,24 @@ sound_test_draw :: proc() {
 	x += 44
 	st.volume = stepper(rect(x, y, 80, 20), st.volume, 0.01, 3, 0.01, 1, fmt.tprintf("%d%%", int(st.volume * 100 + 0.5)))
 	x += 94
-	if button(rect(x, y, 96, 20), st.spread ? "spread L-R" : "all centre", st.spread) do st.spread = !st.spread
+	if button(rect(x, y, 96, 20), st.spread ? "spread out" : "all at one", st.spread) do st.spread = !st.spread
 	x += 110
+	if grouped {
+		if button(rect(x, y, 110, 20), st.mixed ? "all mixed" : "this one only", st.mixed) do st.mixed = !st.mixed
+		x += 118
+	}
 	if button(rect(x, y, 110, 20), "Play burst", true) {
 		music.mixer_stop_sfx(&g.audio, st.handle)
 		st.n = st.count
 		st.span = st.seconds
-		st.handle = music.mixer_play_sfx_burst(&g.audio, fx.key, st.count, st.seconds, st.volume, st.spread ? 0.8 : 0, 1, st.times[:st.n])
+		st.handle = music.mixer_play_sfx_burst(&g.audio, fx.key, st.count, st.seconds, st.volume, st.spread ? 0.8 : 0, 1, st.times[:st.n], music.screen_pan(st.position), mixed)
 		st.at = rl.GetTime()
 		set_status("%d x %s over %.2f s", st.count, fx.name, st.seconds)
 	}
 	x += 118
 	if button(rect(x, y, 56, 20), "Stop") do music.mixer_stop_all_sfx(&g.audio, 0.05)
 	y += 26
-	text(fmt.tprintf("-/+: click 1, Shift+click 10, Ctrl+click 100 (seconds in tenths, volume in %%); wheel too, right-click resets. At most %d shots of this one (%d voices each).", most, len(fx.voices)), r.x + 12, y, COL_FAINT)
+	text(fmt.tprintf("-/+: click 1, Shift+click 10, Ctrl+click 100 (seconds in tenths, volume in %%); wheel too, right-click resets. At most %d shots of this one (%d voices each).", most, voices), r.x + 12, y, COL_FAINT)
 	y += 22
 
 	// When each shot of the last burst fell.
@@ -135,4 +223,34 @@ sound_test_draw :: proc() {
 	text(end, hr.x + hr.width - text_width(end), hr.y + hr.height + 4, COL_FAINT)
 
 	if hovered(r) do ui_take_all()
+}
+
+// Where the first of a group is in the list.
+@(private = "file")
+sfx_group_first :: proc(list: []music.Sfx, group: string) -> int {
+	for s, i in list do if s.group == group do return i
+	return -1
+}
+
+// How many are in list[i]'s group, and which of them it is (1 and 0 alone).
+@(private = "file")
+sfx_group_place :: proc(list: []music.Sfx, i: int) -> (n, at: int) {
+	if list[i].group == "" do return 1, 0
+	for s, k in list {
+		if s.group != list[i].group do continue
+		if k == i do at = n
+		n += 1
+	}
+	return
+}
+
+// The next (dir 1) or previous (-1) member of list[i]'s group, round and round.
+@(private = "file")
+sfx_group_step :: proc(list: []music.Sfx, i, dir: int) -> int {
+	k := i
+	for _ in 0 ..< len(list) {
+		k = (k + dir + len(list)) % len(list)
+		if list[k].group == list[i].group do return k
+	}
+	return i
 }

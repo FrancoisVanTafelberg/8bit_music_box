@@ -89,6 +89,9 @@ Event :: struct {
 	midi:    f32,
 	amp:     f32, // velocity × track volume × instrument gain
 	pan:     f32,
+	// Sound effects: `pan` is a balance - the far side turned down, the near
+	// side never up (see voice_make). Music: constant power.
+	balance: bool,
 	// Where it came from, so the sheet can light it up.
 	track:   int,
 	note:    int,
@@ -384,9 +387,18 @@ voice_make :: proc(ev: Event, ins: Instrument, mode: Sound_Mode) -> Voice {
 		}
 		for k in 0 ..< int(ins.n_resonances) do v.body[k] = biquad_peak(ins.resonances[k])
 	}
-	// Constant-power pan.
-	a := (v.ev.pan + 1) * math.PI / 4
-	v.gl, v.gr = math.cos(a), math.sin(a)
+	if v.ev.balance {
+		// A balance, for sound effects placed on the screen: in the middle
+		// both ears at full; towards one side, the other ear turned down,
+		// to nothing at the edge - never either up. pan -1 = the left edge
+		// (left 100 %, right 0 %), +1 the right edge.
+		p := (clamp(v.ev.pan, -1, 1) + 1) / 2 // 0 left .. 1 right
+		v.gl, v.gr = min(1, 2 * (1 - p)), min(1, 2 * p)
+	} else {
+		// Constant-power pan: the orchestra's seating.
+		a := (v.ev.pan + 1) * math.PI / 4
+		v.gl, v.gr = math.cos(a), math.sin(a)
+	}
 	return v
 }
 

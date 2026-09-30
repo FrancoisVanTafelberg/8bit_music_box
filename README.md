@@ -93,7 +93,7 @@ Songs the old Cello Helper saved in `cello_songs\` still show in Open, marked [c
 | **Edit** | drag to move, right-click to delete, mouse wheel on a note = up/down a semitone |
 | **Range** | the **piano** / **inst** button next to the key: the whole piano range, or only the selected layer's instrument (taller rows). Starts on piano; the Helper switches to inst while it is on. Notes outside the range are red on the piano range and counted at the sheet's edge on inst - switch to piano to move or delete them |
 | **Key lines** | the **lines** button next to the key: rows the key signature sharpens or flattens are tinted and named (F#, Bb) in the note column, and the rows of the key's home chord are marked - tonic brightest, 3rd and 5th fainter. Each row also shows its frequency ratio to a reference note (the tonic at or below the layer's first note): with C5 as 1:1, C6 is 2:1, G5 3:2, E5 5:4, C4 1:2. Right-click a row's name to make it the reference; right-click it again for automatic. On by default |
-| **Sound effects** | the **SFX** button (top right): every sound effect in `sounds/`, click to hear; "many at once" fires N of one over a few seconds (the -/+ take Shift for 10 and Ctrl for 100 at a time, the wheel works too, right-click resets), bunched on a bell curve (e.g. 100 muskets in 2 s), with a chart of when each fell |
+| **Sound effects** | the **SFX** button (top right): every sound effect in `sounds/`, click to hear (a set of variations - the ten musket shots - is one button with **<** **>** to step through them), from where the **position** slider puts it on the screen (0% the left edge: left ear only; 50% the middle: both; 100% the right edge: right ear only - the far ear gets softer, the near one never louder); "many at once" fires N of one over a few seconds (the -/+ take Shift for 10 and Ctrl for 100 at a time, the wheel works too, right-click resets), bunched on a bell curve (e.g. 100 muskets in 2 s), **all mixed** for a random one of the set each shot, with a chart of when each fell |
 | **Octave copy** | `Ctrl`+click a note: a copy of it an octave lower, same place and length; `Shift`+click: an octave higher |
 | **Selected note** | `Alt+↑/↓` a staff step, `Alt+Shift+↑/↓` a semitone, `Alt+←/→` a slot, `Del` removes it |
 | **Bars** | `←` back to the start of the bar (at its start already: the bar before), `→` the start of the next bar - while playing it jumps there; stopped, it moves the bar cursor (the gold marker) that Play starts from |
@@ -157,6 +157,8 @@ and your songs:
     music.mixer_set_layer(&m, march, "Trumpet 1", false)      // one layer, by its name
     music.mixer_set_instrument(&m, march, "trumpet", false)   // every layer playing it
     music.mixer_play_sfx(&m, "cannon")
+    music.mixer_play_sfx_at(&m, "cannon", 0.1)    // on screen: 0 left edge .. 1 right edge
+    music.mixer_play_sfx_group(&m, "musket")      // any of the musket shots
 
     music_rl.output_update(&out, &m)             // every frame
 

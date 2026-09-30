@@ -362,7 +362,10 @@ mixer_sync_song :: proc(m: ^Mixer, h: Song_Handle, song: ^Song) {
 // Sound effects
 // ---------------------------------------------------------------------------
 
-// Play a sound effect from the .sfx files. `pan` -1 left .. +1 right; `pitch`
+// Play a sound effect from the .sfx files. `pan` -1 left .. +1 right, as a
+// balance: 0 is both ears at full; -1 the left ear only (the right turned
+// down to nothing), +1 the right only - one side is only ever turned down,
+// never up (mixer_play_sfx_at takes a place on the screen instead). `pitch`
 // shifts it in semitones; `vary` picks a random shift up to that many
 // semitones either way, so ten musket shots are not one shot ten times.
 // Returns 0 if there is no such sound effect.
@@ -378,6 +381,45 @@ mixer_play_sfx :: proc(m: ^Mixer, key: string, volume: f32 = 1, pan: f32 = 0, pi
 	return h
 }
 
+// One of a group of sound effects at random ("musket": any of the musket
+// shots), so a battle does not fire the same shot twice in a row as often.
+// Returns 0 if no sound effect is in that group.
+mixer_play_sfx_group :: proc(m: ^Mixer, group: string, volume: f32 = 1, pan: f32 = 0, pitch: f32 = 0, vary: f32 = 0) -> Sfx_Handle {
+	fx := sfx_random_of(m, group)
+	if fx == nil do return 0
+	return mixer_play_sfx(m, fx.key, volume, pan, pitch, vary)
+}
+
+// A random member of a group, or nil.
+@(private)
+sfx_random_of :: proc(m: ^Mixer, group: string) -> ^Sfx {
+	if group == "" do return nil
+	n := 0
+	for &s in m.sounds.list do if s.group == group do n += 1
+	if n == 0 do return nil
+	k := min(int(rand_unit(m) * f32(n)), n - 1)
+	for &s in m.sounds.list {
+		if s.group != group do continue
+		if k == 0 do return &s
+		k -= 1
+	}
+	return nil
+}
+
+// A sound effect where it happens on the screen: `x` 0 at its left edge, 0.5
+// the middle, 1 the right edge - a cannon firing on the left at x 0.1 is
+// heard in the left ear at full and in the right at 20 %.
+//
+//     music.mixer_play_sfx_at(&mixer, "cannon", cannon_x / screen_width)
+mixer_play_sfx_at :: proc(m: ^Mixer, key: string, x: f32, volume: f32 = 1, pitch: f32 = 0, vary: f32 = 0) -> Sfx_Handle {
+	return mixer_play_sfx(m, key, volume, screen_pan(x), pitch, vary)
+}
+
+// A place across the screen (0 left edge .. 1 right edge) as a pan.
+screen_pan :: proc(x: f32) -> f32 {
+	return clamp(x, 0, 1) * 2 - 1
+}
+
 // Many of the same sound effect at once: `count` shots spread over
 // `seconds`, clustered along a bell curve - a shot or two alone at first,
 // most of them together in the middle, a few stragglers at the end. A line of
@@ -385,11 +427,13 @@ mixer_play_sfx :: proc(m: ^Mixer, key: string, volume: f32 = 1, pan: f32 = 0, pi
 //
 // Each shot gets its own small differences: pitch (up to `vary` semitones
 // either way), loudness (as if some are further away), and place in the
-// stereo field (up to `pan_spread` either side). The shots are scaled down as
+// stereo field (up to `pan_spread` either side of `pan`). The shots are scaled down as
 // a group so a hundred of them do not simply clip: `volume` 1 is about as loud
 // as the thickest moment should be. All of them share one handle, so
 // mixer_stop_sfx stops the whole burst. `times`, if given, is filled with each
-// shot's start in seconds (for drawing them). Returns 0 for an unknown key.
+// shot's start in seconds (for drawing them). `mixed`: each shot is any
+// sound effect in `key`'s group, at random (ten different musket shots, not
+// one ten times). Returns 0 for an unknown key.
 mixer_play_sfx_burst :: proc(
 	m: ^Mixer,
 	key: string,
@@ -399,6 +443,8 @@ mixer_play_sfx_burst :: proc(
 	pan_spread: f32 = 0.8,
 	vary: f32 = 1,
 	times: []f32 = nil,
+	pan: f32 = 0, // where the burst is, as for mixer_play_sfx (screen_pan for a place on the screen)
+	mixed := false,
 ) -> Sfx_Handle {
 	fx, ok := sfx_find(&m.sounds, key)
 	if !ok || count <= 0 do return 0
@@ -426,9 +472,13 @@ mixer_play_sfx_burst :: proc(
 		at := m.frame + int(t * RATE)
 		shift := (rand_unit(m) * 2 - 1) * vary
 		loud := group * (0.55 + 0.45 * rand_unit(m))
-		pan := (rand_unit(m) * 2 - 1) * pan_spread
-		for sv in fx.voices {
-			ev := sfx_event(sv, fx.volume * loud, pan, shift, at)
+		shot_pan := clamp(pan + (rand_unit(m) * 2 - 1) * pan_spread, -1, 1)
+		shot := fx
+		if mixed {
+			if r := sfx_random_of(m, fx.group); r != nil do shot = r
+		}
+		for sv in shot.voices {
+			ev := sfx_event(sv, shot.volume * loud, shot_pan, shift, at)
 			sfx_add(m, voice_make(ev, sv.ins, m.mode), h)
 		}
 	}

@@ -153,7 +153,7 @@ game_init :: proc() {
 	sheet_range_update()
 	g.key_lines = true
 	g.ratio_ref = -1
-	g.sfx_test = {count = 100, seconds = 2, volume = 1, spread = true}
+	g.sfx_test = {count = 100, seconds = 2, volume = 1, spread = true, position = 0.5}
 	input_init()
 	files_init()
 	music.mixer_init(&g.audio)
