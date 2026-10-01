@@ -9,6 +9,7 @@ define_instrument pulse_lead
 name "Pulse Lead"
 family chip
 range C2 C7
+clef treble
 wave pulse 0.25
 layer none
 envelope 0.002 0.1 0.75 0.03
@@ -26,6 +27,7 @@ define_instrument square_lead
 name "Square Lead"
 family chip
 range C2 C7
+clef treble
 wave pulse 0.5
 layer none
 envelope 0.002 0.1 0.75 0.03
@@ -43,6 +45,7 @@ define_instrument triangle_bass
 name "Triangle Bass"
 family chip
 range A0 C5
+clef bass
 wave triangle
 layer none
 envelope 0.002 0.05 1 0.02

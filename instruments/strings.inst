@@ -28,6 +28,7 @@ define_instrument violin
 name "Violin"
 family strings
 range G3 G7
+clef treble
 wave saw
 layer none
 envelope 0.03 0.1 0.85 0.08
@@ -65,6 +66,7 @@ define_instrument viola
 name "Viola"
 family strings
 range C3 E6
+clef alto treble
 wave saw
 layer none
 envelope 0.04 0.1 0.85 0.1
@@ -106,6 +108,7 @@ define_instrument cello
 name "Cello"
 family strings
 range C2 C6
+clef bass tenor treble
 wave saw
 layer none
 envelope 0.05 0.12 0.85 0.12
@@ -151,6 +154,7 @@ define_instrument contrabass
 name "Contrabass"
 family strings
 range E1 G4
+clef bass_8vb
 wave pulse 0.5
 layer saw 0.4 0
 envelope 0.05 0.15 0.8 0.12
@@ -192,6 +196,7 @@ define_instrument harp
 name "Harp"
 family strings
 range C1 G7
+clef grand
 wave triangle
 layer pulse 0.15 12
 envelope 0.002 1.6 0 0.4
@@ -212,6 +217,7 @@ define_instrument guitar
 name "Guitar"
 family strings
 range E2 B5
+clef treble_8vb
 wave triangle
 layer pulse 0.18 12
 envelope 0.002 1.4 0 0.25

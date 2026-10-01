@@ -15,6 +15,7 @@ define_instrument bugle
 based_on trumpet
 name "Bugle"
 range C4 B5
+clef treble
 wave pulse 0.5
 layer saw 0.35 0
 envelope 0.012 0.1 0.8 0.05
@@ -29,6 +30,7 @@ end
 # tell apart.
 define_instrument fife_low
 based_on fife
+clef treble_8va
 name "Fife (2nd)"
 wave pulse 0.5
 layer triangle 0.7 0
@@ -44,6 +46,7 @@ end
 # british_grenadiers.song; moved here so every marching song can share it.)
 define_instrument side_drum
 based_on field_drum
+clef percussion
 name "Side Drum"
 envelope 0.001 0.2 0 0.05
 tone 0.68

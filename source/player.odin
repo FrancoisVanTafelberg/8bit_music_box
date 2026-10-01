@@ -181,7 +181,8 @@ scope_end :: proc(from: i32) -> i32 {
 	case .Bar:
 		return (from / bt + 1) * bt
 	case .Page:
-		per := bt * BARS_PER_PAGE
+		per := page_ticks()
+		_ = bt
 		return (from / per + 1) * per
 	}
 	return 0
@@ -222,8 +223,8 @@ toggle_play :: proc(from_start: bool) {
 // Where Play starts: the bar cursor (set by the left and right arrows) if it
 // is on the page being shown, otherwise the start of that page.
 play_from :: proc() -> i32 {
-	ps := g.page * music.bar_ticks(&g.song) * BARS_PER_PAGE
-	pe := ps + music.bar_ticks(&g.song) * BARS_PER_PAGE
+	ps := g.page * page_ticks()
+	pe := ps + page_ticks()
 	if g.cursor_tick >= ps && g.cursor_tick < pe do return g.cursor_tick
 	return ps
 }
@@ -245,7 +246,7 @@ bar_step :: proc(dir: int) {
 	last := max(music.song_end_tick(&g.song) / bt, g.song.bars - 1)
 	target = clamp(target, 0, last * bt)
 	g.cursor_tick = target
-	g.page = clamp(target / (bt * BARS_PER_PAGE), 0, page_count() - 1)
+	g.page = clamp(target / page_ticks(), 0, page_count() - 1)
 	if g.player.playing do player_play(&g.player, &g.song, target)
 }
 

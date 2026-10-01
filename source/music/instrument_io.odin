@@ -197,6 +197,15 @@ inst_block_build :: proc(
 			ins.n_resonances += 1
 		case "board", "board_mm", "board_semis", "frets", "position", "board_default", "keyboard":
 			if msg := board_line(&ins.board, l.cmd, a, &fresh_positions); msg != "" do bad(rep, where_, l.no, msg)
+		case "clef":
+			ins.n_clefs = 0
+			for c in a {
+				cl, ok := clef_from(c)
+				if !ok {bad(rep, where_, l.no, "clef: treble bass alto tenor treble_8vb treble_8va bass_8vb percussion or grand (up to 3, first choice first)"); break}
+				if int(ins.n_clefs) >= MAX_CLEFS do break
+				ins.clefs[ins.n_clefs] = cl
+				ins.n_clefs += 1
+			}
 		case "color", "colour":
 			if len(a) < 3 {bad(rep, where_, l.no, "color: r g b"); continue}
 			for k in 0 ..< 3 {
@@ -232,6 +241,11 @@ inst_write :: proc(w: ^strings.Builder, ins: ^Instrument) {
 	fmt.sbprintfln(w, "name %q", ins.name)
 	fmt.sbprintfln(w, "family %s", strings.to_lower(FAMILY_NAME[ins.family], context.temp_allocator))
 	fmt.sbprintfln(w, "range %s %s", lo_s, hi)
+	if ins.n_clefs > 0 {
+		fmt.sbprint(w, "clef")
+		for c in ins.clefs[:ins.n_clefs] do fmt.sbprintf(w, " %s", CLEF_NAME[c])
+		fmt.sbprintln(w)
+	}
 	if ins.wave == .Pulse {
 		fmt.sbprintfln(w, "wave pulse %v", ins.duty)
 	} else {

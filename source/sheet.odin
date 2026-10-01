@@ -14,6 +14,10 @@ package app
 
     Every layer is drawn; the active one last and at full strength, with its
     instrument's out-of-range rows shaded. Only the active layer is edited.
+
+    This is the Grid view. The Score view (score.odin) shows the active layer
+    as sheet music instead; sheet_draw and sheet_hover hand over to it, and
+    everything else here (placing, dragging, the keys) works on either.
 */
 
 import "core:fmt"
@@ -100,7 +104,7 @@ row_center :: proc(step: int) -> f32 {
 }
 
 page_ticks :: proc() -> i32 {
-	return music.bar_ticks(&g.song) * BARS_PER_PAGE
+	return music.bar_ticks(&g.song) * page_bars()
 }
 
 page_start :: proc() -> i32 {
@@ -108,7 +112,7 @@ page_start :: proc() -> i32 {
 }
 
 page_count :: proc() -> i32 {
-	return max((g.song.bars + BARS_PER_PAGE - 1) / BARS_PER_PAGE, 1)
+	return max((g.song.bars + page_bars() - 1) / page_bars(), 1)
 }
 
 px_per_tick :: proc() -> f32 {
@@ -160,6 +164,7 @@ snap_tick :: proc(tick: i32) -> i32 {
 }
 
 sheet_hover :: proc() -> Hover {
+	if score_on() do return score_hover()
 	m := g.ui.mouse
 	if m.x < bars_x() || m.x >= bars_x() + bars_w() || m.y < ROWS_Y || m.y >= ROWS_Y + rows_h() do return {}
 	h: Hover
@@ -210,6 +215,13 @@ in_range :: proc(inst: music.Inst_Id, p: music.Pitch) -> bool {
 // ---------------------------------------------------------------------------
 
 sheet_draw :: proc() {
+	if score_on() {
+		// Drawn already, into its own texture (score.odin): shown here.
+		score_blit()
+		strip_draw()
+		if g.helper do helper_draw()
+		return
+	}
 	fill(rect(panel_w(), TOP_H, sheet_r() - panel_w(), 720 - TOP_H - STATUS_H), COL_SHEET)
 	t := active_track()
 	bt := music.bar_ticks(&g.song)
@@ -524,7 +536,7 @@ strip_draw :: proc() {
 	}
 	add := rect(bars_x() + f32(n) * w, STRIP_Y, 26, STRIP_H)
 	if button(add, "+") {
-		g.song.bars = (page_count() + 1) * BARS_PER_PAGE
+		g.song.bars = (page_count() + 1) * page_bars()
 		g.page = page_count() - 1
 		g.dirty = true
 	}
@@ -574,6 +586,7 @@ sheet_input :: proc() {
 	// The piano gutter: click to hear a row; right-click makes it the
 	// reference note the ratios count from (again: back to automatic).
 	gut := rect(panel_w(), ROWS_Y, GUTTER_W, rows_h())
+	if score_on() do gut = {} // no gutter on the score
 	if ui_take_click(gut) {
 		step := sheet_hi() - int((g.ui.mouse.y - ROWS_Y) / row_h())
 		player_preview(&g.player, t.inst, placed_pitch(step))
@@ -591,6 +604,7 @@ sheet_input :: proc() {
 
 	if !hov.ok do return
 	area := rect(bars_x(), ROWS_Y, bars_w(), rows_h())
+	if score_on() do area = score_area()
 	under := music.track_note_at(t, hov.step, hov.raw_tick)
 
 	if ui_take_click(area) {

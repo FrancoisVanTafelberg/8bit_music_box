@@ -93,6 +93,10 @@ Instrument :: struct {
 	n_resonances: u8,
 	// The fingerboard, for the Helper (board.odin); n_strings 0 = none.
 	board:        Board,
+	// The staff its part is written on, in the Score view (clef.odin);
+	// n_clefs 0 = guessed from the range.
+	clefs:        [MAX_CLEFS]Clef,
+	n_clefs:      u8,
 	// Where this definition came from - shown in the panel, and what decides
 	// whether its strings belong to someone to free.
 	origin:     Origin,

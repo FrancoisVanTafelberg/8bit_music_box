@@ -233,6 +233,61 @@ one per instrument; add a second Violin layer for Violin II. The active layer is
 on top at full strength; the others at ~35 %, so you can see the chords you are writing
 against. MIDI import creates one layer per MIDI track+channel.
 
+### 3.4a The Score view (sheet music)
+
+The sheet has two views (`g.view`; the **Score** button under the sheet, or `V`):
+the **Grid** above, and the **Score** (`source/score.odin`, `score_glyphs.odin`): the
+active layer as a printed part. Only the active layer is drawn - it is that part's sheet.
+
+* **Page:** up to 4 lines (systems) of up to 4 bars - fewer bars a line when a bar would
+  be narrower than 150 px (the Helper on). A page is what is on screen, so Page play,
+  the page strip, Follow and PgUp/PgDn go a page of lines at a time (`page_bars()` in
+  `mode.odin`; the song's length is still kept to whole 4-bar grid pages). Switching
+  views keeps the first bar in front of you. **Scroll** play moves the page up instead of
+  sideways: the line being played rides a third of a line from the top (`score_top`).
+* **Staff:** from the instrument's `clef` line (`music/clef.odin`, `instruments/*.inst`):
+  treble, bass, alto, tenor, grand (keyboards, harp: treble and bass braced, split at
+  middle C), the octave clefs (`treble_8vb` guitar, `treble_8va` piccolo/fife/
+  glockenspiel, `bass_8vb` contrabass/contrabassoon - notes always shown at the pitch they
+  sound, the little 8 saying so) and `percussion` (a drum's rows are brightness, not pitch:
+  centred on the staff, no key signature or accidentals). With several clefs (`clef bass
+  tenor treble` for the cello) each line picks one: the last line's if its notes need two
+  ledger lines or fewer, else whichever needs fewest. No `clef` line: guessed from the range.
+* **Spacing:** proportional - bars all one width, time even across each - so a click lands
+  where the time is and the playhead moves steadily; hover and drawing share one mapping
+  (`score_x`, `step_y`), and a test walks every note of the shipped songs through
+  draw-position -> hover and back.
+* **How it is written** is worked out each frame from the notes (`score_bar`), never
+  saved: each note split at bar lines and into written values (`split_dur`: dotted where
+  it can, triplets when the ticks call for them) joined by ties; notes starting together
+  with the same value form a chord; rests fill the gaps, each the longest that starts on a
+  multiple of its own length (a half rest on beat 1 or 3), an empty bar a whole rest;
+  accidentals where the key signature or an earlier note in the bar says otherwise;
+  eighths and shorter beamed within a beat (three eighths in 6/8), one direction for the
+  group from its note furthest from the middle line, the beam sloping by at most a space;
+  seconds in a chord on the other side of the stem; stems 3.5 spaces, to the middle line
+  for notes far off the staff; ledger lines, dots, flags, triplet brackets.
+  Two readings make played music read as written: a note that stops a little short of the
+  next (a third of its length or less - the fife's 10-tick eighths) is written up to it;
+  and on the percussion staff a stroke lasts until the next stroke (a quarter at most), a
+  stroke a tick or two before the next (a flam) is not written, nor is a stroke on a line
+  that is still sounding.
+* **Everything else is the grid's:** click to place (the staff position is the step; the
+  key and the accidental buttons as on the grid), drag, right-click, the wheel, octave
+  copy; the playhead, bar cursor and Page/Bar/Repeat markers; the Helper's tracking and
+  suggest colours on the heads; the selected note boxed; Check mode's outlines; the mic's
+  take and live dots (`input_score_draw`); the Helper's pointed-at row as a band on every
+  line. Colours: white ink on black paper; right-click **Score** (or `Shift+V`) for black
+  on white.
+* **Drawn without a font:** clefs, rests, flags and accidentals are pen strokes - smooth
+  lines through a few points, each with its own width (`pen_stroke`) - so they look the
+  same everywhere and scale with the staff space (`SP`, 9 px). The score is drawn before
+  the canvas into its own texture at twice the size and shrunk onto the canvas: every edge
+  anti-aliased (`score_prerender`, `score_blit`).
+* **Not yet:** voices (two rhythms on one staff draw as separate chords at the same place),
+  grace notes, 8va lines for very high piano notes, clef changes within a line, and
+  transposing parts (a clarinet in Bb is shown at concert pitch).
+
 ### 3.5 Play mode
 
 `Space` plays from the start of the current page (`Shift+Space` from the beginning).
@@ -362,6 +417,7 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `main_hot_reload/` | the hot-reload host, unchanged apart from names: owns the window, swaps `build/hot_reload/game.dll` |
 | `main_release/` | shipping entry point |
 | `source/` | package `app` — one package, one file per concern. All state in one `App` block (`g`) so hot reload keeps the song you are editing |
+| `source/score.odin` | the Score view: the sheet as sheet music (§3.4a); `score_glyphs.odin` draws its clefs, rests, flags, accidentals and note heads |
 | `source/helper.odin` | the Helper: the selected layer's fingerboard (`fingerboard.odin`) or keyboard (`keyboard.odin`) (§4.3) |
 | `source/rlu/` | virtual resolution, vendored from Animal Kingdoms (canvas 1280 × 720) |
 | `source/music/` | package `music` — **no raylib**. Theory (pitches, keys, lengths), the song model, the `.song` format, the instrument table, the synth engine, sound effects, the Mixer, WAV writing and MIDI import. Headless, so `tools/render` can use it, and so can any other program (§4.2) |

@@ -13,6 +13,7 @@ define_instrument piano
 name "Piano"
 family keyboards
 range A0 C8
+clef grand
 wave pulse 0.25
 layer triangle 0.4 0
 envelope 0.002 1.4 0.15 0.25
@@ -31,6 +32,7 @@ define_instrument harpsichord
 name "Harpsichord"
 family keyboards
 range F1 F6
+clef grand
 wave pulse 0.125
 layer pulse 0.3 12
 envelope 0.001 0.8 0 0.15
@@ -49,6 +51,7 @@ define_instrument celesta
 name "Celesta"
 family keyboards
 range C4 C8
+clef treble treble_8va
 wave sine
 layer triangle 0.25 12
 envelope 0.002 0.9 0 0.3
@@ -67,6 +70,7 @@ define_instrument organ
 name "Organ"
 family keyboards
 range C1 C7
+clef grand
 wave pulse 0.5
 layer pulse 0.45 12
 envelope 0.01 0.01 1 0.05

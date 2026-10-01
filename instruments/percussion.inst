@@ -10,6 +10,7 @@ define_instrument timpani
 name "Timpani"
 family percussion
 range D2 A3
+clef bass
 wave triangle
 layer noise 0.2 24
 envelope 0.002 1.1 0 0.3
@@ -27,6 +28,7 @@ define_instrument glockenspiel
 name "Glockenspiel"
 family percussion
 range G5 C8
+clef treble_8va
 wave sine
 layer sine 0.3 24
 envelope 0.001 1.2 0 0.5
@@ -44,6 +46,7 @@ define_instrument xylophone
 name "Xylophone"
 family percussion
 range F4 C8
+clef treble treble_8va
 wave triangle
 layer sine 0.3 19
 envelope 0.001 0.25 0 0.08
@@ -61,6 +64,7 @@ define_instrument tubular_bells
 name "Tubular Bells"
 family percussion
 range C4 F5
+clef treble
 wave sine
 layer sine 0.35 15.3
 envelope 0.001 2.5 0 1
@@ -78,6 +82,7 @@ define_instrument snare
 name "Snare Drum"
 family percussion
 range G3 G5
+clef percussion
 wave noise
 layer triangle 0.25 -24
 envelope 0.001 0.18 0 0.05
@@ -97,6 +102,7 @@ define_instrument field_drum
 name "Field Drum"
 family percussion
 range C3 G4
+clef percussion
 wave noise
 layer triangle 0.4 -19
 envelope 0.001 0.26 0 0.06
@@ -114,6 +120,7 @@ define_instrument bass_drum
 name "Bass Drum"
 family percussion
 range E1 G2
+clef percussion
 wave triangle
 layer none
 envelope 0.001 0.35 0 0.05
@@ -131,6 +138,7 @@ define_instrument cymbals
 name "Cymbals"
 family percussion
 range C5 C7
+clef percussion
 wave noise
 layer noise 0.5 7
 envelope 0.001 0.9 0 0.3
@@ -151,6 +159,7 @@ define_instrument metronome
 name "Metronome"
 family percussion
 range C6 C8
+clef percussion
 wave sine
 layer noise 0.35 24
 envelope 0.0005 0.035 0 0.015

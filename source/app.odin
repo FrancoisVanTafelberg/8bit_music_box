@@ -69,8 +69,14 @@ App :: struct {
 	metro_sig:  [4]i32,
 	// Repeat (player.odin): go round the song or the scope again at its end.
 	repeat:     bool,
-	// The Scroll play mode: the tick at the sheet's left edge (sheet.odin).
+	// The Scroll play mode: the tick at the sheet's left edge (sheet.odin);
+	// in the Score view, the tick being played (the page scrolls up).
 	scroll_view: f32,
+	// The sheet as a grid or as sheet music (score.odin), and the Score
+	// view's paper (false: white ink on black) and its texture.
+	view:        Sheet_View,
+	score_paper: bool,
+	score_rt:    rl.RenderTexture2D,
 	sheet_lo:   int,
 	sheet_hi:   int,
 	row_h:      int,
@@ -194,7 +200,7 @@ game_update :: proc() -> bool {
 	player_update(&g.player, &g.song)
 	input_update()
 	perf_mark(.Audio)
-	per_page := music.bar_ticks(&g.song) * BARS_PER_PAGE
+	per_page := page_ticks()
 	if scrolling() {
 		// Continuous: the sheet's left edge is the playhead, moving on
 		// smoothly; the page boxes say which page it is in.
@@ -208,6 +214,8 @@ game_update :: proc() -> bool {
 	// see it, the panels before the sheet.
 	keys_update()
 	perf_mark(.Logic)
+	// The Score view draws itself first, into its own texture (score.odin).
+	if score_on() do score_prerender()
 	{
 		rlu.begin(&g.v)
 		rl.ClearBackground(COL_BG)
@@ -245,6 +253,7 @@ game_update :: proc() -> bool {
 
 @(export)
 game_shutdown :: proc() {
+	if g.score_rt.id != 0 do rl.UnloadRenderTexture(g.score_rt)
 	input_shutdown()
 	player_destroy(&g.player)
 	music.song_destroy(&g.song)

@@ -431,6 +431,10 @@ input_y :: proc(midi: f32) -> (y: f32, step: int, cents: int) {
 
 // The take and the live dot, over the notes.
 input_sheet_draw :: proc() {
+	if score_on() {
+		input_score_draw()
+		return
+	}
 	in_ := &g.input
 	col := input_colour()
 	ps := view_start()
@@ -490,16 +494,82 @@ input_sheet_draw :: proc() {
 	}
 }
 
+// The same on the Score view (score.odin): the take's lines broken at the
+// end of each line of music, the dots on the staff.
+@(private = "file")
+input_score_draw :: proc() {
+	in_ := &g.input
+	col := input_colour()
+	top := score_top()
+	clefs := score_clefs()
+	pos :: proc(tick, midi, top: f32, clefs: []music.Clef) -> (x, y: f32, line: int, ok: bool) {
+		m := note_of(midi)
+		p := music.pitch_from_midi(m, int(g.song.key))
+		x, y, line, ok = score_point(tick, int(p.step), top, clefs)
+		// Sharp or flat of the note: up or down, a quarter tone most of the
+		// way to the next step.
+		y -= 2 * (midi - f32(m)) * (SP / 2) * 0.45
+		return
+	}
+	gap := f32(music.TPQ) / 4
+	prev: Take_Point
+	for &p in in_.take {
+		if prev.n > 0 && p.tick - prev.tick <= gap && p.tick >= prev.tick {
+			for a in p.notes[:p.n] {
+				from := f32(-1)
+				best := f32(1.5)
+				for b in prev.notes[:prev.n] do if abs(a - b) < best {best = abs(a - b); from = b}
+				if from < 0 do continue
+				x0, y0, l0, ok0 := pos(prev.tick, from, top, clefs)
+				x1, y1, l1, ok1 := pos(p.tick, a, top, clefs)
+				if !ok0 || !ok1 || l0 != l1 do continue
+				same := int(math.round(from)) == int(math.round(a))
+				rl.DrawLineEx({x0, y0}, {x1, y1}, same ? 3 : 1.2, same ? col : with_alpha(col, 150))
+			}
+		}
+		prev = p
+	}
+	if !in_.on || in_.n == 0 do return
+	tick := g.player.playing ? (scrolling() ? g.scroll_view : f32(player_tick(&g.player, &g.song))) : f32(play_from())
+	r := f32(7)
+	last_label := f32(-1000)
+	right := score_area().x + score_area().width
+	for i := in_.n - 1; i >= 0; i -= 1 {
+		midi := in_.notes[i]
+		x, y, _, ok := pos(tick, midi, top, clefs)
+		if !ok do continue
+		x += HEAD_RX
+		cents := int(math.round((midi - f32(note_of(midi))) * 100))
+		rl.DrawCircleV({x, y}, r + 2, {0, 0, 0, 160})
+		rl.DrawCircleV({x, y}, r, col)
+		rl.DrawCircleLines(i32(x), i32(y), r + 2, rl.WHITE)
+		s := fmt.tprintf("%s %s%d", midi_name(note_of(midi)), cents >= 0 ? "+" : "", cents)
+		ly := max(y, last_label + 14)
+		last_label = ly
+		lx := x + r + 6
+		if lx + text_width(s) + 6 > right do lx = x - r - 10 - text_width(s)
+		fill(rect(lx - 3, ly - 7, text_width(s) + 6, 14), {0, 0, 0, 170})
+		text(s, lx, ly - 5, abs(cents) <= 10 ? COL_GOOD : (abs(cents) <= music.CHECK_TUNE ? COL_ACCENT : COL_BAD))
+	}
+}
+
 // ---------------------------------------------------------------------------
 // The practice controls: under the sheet, right of the page boxes.
 // ---------------------------------------------------------------------------
 
-PRACTICE_W :: 256
+PRACTICE_W :: 308
 
 practice_draw :: proc() {
 	y := f32(STRIP_Y)
 	h := f32(STRIP_H)
 	x := f32(bars_x() + bars_w() - PRACTICE_W)
+	// The sheet as a grid or as sheet music (score.odin); right-click: paper.
+	{
+		r := rect(x, y, 48, h)
+		if button(r, "Score", score_on()) do view_toggle()
+		if ui_take_right(r) && score_on() do paper_toggle()
+	}
+	x += 52
 	if button(rect(x, y, 48, h), "Metro", g.metronome) do metronome_toggle()
 	x += 52
 	if button(rect(x, y, 36, h), "Mic", g.input.on) do input_toggle()
@@ -544,9 +614,9 @@ scope_step :: proc(dir: int) {
 	case .Song:
 		set_status("Play plays the whole song, a page at a time")
 	case .Scroll:
-		set_status("continuous: Play plays the whole song, the sheet scrolling past the playhead at the tempo")
+		set_status(score_on() ? "continuous: Play plays the whole song, the score scrolling up line by line at the tempo" : "continuous: Play plays the whole song, the sheet scrolling past the playhead at the tempo")
 	case .Page:
-		set_status("Play plays the four bars on this page (from the cursor, if it is on it)")
+		set_status("Play plays the %d bars on this page (from the cursor, if it is on it)", page_bars())
 	case .Bar:
 		set_status("Play plays one bar, from the cursor (left/right arrows move it)")
 	}

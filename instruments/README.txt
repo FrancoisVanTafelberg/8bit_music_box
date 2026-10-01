@@ -36,6 +36,11 @@ The format, one block per instrument:
   gain 0.5
   pan 0.2                          # -1 left .. +1 right
   color 255 200 80                 # its colour on the sheet
+  clef bass tenor treble           # the Score view's staff: treble bass alto tenor grand
+                                   #   treble_8vb treble_8va bass_8vb percussion; with
+                                   #   more than one, each line of music picks the one
+                                   #   its notes fit (first choice first). None: guessed
+                                   #   from the range
   model bowed 0.5 0.12             # 32-bit mode only: a simulated bowed string
                                    #   (bow pressure 0..1, bow position 0..0.5 from the bridge)
   resonance 200 3 4                # 32-bit mode only: a body resonance, Hz Q dB (up to 4

@@ -9,6 +9,7 @@ define_instrument choir
 name "Choir"
 family voices
 range E2 A5
+clef treble bass
 wave pulse 0.5
 layer triangle 0.5 0.08
 envelope 0.12 0.2 0.85 0.2

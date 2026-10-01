@@ -584,6 +584,8 @@ keys_update :: proc() {
 	if rl.IsKeyPressed(.I) do input_toggle()
 	if rl.IsKeyPressed(.K) do metronome_toggle()
 	if rl.IsKeyPressed(.H) do helper_toggle()
+	// V: the grid or the score; Shift+V: the score's paper.
+	if rl.IsKeyPressed(.V) {if shift && score_on() do paper_toggle(); else do view_toggle()}
 	if rl.IsKeyPressed(.R) do repeat_toggle()
 
 	// Pages.
