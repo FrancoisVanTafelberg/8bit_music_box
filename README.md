@@ -56,7 +56,7 @@ violin and viola's frame, Simandl on the double bass, a finger per fret on the g
 and draw a line across the board for each finger, labelled f1–f4 at the right edge.
 
 **Tracking** - one button, three states: **Off**, **Tracking** (the default) and
-**Suggest**. **Tracking** follows the layer note by note: the last N notes (8 by default;
+**Suggest**. **Tracking** follows the layer note by note: the last N notes (4 by default;
 Shift/Ctrl for 10/100 on the -/+) up to the playhead - or up to the selected note when
 stopped - each filled in its own colour, with the way between them drawn: along the
 string, as a line straight down it, or straight across the board to another string. Only

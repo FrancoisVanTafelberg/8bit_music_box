@@ -51,7 +51,7 @@ TRACK_MODE_NAME := [Track_Mode]string {
 // Room for a trail: every step can be a chord across all the strings.
 TRAIL_CAP :: TRACK_MAX * music.BOARD_MAX_STRINGS
 
-TRACK_DEFAULT_N :: 8
+TRACK_DEFAULT_N :: 4
 TRACK_MAX :: 64
 
 // The colours the notes cycle through: bright, and each unlike the next.
