@@ -20,8 +20,8 @@ package app
     the check marks all show on the notes. A page is the lines on screen, so
     Page play (and the page boxes, and page turning while following) goes a
     page of four lines at a time. Scroll play moves the page UP instead of
-    sideways: the line being played rides near the top and the next lines
-    come up under it.
+    sideways: the line being played is the top line until it has been played
+    through; then the page glides up a line and the next one takes its place.
 
     Black paper and white ink by default; right-click the Score button (or
     Shift+V) for white paper and black ink.
@@ -135,14 +135,27 @@ score_systems :: proc() -> int {
 	return max(int((g.song.bars + bps - 1) / bps), 1)
 }
 
-// The line at the top of the sheet, fractional while scrolling: the line
-// being played sits a third of a line down, the lines to come under it.
+// The line at the top of the sheet. Scroll play: the line being played is
+// the top line, whole, until it has been played to its end; only when the
+// playhead has moved on to the next line does the page move up a line - a
+// short glide (SCROLL_GLIDE seconds) at the start of the new line, so the
+// eye can follow it. Worked out from the playhead alone, so it holds after
+// a jump or a repeat.
+SCROLL_GLIDE :: 0.35
+
 score_top :: proc() -> f32 {
-	if scrolling() {
-		top := g.scroll_view / f32(system_ticks()) - 0.3
-		return clamp(top, 0, max(f32(score_systems()) - 1, 0))
+	if !scrolling() do return f32(g.page * SCORE_SYSTEMS)
+	st := f32(system_ticks())
+	pos := max(g.scroll_view, 0) / st
+	line := math.floor(pos)
+	top := line
+	if line >= 1 {
+		glide := f32(SCROLL_GLIDE / music.tick_seconds(&g.song)) / st // in lines
+		t := clamp((pos - line) / max(glide, 1e-4), 0, 1)
+		t = t * t * (3 - 2 * t) // ease in and out
+		top = line - 1 + t
 	}
-	return f32(g.page * SCORE_SYSTEMS)
+	return clamp(top, 0, max(f32(score_systems()) - 1, 0))
 }
 
 Staff :: struct {

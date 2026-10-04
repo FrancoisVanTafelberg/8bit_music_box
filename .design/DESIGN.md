@@ -259,7 +259,9 @@ active layer as a printed part. Only the active layer is drawn - it is that part
   the page strip, Follow and PgUp/PgDn go a page of lines at a time (`page_bars()` in
   `mode.odin`; the song's length is still kept to whole 4-bar grid pages). Switching
   views keeps the first bar in front of you. **Scroll** play moves the page up instead of
-  sideways: the line being played rides a third of a line from the top (`score_top`).
+  sideways, a line at a time: the line being played stays the top line, whole, until it has
+  been played through; then the page glides up one line (0.35 s, eased) and the next line
+  is on top (`score_top`).
 * **Staff:** from the instrument's `clef` line (`music/clef.odin`, `instruments/*.inst`):
   treble, bass, alto, tenor, grand (keyboards, harp: treble and bass braced, split at
   middle C), the octave clefs (`treble_8vb` guitar, `treble_8va` piccolo/fife/
