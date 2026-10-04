@@ -42,8 +42,8 @@ helper_toggle :: proc() {
 
 // The right-hand panel, with the Helper on.
 helper_draw :: proc() {
-	fill(rect(FB_X, TOP_H, FB_W, 720 - TOP_H - STATUS_H), COL_PANEL)
-	rl.DrawLine(FB_X, TOP_H, FB_X, 720 - STATUS_H, COL_EDGE)
+	fill(rect(fb_left(), TOP_H, fb_w(), screen_h() - TOP_H - STATUS_H), COL_PANEL)
+	rl.DrawLineV({fb_left(), TOP_H}, {fb_left(), screen_h() - STATUS_H}, COL_EDGE)
 	if fb_board() != nil {
 		fingerboard_draw()
 		return
@@ -52,13 +52,13 @@ helper_draw :: proc() {
 		keyboard_draw()
 		return
 	}
-	x0 := f32(FB_X + 8)
+	x0 := f32(fb_left() + 8)
 	t := active_track()
 	title := "HELPER"
 	if t != nil do title = fmt.tprintf("%s HELPER", strings.to_upper(inst_of(t).name, context.temp_allocator))
 	label(title, x0, TOP_H + 6)
 
-	box := rect(FB_X + 20, TOP_H + 200, FB_W - 40, 170)
+	box := rect(fb_left() + 20, TOP_H + 200, fb_w() - 40, 170)
 	fill(box, COL_SHEET)
 	outline(box, COL_EDGE)
 	y := box.y + 16

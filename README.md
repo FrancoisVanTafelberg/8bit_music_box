@@ -94,7 +94,7 @@ Songs the old Cello Helper saved in `cello_songs\` still show in Open, marked [c
 | **Edit** | drag to move, right-click to delete, mouse wheel on a note = up/down a semitone |
 | **Range** | the **piano** / **inst** button next to the key: the whole piano range, or only the selected layer's instrument (taller rows). Starts on piano; the Helper switches to inst while it is on. Notes outside the range are red on the piano range and counted at the sheet's edge on inst - switch to piano to move or delete them |
 | **Key lines** | the **lines** button next to the key: rows the key signature sharpens or flattens are tinted and named (F#, Bb) in the note column, and the rows of the key's home chord are marked - tonic brightest, 3rd and 5th fainter. Each row also shows its frequency ratio to a reference note (the tonic at or below the layer's first note): with C5 as 1:1, C6 is 2:1, G5 3:2, E5 5:4, C4 1:2. Right-click a row's name to make it the reference; right-click it again for automatic. On by default |
-| **Sound effects** | the **SFX** button (top right): every sound effect in `sounds/`, click to hear (a set of variations - the ten musket shots - is one button with **<** **>** to step through them), from where the **position** slider puts it on the screen (0% the left edge: left ear only; 50% the middle: both; 100% the right edge: right ear only - the far ear gets softer, the near one never louder); "many at once" fires N of one over a few seconds (the -/+ take Shift for 10 and Ctrl for 100 at a time, the wheel works too, right-click resets), bunched on a bell curve (e.g. 100 muskets in 2 s), **all mixed** for a random one of the set each shot, with a chart of when each fell |
+| **Sound effects** | the **SFX** button (top right): every sound effect in `sounds/`, click to hear (a set of variations - the ten musket shots - is one button with **<** **>** to step through them), from where the **position** slider puts it on the screen (0% the left edge: left ear only; 50% the middle: both; 100% the right edge: right ear only - the far ear gets softer, the near one never louder); "many at once" fires N of one over a few seconds (the -/+ take Shift for 10 and Ctrl for 100 at a time, the wheel works too, right-click resets), bunched on a bell curve (e.g. 100 muskets in 2 s), **all mixed** for a random one of the set each shot, with a chart of when each fell. The **bus** row shows the bus the sound plays on: its volume, an effect to try (muffled, thin, echo), a meter, and the master limiter (how far it is turning a loud volley down) |
 | **Octave copy** | `Ctrl`+click a note: a copy of it an octave lower, same place and length; `Shift`+click: an octave higher |
 | **Selected note** | `Alt+↑/↓` a staff step, `Alt+Shift+↑/↓` a semitone, `Alt+←/→` a slot, `Del` removes it |
 | **Bars** | `←` back to the start of the bar (at its start already: the bar before), `→` the start of the next bar - while playing it jumps there; stopped, it moves the bar cursor (the gold marker) that Play starts from |
@@ -119,6 +119,7 @@ Songs the old Cello Helper saved in `cello_songs\` still show in Open, marked [c
 | `F3` | performance monitor: where each frame's time goes (logic, audio mixing, drawing, present), the mixing load, voices, underruns, and a graph of the last 240 frames. The FPS is always shown top right (click it too) |
 | `F7` | reload the instrument and sound effect files |
 | `F11` | fullscreen |
+| `Ctrl+-` / `Ctrl+=` / `Ctrl+0` | UI size: smaller (more room for the music), bigger, automatic (the largest the window fits). Everything is drawn at the window's own resolution, so it is sharp at any size; remembered in `settings.txt` |
 
 Rows the active instrument cannot play are shaded and refuse clicks.
 
@@ -129,7 +130,7 @@ Rows the active instrument cannot play are shaded and refuse clicks.
 | `source/` | package `app`: the editor. All state in one block for hot reload |
 | `source/music/` | package `music`, no raylib: theory, song model, `.song` format, instruments, synth, sound effects, the Mixer, WAV, MIDI import |
 | `source/music_rl/` | the Mixer's sound out through raylib |
-| `source/rlu/` | virtual resolution (1280 × 720 canvas), from Animal Kingdoms |
+| `source/window.odin` | the window and the UI scale: drawn at the window's own resolution, sharp at any size (`Ctrl+-` / `Ctrl+=` / `Ctrl+0` UI size) |
 | `tools/render/` | `odin run tools/render -- songs/ode_to_joy.song` renders to WAV with no window (`-4` `-8` `-16` `-32` pick the sound mode); `-- sfx all` renders every sound effect |
 | `examples/battle_demo/` | the engine in another program: `odin run examples/battle_demo` |
 | `instruments/` | every instrument, as text files (`.inst`): add or change them without a rebuild, F7 reloads. See `instruments/README.txt` |

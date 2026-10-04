@@ -560,7 +560,7 @@ input_score_draw :: proc() {
 PRACTICE_W :: 308
 
 practice_draw :: proc() {
-	y := f32(STRIP_Y)
+	y := f32(strip_y())
 	h := f32(STRIP_H)
 	x := f32(bars_x() + bars_w() - PRACTICE_W)
 	// The sheet as a grid or as sheet music (score.odin); right-click: paper.
@@ -629,7 +629,7 @@ mic_overlay_draw :: proc() {
 	W :: f32(340)
 	rows := in_.n_devices + 1
 	H := 234 + f32(rows) * 22
-	r := rect(f32(bars_x() + bars_w()) - W, f32(STRIP_Y) - H - 4, W, H)
+	r := rect(f32(bars_x() + bars_w()) - W, f32(strip_y()) - H - 4, W, H)
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	x := r.x + 10

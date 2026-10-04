@@ -17,7 +17,9 @@ package battle_demo
     Shift+M      100 muskets over 2 seconds, bunched on a bell curve (a burst)
     S  D         sword clash, sword drawn
     E  W         ship's bell, splash
-    Up / Down    music volume        Left / Right   sound effect volume
+    Up / Down    music bus volume    Left / Right   sound effect bus volume
+    F            the sound effect bus muffled (low-pass: behind a wall)
+    R            an echo on the sound effect bus (a valley)
 
     To use it in your own program, copy source/music (the engine, no raylib)
     and, for a raylib program, source/music_rl (the audio output), plus the
@@ -121,11 +123,21 @@ main :: proc() {
 				last = k.sfx
 			}
 		}
-		// Volumes: plain fields.
-		if rl.IsKeyDown(.UP) do mixer.music_volume = min(mixer.music_volume + 0.01, 1.5)
-		if rl.IsKeyDown(.DOWN) do mixer.music_volume = max(mixer.music_volume - 0.01, 0)
-		if rl.IsKeyDown(.RIGHT) do mixer.sfx_volume = min(mixer.sfx_volume + 0.01, 1.5)
-		if rl.IsKeyDown(.LEFT) do mixer.sfx_volume = max(mixer.sfx_volume - 0.01, 0)
+		// Volumes and effects: per bus (music/bus.odin).
+		mv := music.mixer_bus_volume(&mixer, music.BUS_MUSIC)
+		sv := music.mixer_bus_volume(&mixer, music.BUS_SFX)
+		if rl.IsKeyDown(.UP) do music.mixer_set_bus_volume(&mixer, music.BUS_MUSIC, min(mv + 0.01, 1.5))
+		if rl.IsKeyDown(.DOWN) do music.mixer_set_bus_volume(&mixer, music.BUS_MUSIC, max(mv - 0.01, 0))
+		if rl.IsKeyDown(.RIGHT) do music.mixer_set_bus_volume(&mixer, music.BUS_SFX, min(sv + 0.01, 1.5))
+		if rl.IsKeyDown(.LEFT) do music.mixer_set_bus_volume(&mixer, music.BUS_SFX, max(sv - 0.01, 0))
+		if rl.IsKeyPressed(.F) {
+			muffled := music.mixer_bus_effect(&mixer, music.BUS_SFX) == .Low_Pass
+			music.mixer_set_bus_low_pass(&mixer, music.BUS_SFX, muffled ? 0 : 700)
+		}
+		if rl.IsKeyPressed(.R) {
+			echo := music.mixer_bus_effect(&mixer, music.BUS_SFX) == .Echo
+			music.mixer_set_bus_echo(&mixer, music.BUS_SFX, echo ? 0 : 0.32, 0.4, 0.4)
+		}
 
 		// Once a frame: hand the output its next blocks.
 		music_rl.output_update(&out, &mixer)
@@ -146,7 +158,7 @@ main :: proc() {
 			line(&y, fmt.tprintf("  %d  %-12s (%s)  %s", i + 1, name, inst, on ? "on" : "off"), on ? rl.Color{140, 220, 140, 255} : rl.Color{150, 90, 90, 255})
 		}
 		y += 10
-		line(&y, fmt.tprintf("music %.0f%%   effects %.0f%%   (arrow keys)", mixer.music_volume * 100, mixer.sfx_volume * 100))
+		line(&y, fmt.tprintf("music %.0f%%   effects %.0f%% (%v)   (arrow keys, F muffle, R echo)   limiter -%.1f dB", music.mixer_bus_volume(&mixer, music.BUS_MUSIC) * 100, music.mixer_bus_volume(&mixer, music.BUS_SFX) * 100, music.mixer_bus_effect(&mixer, music.BUS_SFX), music.mixer_limiter_reduction(&mixer)))
 		line(&y, "Space play/stop   1-6 layers   T trumpets   Y only Trumpet 2   A all   L loop")
 		line(&y, "C cannon  V distant cannon  M musket  Shift+M 100 muskets  B volley  S sword clash  D sword drawn  E bell  W splash")
 		if last != "" do line(&y, fmt.tprintf("last: %s", last), {240, 200, 120, 255})

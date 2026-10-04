@@ -252,7 +252,7 @@ bar_step :: proc(dir: int) {
 
 // Up and down arrows: the overall volume, 5% a press (Shift: 20%).
 volume_step :: proc(steps: int) {
-	v := clamp(f32(int(g.audio.master * 20 + 0.5) + steps) / 20, 0, 2)
-	g.audio.master = v
+	v := clamp(f32(int(music.mixer_bus_volume(&g.audio, music.BUS_MASTER) * 20 + 0.5) + steps) / 20, 0, 2)
+	music.mixer_set_bus_volume(&g.audio, music.BUS_MASTER, v)
 	set_status("volume %d%%", int(v * 100 + 0.5))
 }

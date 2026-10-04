@@ -4,9 +4,9 @@ package app
     Widgets, hand-rolled, in the app's palette.
 
     Immediate mode, and deliberately tiny: a button is a rectangle that returns
-    true on the frame it was clicked. Everything is drawn into the 1280 x 720
-    canvas with raylib's default font, which is a pixel font - at 2x on a 1440p
-    screen it is exactly the 8-bit look we want.
+    true on the frame it was clicked. Laid out in points and drawn at the
+    window's own resolution (window.odin), text in JetBrains Mono rasterised
+    for the UI scale, so it is sharp at any size.
 
     One rule: the first widget to see a click CONSUMES it (ui_take_click), so a
     button drawn over the sheet does not also drop a note underneath it.
@@ -14,7 +14,6 @@ package app
 */
 
 import "core:strings"
-import "rlu"
 import rl "vendor:raylib"
 
 // --- Palette: a dark NES-ish night sky ---
@@ -33,8 +32,8 @@ COL_BUTTON :: rl.Color{44, 48, 80, 255}
 COL_BUTTON_HOT :: rl.Color{64, 70, 116, 255}
 COL_BUTTON_ON :: rl.Color{92, 78, 34, 255}
 
-FONT :: 10 // the default font's own size: crisp
-FONT_BIG :: 20 // exactly 2x: still crisp
+FONT :: 11 // points: the text everywhere
+FONT_BIG :: 20 // points: titles
 
 Ui_State :: struct {
 	mouse:   rl.Vector2,
@@ -46,7 +45,7 @@ Ui_State :: struct {
 }
 
 ui_begin :: proc() {
-	g.ui.mouse = rlu.mouse(&g.v)
+	g.ui.mouse = rl.GetMousePosition() / g.scale
 	g.ui.clicked = rl.IsMouseButtonPressed(.LEFT)
 	g.ui.right = rl.IsMouseButtonPressed(.RIGHT)
 	g.ui.wheel = rl.GetMouseWheelMove()
@@ -102,12 +101,25 @@ outline :: proc(r: rl.Rectangle, c: rl.Color) {
 	rl.DrawRectangleLines(i32(r.x), i32(r.y), i32(r.width), i32(r.height), c)
 }
 
+// Text at (x, y), its top-left, in points. The font is drawn at its own
+// pixel size, and placed on a whole pixel, so it is never resampled.
 text :: proc(s: string, x, y: f32, c: rl.Color = COL_TEXT, size: i32 = FONT) {
-	rl.DrawText(strings.clone_to_cstring(s, context.temp_allocator), i32(x), i32(y), size, c)
+	f := font_of(size)
+	sc := g.scale
+	// Lifted a little: the font's line box has room above the capitals that
+	// the old pixel font did not, and the layout was made for that one.
+	px := f32(i32(x * sc + 0.5)) / sc
+	py := f32(i32((y - f32(size) * 0.12) * sc + 0.5)) / sc
+	rl.DrawTextEx(f, strings.clone_to_cstring(s, context.temp_allocator), {px, py}, f32(size), 0, c)
 }
 
 text_width :: proc(s: string, size: i32 = FONT) -> f32 {
-	return f32(rl.MeasureText(strings.clone_to_cstring(s, context.temp_allocator), size))
+	return rl.MeasureTextEx(font_of(size), strings.clone_to_cstring(s, context.temp_allocator), f32(size), 0).x
+}
+
+@(private = "file")
+font_of :: proc(size: i32) -> rl.Font {
+	return size > 14 ? g.fonts.big : g.fonts.small
 }
 
 text_centered :: proc(s: string, r: rl.Rectangle, c: rl.Color = COL_TEXT, size: i32 = FONT) {

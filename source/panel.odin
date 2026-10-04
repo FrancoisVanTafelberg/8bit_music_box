@@ -39,8 +39,8 @@ TIME_SIGS := [?][2]i32{{4, 4}, {3, 4}, {2, 4}, {2, 2}, {6, 8}, {9, 8}, {12, 8}, 
 // ---------------------------------------------------------------------------
 
 topbar_draw :: proc() {
-	fill(rect(0, 0, 1280, TOP_H), COL_PANEL)
-	rl.DrawLine(0, TOP_H - 1, 1280, TOP_H - 1, COL_EDGE)
+	fill(rect(0, 0, screen_w(), TOP_H), COL_PANEL)
+	rl.DrawLineV({0, TOP_H - 1}, {screen_w(), TOP_H - 1}, COL_EDGE)
 	y := f32(6)
 	h := f32(20)
 
@@ -176,8 +176,8 @@ layer_rows :: proc() -> int {return g.helper ? 11 : 12}
 LAYER_H :: 20
 
 panel_draw :: proc() {
-	fill(rect(0, TOP_H, panel_w(), 720 - TOP_H - STATUS_H), COL_PANEL)
-	rl.DrawLine(i32(panel_w()) - 1, TOP_H, i32(panel_w()) - 1, 720 - STATUS_H, COL_EDGE)
+	fill(rect(0, TOP_H, panel_w(), screen_h() - TOP_H - STATUS_H), COL_PANEL)
+	rl.DrawLineV({panel_w() - 1, TOP_H}, {panel_w() - 1, screen_h() - STATUS_H}, COL_EDGE)
 	x := f32(8)
 	w := f32(panel_w() - 16)
 	y := f32(TOP_H + 8)
@@ -374,9 +374,9 @@ wave_desc :: proc(ins: ^music.Instrument) -> string {
 // ---------------------------------------------------------------------------
 
 statusbar_draw :: proc() {
-	y := f32(720 - STATUS_H)
-	fill(rect(0, y, 1280, STATUS_H), COL_PANEL)
-	rl.DrawLine(0, i32(y), 1280, i32(y), COL_EDGE)
+	y := f32(screen_h() - STATUS_H)
+	fill(rect(0, y, screen_w(), STATUS_H), COL_PANEL)
+	rl.DrawLineV({0, y}, {screen_w(), y}, COL_EDGE)
 
 	msg := status_text()
 	age := rl.GetTime() - g.status_time
@@ -407,7 +407,7 @@ statusbar_draw :: proc() {
 	}
 	hint := "click place   drag move   right-click delete   wheel sharp/flat   Ctrl/Shift+click note: octave copy down/up   Space play   Ctrl+Z undo"
 	if g.helper do hint = "click place   right-click delete   Ctrl/Shift+click note: octave copy down/up   Space play   click the board to hear"
-	text(hint, 1280 - text_width(hint) - 8, y + 5, COL_FAINT)
+	text(hint, screen_w() - text_width(hint) - 8, y + 5, COL_FAINT)
 }
 
 // ---------------------------------------------------------------------------
@@ -441,8 +441,8 @@ overlay_draw :: proc() {
 
 @(private = "file")
 instruments_overlay :: proc() {
-	r := rect(panel_w() + 20, TOP_H + 20, 1280 - panel_w() - 40, 520)
-	fill(rect(0, 0, 1280, 720), {0, 0, 0, 150})
+	r := rect(panel_w() + 20, TOP_H + 20, screen_w() - panel_w() - 40, 520)
+	fill(rect(0, 0, screen_w(), screen_h()), {0, 0, 0, 150})
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Add an instrument layer", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
@@ -493,8 +493,8 @@ open_overlay :: proc() {
 
 @(private = "file")
 open_overlay_draw :: proc() {
-	r := rect(panel_w() + 20, TOP_H + 20, 1280 - panel_w() - 40, 560)
-	fill(rect(0, 0, 1280, 720), {0, 0, 0, 150})
+	r := rect(panel_w() + 20, TOP_H + 20, screen_w() - panel_w() - 40, 560)
+	fill(rect(0, 0, screen_w(), screen_h()), {0, 0, 0, 150})
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Open", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
@@ -560,6 +560,10 @@ keys_update :: proc() {
 		if rl.IsKeyPressed(.E) do file_export("wav")
 		if rl.IsKeyPressed(.Z) || rl.IsKeyPressedRepeat(.Z) {if shift do redo(); else do undo()}
 		if rl.IsKeyPressed(.Y) || rl.IsKeyPressedRepeat(.Y) do redo()
+		// The UI size (window.odin): smaller, bigger, automatic.
+		if rl.IsKeyPressed(.MINUS) || rl.IsKeyPressed(.KP_SUBTRACT) do ui_size_step(-1)
+		if rl.IsKeyPressed(.EQUAL) || rl.IsKeyPressed(.KP_ADD) do ui_size_step(1)
+		if rl.IsKeyPressed(.ZERO) || rl.IsKeyPressed(.KP_0) do ui_size_step(0)
 		return
 	}
 
@@ -740,7 +744,7 @@ colour_picker_draw :: proc() {
 	COLS :: 6
 	SW :: f32(22)
 	rows := (len(LAYER_PALETTE) + COLS - 1) / COLS
-	r := rect(panel_w() + 4, clamp(g.colour_y - 30, TOP_H + 4, 720 - STATUS_H - 200), 12 + COLS * (SW + 4), 64 + f32(rows) * (SW + 4))
+	r := rect(panel_w() + 4, clamp(g.colour_y - 30, TOP_H + 4, screen_h() - STATUS_H - 200), 12 + COLS * (SW + 4), 64 + f32(rows) * (SW + 4))
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text(fit_text(fmt.tprintf("Colour: %s", t.name), r.width - 16), r.x + 8, r.y + 8, COL_TEXT)

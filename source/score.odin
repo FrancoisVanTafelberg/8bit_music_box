@@ -26,11 +26,9 @@ package app
     Black paper and white ink by default; right-click the Score button (or
     Shift+V) for white paper and black ink.
 
-    DRAWN AT TWICE THE SIZE. The app draws into a 1280 x 720 canvas; staff
-    lines, note heads and clefs at that size are all jagged edges. So the
-    score is drawn first, before the canvas, into its own texture twice the
-    size, and that is shrunk onto the canvas - every edge smoothed by the
-    average of four pixels (score_prerender, score_blit).
+    Drawn straight to the window at its full resolution, like everything
+    else (window.odin): staff lines, note heads and clefs are sharp at any
+    window size.
 
     Layout: bars are all the same width and time runs evenly across each
     (proportional spacing, as the grid), so the playhead moves steadily and
@@ -106,7 +104,7 @@ paper_toggle :: proc() {
 // ---------------------------------------------------------------------------
 
 score_area :: proc() -> rl.Rectangle {
-	return {panel_w(), TOP_H, sheet_r() - panel_w(), f32(STRIP_Y) - 4 - TOP_H}
+	return {panel_w(), TOP_H, sheet_r() - panel_w(), f32(strip_y()) - 4 - TOP_H}
 }
 
 sys_h :: proc() -> f32 {return score_area().height / SCORE_SYSTEMS}
@@ -564,30 +562,16 @@ score_bar :: proc(t: ^music.Track, bar: i32, s: ^Sys, out: ^[dynamic]Ev) {
 // Drawing
 // ---------------------------------------------------------------------------
 
-// Into the score's own texture, at twice the size; called before the canvas
-// is started (a texture pass cannot happen inside another).
-score_prerender :: proc() {
+// The page, straight onto the window at its own resolution (window.odin):
+// the paper, then everything on it, kept inside the sheet's area.
+score_draw :: proc() {
 	a := score_area()
-	w, h := i32(a.width * 2), i32(a.height * 2)
-	if g.score_rt.id == 0 || g.score_rt.texture.width != w || g.score_rt.texture.height != h {
-		if g.score_rt.id != 0 do rl.UnloadRenderTexture(g.score_rt)
-		g.score_rt = rl.LoadRenderTexture(w, h)
-		rl.SetTextureFilter(g.score_rt.texture, .BILINEAR)
-	}
 	ink := score_ink()
-	rl.BeginTextureMode(g.score_rt)
-	rl.ClearBackground(ink.paper)
-	rl.BeginMode2D({offset = {0, 0}, target = {a.x, a.y}, rotation = 0, zoom = 2})
+	rl.DrawRectangleRec(a, ink.paper)
+	sc := g.scale
+	rl.BeginScissorMode(i32(a.x * sc), i32(a.y * sc), i32(a.width * sc + 0.5), i32(a.height * sc + 0.5))
 	score_draw_page(ink)
-	rl.EndMode2D()
-	rl.EndTextureMode()
-}
-
-score_blit :: proc() {
-	a := score_area()
-	if g.score_rt.id == 0 do return
-	tex := g.score_rt.texture
-	rl.DrawTexturePro(tex, {0, 0, f32(tex.width), -f32(tex.height)}, a, {0, 0}, 0, rl.WHITE)
+	rl.EndScissorMode()
 }
 
 // A tie from one head to the next, or to or from a line's edge.

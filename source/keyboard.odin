@@ -30,11 +30,11 @@ import "core:strings"
 import "music"
 import rl "vendor:raylib"
 
-KB_X0 :: FB_X + 10 // the back of the keys
+kb_x0 :: proc() -> f32 {return fb_left() + 10} // the back of the keys
 KB_LEN :: f32(170) // a white key's length
 KB_BLACK :: KB_LEN * 0.6 // a black key's
-KB_COL_X :: FB_X + 190 // the controls, right of the keys
-KB_COL_W :: f32(1280 - 8 - KB_COL_X)
+kb_col_x :: proc() -> f32 {return fb_left() + 190} // the controls, right of the keys
+kb_col_w :: proc() -> f32 {return screen_w() - 8 - kb_col_x()}
 
 // The selected layer's keyboard, or nil.
 kb_board :: proc() -> ^music.Board {
@@ -60,11 +60,11 @@ kb_key_rect :: proc(m: int) -> (r: rl.Rectangle, ok: bool) {
 		s := int(music.pitch_from_midi(m - 1, 0).step) // the white key below
 		if s < sheet_lo() || s + 1 > sheet_hi() do return {}, false
 		h := max(row_h() * 0.64, 6)
-		return rect(KB_X0, row_y(s) - h / 2, KB_BLACK, h), true
+		return rect(kb_x0(), row_y(s) - h / 2, KB_BLACK, h), true
 	}
 	s := int(music.pitch_from_midi(m, 0).step)
 	if s < sheet_lo() || s > sheet_hi() do return {}, false
-	return rect(KB_X0, row_y(s), KB_LEN, row_h()), true
+	return rect(kb_x0(), row_y(s), KB_LEN, row_h()), true
 }
 
 // Where a note is marked on its key: on a black key its middle, on a white
@@ -72,7 +72,7 @@ kb_key_rect :: proc(m: int) -> (r: rl.Rectangle, ok: bool) {
 kb_point :: proc(m: int) -> rl.Vector2 {
 	r, _ := kb_key_rect(m)
 	if kb_is_black(m) do return {r.x + r.width * 0.55, r.y + r.height / 2}
-	return {KB_X0 + KB_BLACK + (KB_LEN - KB_BLACK) * 0.45, r.y + r.height / 2}
+	return {kb_x0() + KB_BLACK + (KB_LEN - KB_BLACK) * 0.45, r.y + r.height / 2}
 }
 
 @(private = "file")
@@ -85,7 +85,7 @@ kb_range :: proc() -> (lo, hi: int) {
 kb_hover :: proc() -> int {
 	if kb_board() == nil do return -1
 	m := g.ui.mouse
-	if m.x < KB_X0 || m.x >= KB_X0 + KB_LEN do return -1
+	if m.x < kb_x0() || m.x >= kb_x0() + KB_LEN do return -1
 	lo, hi := kb_range()
 	for k in lo ..= hi {
 		if !kb_is_black(k) do continue
@@ -137,7 +137,7 @@ keyboard_draw :: proc() {
 	t := active_track()
 	ins := inst_of(t)
 	lo, hi := kb_range()
-	label(fmt.tprintf("%s KEYBOARD", strings.to_upper(ins.name, context.temp_allocator)), FB_X + 8, TOP_H + 5)
+	label(fmt.tprintf("%s KEYBOARD", strings.to_upper(ins.name, context.temp_allocator)), fb_left() + 8, TOP_H + 5)
 
 	// What is lit.
 	target := fb_sheet_target()
@@ -201,8 +201,8 @@ keyboard_draw :: proc() {
 		bot_r, _ := kb_key_rect(lo)
 		y0 := max(top_r.y, f32(ROWS_Y))
 		y1 := min(bot_r.y + bot_r.height, f32(ROWS_Y) + rows_h())
-		rl.DrawLineEx({KB_X0 - 2, y0}, {KB_X0 - 2, y1}, 3, {90, 60, 40, 255})
-		outline(rect(KB_X0, y0, KB_LEN, y1 - y0), {90, 88, 84, 255})
+		rl.DrawLineEx({kb_x0() - 2, y0}, {kb_x0() - 2, y1}, 3, {90, 60, 40, 255})
+		outline(rect(kb_x0(), y0, KB_LEN, y1 - y0), {90, 88, 84, 255})
 	}
 
 	// The trail: a line from each step's notes to the next's, then the notes.
@@ -253,7 +253,7 @@ keyboard_draw :: proc() {
 	}
 
 	// Click a key: hear it.
-	if here >= 0 && ui_take_click(rect(KB_X0, ROWS_Y, KB_LEN, rows_h())) {
+	if here >= 0 && ui_take_click(rect(kb_x0(), ROWS_Y, KB_LEN, rows_h())) {
 		player_preview(&g.player, t.inst, music.pitch_from_midi(here, fb_spell_key()))
 	}
 
@@ -263,9 +263,9 @@ keyboard_draw :: proc() {
 // The column right of the keys: the key filter, tracking, what is pointed at.
 @(private = "file")
 keyboard_controls :: proc(t: ^music.Track, lo, hi, here: int) {
-	x := f32(KB_COL_X)
+	x := f32(kb_col_x())
 	y := f32(ROWS_Y)
-	w := KB_COL_W
+	w := kb_col_w()
 	text(fmt.tprintf("%s - %s", midi_name(lo), midi_name(hi)), x, y, COL_DIM)
 	y += 16
 
@@ -339,7 +339,7 @@ keyboard_controls :: proc(t: ^music.Track, lo, hi, here: int) {
 		}
 	}
 
-	if wh := ui_take_wheel(rect(KB_X0, ROWS_Y, KB_LEN, rows_h())); wh != 0 do g.fb_track_n = clamp(g.fb_track_n + (wh > 0 ? 1 : -1), 1, TRACK_MAX)
+	if wh := ui_take_wheel(rect(kb_x0(), ROWS_Y, KB_LEN, rows_h())); wh != 0 do g.fb_track_n = clamp(g.fb_track_n + (wh > 0 ? 1 : -1), 1, TRACK_MAX)
 }
 
 // The status line while the mouse is on the keys.

@@ -18,6 +18,7 @@ package music
         name "Cannon"
         volume 1
         group cannons   # optional: variations of one sound, stepped through with < >
+        bus battle      # optional: the bus it plays on (made when first used); else "sfx"
         # voice <instrument> <pitch> <start s> <length s> [volume] [pan]
         voice boom  A1   0     0.8
         voice blast C3   0     0.5  0.9
@@ -63,6 +64,8 @@ Sfx :: struct {
 	// them as one button with < > to step through them, and a game can pick
 	// one at random (mixer_play_sfx_group). "" = on its own.
 	group:  string,
+	// The bus it plays on (bus.odin) unless told otherwise; "" = "sfx".
+	bus:    string,
 	voices: [dynamic]Sfx_Voice,
 	source: string, // the .sfx file
 }
@@ -144,6 +147,9 @@ sfx_bank_load_dir :: proc(b: ^Sfx_Bank, orchestra: ^Registry, dir: string, rep: 
 			switch l.cmd {
 			case "name":
 				if len(a) >= 1 do name = a[0]
+			case "bus":
+				if len(a) >= 1 do fx.bus = own(b, a[0])
+				else do append(&rep.errors, fmt.aprintf("%s:%d: bus needs a name", where_, l.no))
 			case "group":
 				if len(a) >= 1 do fx.group = own(b, a[0])
 				else do append(&rep.errors, fmt.aprintf("%s:%d: group needs a name", where_, l.no))

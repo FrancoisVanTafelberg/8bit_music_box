@@ -380,7 +380,7 @@ file_save_new :: proc(name: string) -> bool {
 save_menu_draw :: proc() {
 	W :: f32(330)
 	H :: f32(150)
-	x := g.save_x >= 0 ? clamp(g.save_x - 120, 8, 1280 - W - 8) : (1280 - W) / 2
+	x := g.save_x >= 0 ? clamp(g.save_x - 120, 8, screen_w() - W - 8) : (screen_w() - W) / 2
 	r := rect(x, TOP_H + 2, W, H)
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)

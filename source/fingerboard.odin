@@ -41,13 +41,13 @@ import rl "vendor:raylib"
 // The panel, from here to the right edge of the screen (the sheet ends where
 // it starts). Just wide enough for the board, the note names beside its
 // circles, the octave marks to its left and the finger labels at the edge.
-FB_X :: 1280 - 348
-FB_W :: 1280 - FB_X
-FB_CX :: FB_X + 166 // the middle of the board
+fb_left :: proc() -> f32 {return screen_w() - 348}
+fb_w :: proc() -> f32 {return screen_w() - fb_left()}
+fb_cx :: proc() -> f32 {return fb_left() + 166} // the middle of the board
 
 FB_OPEN_Y :: TOP_H + 208 // the open-string circles, above the nut
 FB_NUT_Y :: TOP_H + 224
-FB_END_Y :: 720 - STATUS_H - 12
+fb_end_y :: proc() -> f32 {return screen_h() - STATUS_H - 12}
 
 FB_HALF_NUT :: 69 // half the board's width at the nut...
 FB_HALF_END :: 93 // ...and at its end: a fingerboard widens toward the bridge
@@ -165,18 +165,18 @@ fb_y :: proc(n: int) -> f32 {
 // Where semitone n is stopped (on a fretted board: its fret).
 fb_fret_y :: proc(n: int) -> f32 {
 	if n == 0 do return FB_NUT_Y
-	return FB_NUT_Y + fb_frac(n) * (FB_END_Y - FB_NUT_Y)
+	return FB_NUT_Y + fb_frac(n) * (fb_end_y() - FB_NUT_Y)
 }
 
 fb_center_x :: proc() -> f32 {
-	return f32(FB_CX)
+	return f32(fb_cx())
 }
 
 @(private = "file")
 fb_half :: proc(y: f32) -> f32 {
 	// The board widens along its real length: over the part shown, only a
 	// share of the whole widening.
-	t := clamp((y - FB_NUT_Y) / (FB_END_Y - FB_NUT_Y), 0, 1.1) * fb_phys(max(g.fb_view, 1)) / fb_phys(f32(fb_semis()))
+	t := clamp((y - FB_NUT_Y) / (fb_end_y() - FB_NUT_Y), 0, 1.1) * fb_phys(max(g.fb_view, 1)) / fb_phys(f32(fb_semis()))
 	return (FB_HALF_NUT + (FB_HALF_END - FB_HALF_NUT) * t) * fb_widen()
 }
 
@@ -203,7 +203,7 @@ fb_radius :: proc(n: int) -> f32 {
 // The circle under the mouse, if any.
 fb_hover :: proc() -> Fb_Pos {
 	m := g.ui.mouse
-	if m.x < FB_X || m.y < FB_OPEN_Y - 10 || m.y > FB_END_Y + 10 do return {}
+	if m.x < fb_left() || m.y < FB_OPEN_Y - 10 || m.y > fb_end_y() + 10 do return {}
 	best: Fb_Pos
 	best_d := f32(1e9)
 	for s in 0 ..< fb_strings() {
@@ -298,7 +298,7 @@ fingerboard_draw :: proc() {
 		g.fb_view += (target - g.fb_view) * min(rl.GetFrameTime() * 10, 1)
 		if abs(target - g.fb_view) < 0.01 do g.fb_view = target
 	}
-	x0 := f32(FB_X + 8)
+	x0 := f32(fb_left() + 8)
 	y := f32(TOP_H + 6)
 
 	ins := fb_instrument()
@@ -308,7 +308,7 @@ fingerboard_draw :: proc() {
 	y += 14
 
 	// The key filter.
-	bw := (f32(FB_W) - 16 - 8 * 4) / 9
+	bw := (f32(fb_w()) - 16 - 8 * 4) / 9
 	if button(rect(x0, y, bw, 18), "All", !g.fb_filter) do g.fb_filter = false
 	for k, i in FB_KEYS_SHARP {
 		r := rect(x0 + f32(i + 1) * (bw + 4), y, bw, 18)
@@ -338,7 +338,7 @@ fingerboard_draw :: proc() {
 	// The hand position: two rows of five.
 	board := fb_board()
 	hand := fb_hand()
-	pw := (f32(FB_W) - 16 - 4 * 4) / 5
+	pw := (f32(fb_w()) - 16 - 4 * 4) / 5
 	for i in 0 ..< int(board.n_positions) {
 		hp := &board.positions[i]
 		if button(rect(x0 + f32(i % 5) * (pw + 4), y + f32(i / 5) * 22, pw, 18), music.board_position_short(hp), int(g.fb_hand) == i) do g.fb_hand = i8(i)
@@ -389,7 +389,7 @@ fingerboard_draw :: proc() {
 	text(g.input.chords ? "mic: every note it can pick out" : "mic: one note - the note, not its overtones", x0 + 70, y + 4, COL_DIM)
 
 	// The wheel over the board steps through them.
-	if w := ui_take_wheel(rect(FB_X, FB_OPEN_Y - 12, FB_W, FB_END_Y - FB_OPEN_Y + 24)); w != 0 {
+	if w := ui_take_wheel(rect(fb_left(), FB_OPEN_Y - 12, fb_w(), fb_end_y() - FB_OPEN_Y + 24)); w != 0 {
 		g.fb_hand = i8(clamp(int(g.fb_hand) + (w < 0 ? 1 : -1), 0, max(int(board.n_positions) - 1, 0)))
 	}
 
@@ -429,8 +429,8 @@ fingerboard_draw :: proc() {
 		we := FB_HALF_END * 1.125 * fb_widen()
 		tl := rl.Vector2{cx - wn - pad, FB_NUT_Y}
 		tr := rl.Vector2{cx + wn + pad, FB_NUT_Y}
-		bl := rl.Vector2{cx - we - pad, FB_END_Y + 8}
-		br := rl.Vector2{cx + we + pad, FB_END_Y + 8}
+		bl := rl.Vector2{cx - we - pad, fb_end_y() + 8}
+		br := rl.Vector2{cx + we + pad, fb_end_y() + 8}
 		board := rl.Color{34, 27, 25, 255}
 		rl.DrawTriangle(tl, bl, br, board)
 		rl.DrawTriangle(tl, br, tr, board)
@@ -476,7 +476,7 @@ fingerboard_draw :: proc() {
 		finger_line :: proc(semis: int, label_s: string, c: rl.Color, below: ^f32) {
 			fy := fb_y(semis)
 			l := fb_x(0, fy) - 16
-			r := f32(1280 - 26)
+			r := f32(screen_w() - 26)
 			rl.DrawLineEx({l, fy}, {r - 6, fy}, 2, c)
 			ly := max(fy, below^ + 15)
 			rl.DrawLineEx({r - 6, fy}, {r, ly}, 2, c)
@@ -498,7 +498,7 @@ fingerboard_draw :: proc() {
 	// Strings: thickest on the left.
 	for s in 0 ..< n_str {
 		top := rl.Vector2{fb_x(s, FB_NUT_Y), FB_NUT_Y}
-		bottom := rl.Vector2{fb_x(s, FB_END_Y + 8), FB_END_Y + 8}
+		bottom := rl.Vector2{fb_x(s, fb_end_y() + 8), fb_end_y() + 8}
 		rl.DrawLineEx(top, bottom, 3 - f32(s) * 2 / f32(max(n_str, 2)), {176, 172, 160, 255})
 		text_centered(fb_string_name(s), rect(top.x - 20, FB_OPEN_Y - 22, 40, 12), COL_DIM)
 	}
@@ -558,7 +558,7 @@ fingerboard_draw :: proc() {
 	fb_input_draw()
 
 	// Click a circle: hear it.
-	if here.ok && ui_take_click(rect(FB_X, FB_OPEN_Y - 12, FB_W, FB_END_Y - FB_OPEN_Y + 24)) {
+	if here.ok && ui_take_click(rect(fb_left(), FB_OPEN_Y - 12, fb_w(), fb_end_y() - FB_OPEN_Y + 24)) {
 		m := fb_midi(here)
 		if !fb_playable(m) {
 			set_error("%s is outside the %s's range", fb_name(m), ins.name)
@@ -595,7 +595,7 @@ fb_input_draw :: proc() {
 		m := midis[i]
 		if !p.ok || fb_midi(p) != m do continue
 		cents := in_.notes[i] - f32(m)
-		y := fb_in_view(p.semis) ? fb_y(p.semis) : FB_END_Y + 4
+		y := fb_in_view(p.semis) ? fb_y(p.semis) : fb_end_y() + 4
 		if fb_in_view(p.semis) {
 			if cents > 0 && p.semis > 0 && fb_in_view(p.semis + 1) {
 				y += (fb_y(p.semis + 1) - y) * cents

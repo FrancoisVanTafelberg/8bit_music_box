@@ -30,10 +30,12 @@ package music
     false. 0 is never a valid handle.
 
     VOLUMES. Each song has its own volume (mixer_set_song_volume, which can
-    fade), each layer can be on or off and has a gain, and on top of all of it
-    `music_volume`, `sfx_volume` and `master` are plain fields to set: the
-    options-menu sliders. Every change is ramped over one block, so nothing
-    clicks.
+    fade), each layer can be on or off and has a gain. Above that, BUSES
+    (bus.odin): songs play on the "music" bus, sound effects on "sfx" (or the
+    bus their .sfx file names), note previews on "ui", each with a volume, a
+    pan and an effect, all into the master bus and its limiter - the
+    options-menu sliders are mixer_set_bus_volume(&m, BUS_MUSIC / BUS_SFX /
+    BUS_MASTER, v). Every change is ramped over one block, so nothing clicks.
 
     THREADS. Not thread-safe: call everything, mixer_render included, from one
     thread (the game loop, polling the output, as music_rl does), or guard the
@@ -58,10 +60,9 @@ Mixer :: struct {
 	sounds:       Sfx_Bank, // the sound effects
 	songs:        [MAX_SONGS]Song_Slot,
 	sfx:          [dynamic]Sfx_Live,
-	// Levels, 0..1 (more than 1 is allowed, and louder). Set them directly.
-	master:       f32,
-	music_volume: f32,
-	sfx_volume:   f32,
+	// Where they are mixed (bus.odin): 0 is the master.
+	buses:        [MAX_BUSES]Bus_State,
+	limiter:      Limiter,
 	// 4-bit .. 32-bit (synth.odin). Used by songs and sounds started after it
 	// is changed.
 	mode:         Sound_Mode,
@@ -83,6 +84,7 @@ Song_Slot :: struct {
 	step:       f32, // ...by this much a frame
 	applied:    f32, // the gain the last block ended on
 	stopping:   bool, // free the slot when `level` reaches 0
+	bus:        Bus,
 }
 
 Mixer_Layer :: struct {
@@ -99,6 +101,7 @@ Sfx_Live :: struct {
 	level:   f32,
 	step:    f32, // > 0 while being stopped
 	applied: f32,
+	bus:     Bus,
 }
 
 // ---------------------------------------------------------------------------
@@ -107,9 +110,7 @@ Sfx_Live :: struct {
 
 mixer_init :: proc(m: ^Mixer) {
 	mixer_destroy(m)
-	m.master = 1
-	m.music_volume = 1
-	m.sfx_volume = 1
+	buses_init(m)
 	m.mode = DEFAULT_MODE
 	m.rng = 0x2545F491
 	registry_bind(&m.reg)
@@ -125,6 +126,7 @@ mixer_destroy :: proc(m: ^Mixer) {
 	for &s in m.songs do if s.handle != 0 do slot_free(&s)
 	delete(m.sfx)
 	delete(m.scratch)
+	buses_destroy(m)
 	sfx_bank_destroy(&m.sounds)
 	registry_destroy(&m.reg)
 	m^ = {}
@@ -164,6 +166,7 @@ mixer_play_song_file :: proc(
 	volume: f32 = 1,
 	fade_in: f32 = 0,
 	rep: ^Load_Report = nil,
+	bus := BUS_DEFAULT,
 ) -> Song_Handle {
 	local: Load_Report
 	r := rep != nil ? rep : &local
@@ -174,7 +177,7 @@ mixer_play_song_file :: proc(
 		song_destroy(&song)
 		return 0
 	}
-	h := mixer_play_song(m, &song, loop, volume, fade_in)
+	h := mixer_play_song(m, &song, loop, volume, fade_in, bus = bus)
 	slot := slot_get(m, h)
 	slot.song = song // the slot keeps it (song-defined instruments live in it)
 	slot.owns_song = true
@@ -193,8 +196,10 @@ mixer_play_song :: proc(
 	fade_in: f32 = 0,
 	from_tick: i32 = 0,
 	to_tick: i32 = -1,
+	bus := BUS_DEFAULT, // BUS_DEFAULT: the music bus
 ) -> Song_Handle {
 	slot := slot_take(m)
+	slot.bus = bus_live(m, bus == BUS_DEFAULT ? BUS_MUSIC : bus)
 	engine_start(&slot.engine, song, from_tick, m.mode, to_tick)
 	engine_set_loop(&slot.engine, loop)
 	slot.title = strings.clone(song.title)
@@ -211,7 +216,7 @@ mixer_play_song :: proc(
 	slot.goal = max(volume, 0)
 	slot_ramp(slot, fade_in)
 	slot.level = fade_in > 0 ? 0 : slot.goal
-	slot.applied = slot.level * m.music_volume
+	slot.applied = slot.level
 	m.next_handle += 1
 	if m.next_handle == 0 do m.next_handle = 1
 	slot.handle = Song_Handle(m.next_handle)
@@ -369,25 +374,38 @@ mixer_sync_song :: proc(m: ^Mixer, h: Song_Handle, song: ^Song) {
 // shifts it in semitones; `vary` picks a random shift up to that many
 // semitones either way, so ten musket shots are not one shot ten times.
 // Returns 0 if there is no such sound effect.
-mixer_play_sfx :: proc(m: ^Mixer, key: string, volume: f32 = 1, pan: f32 = 0, pitch: f32 = 0, vary: f32 = 0) -> Sfx_Handle {
+// `bus`: BUS_DEFAULT is the one its .sfx file names (`bus battle`), else "sfx".
+mixer_play_sfx :: proc(m: ^Mixer, key: string, volume: f32 = 1, pan: f32 = 0, pitch: f32 = 0, vary: f32 = 0, bus := BUS_DEFAULT) -> Sfx_Handle {
 	fx, ok := sfx_find(&m.sounds, key)
 	if !ok do return 0
 	h := sfx_handle(m)
+	b := sfx_bus_of(m, fx, bus)
 	shift := pitch + (vary != 0 ? (rand_unit(m) * 2 - 1) * vary : 0)
 	for sv in fx.voices {
 		ev := sfx_event(sv, fx.volume * volume, pan, shift, m.frame)
-		sfx_add(m, voice_make(ev, sv.ins, m.mode), h)
+		sfx_add(m, voice_make(ev, sv.ins, m.mode), h, b)
 	}
 	return h
+}
+
+// The bus a sound effect plays on: the one asked for, else its own (made the
+// first time it is wanted), else "sfx".
+@(private)
+sfx_bus_of :: proc(m: ^Mixer, fx: ^Sfx, bus: Bus) -> Bus {
+	if bus != BUS_DEFAULT do return bus_live(m, bus)
+	if fx.bus != "" {
+		if b, ok := mixer_bus_create(m, fx.bus); ok do return b
+	}
+	return BUS_SFX
 }
 
 // One of a group of sound effects at random ("musket": any of the musket
 // shots), so a battle does not fire the same shot twice in a row as often.
 // Returns 0 if no sound effect is in that group.
-mixer_play_sfx_group :: proc(m: ^Mixer, group: string, volume: f32 = 1, pan: f32 = 0, pitch: f32 = 0, vary: f32 = 0) -> Sfx_Handle {
+mixer_play_sfx_group :: proc(m: ^Mixer, group: string, volume: f32 = 1, pan: f32 = 0, pitch: f32 = 0, vary: f32 = 0, bus := BUS_DEFAULT) -> Sfx_Handle {
 	fx := sfx_random_of(m, group)
 	if fx == nil do return 0
-	return mixer_play_sfx(m, fx.key, volume, pan, pitch, vary)
+	return mixer_play_sfx(m, fx.key, volume, pan, pitch, vary, bus)
 }
 
 // A random member of a group, or nil.
@@ -411,8 +429,8 @@ sfx_random_of :: proc(m: ^Mixer, group: string) -> ^Sfx {
 // heard in the left ear at full and in the right at 20 %.
 //
 //     music.mixer_play_sfx_at(&mixer, "cannon", cannon_x / screen_width)
-mixer_play_sfx_at :: proc(m: ^Mixer, key: string, x: f32, volume: f32 = 1, pitch: f32 = 0, vary: f32 = 0) -> Sfx_Handle {
-	return mixer_play_sfx(m, key, volume, screen_pan(x), pitch, vary)
+mixer_play_sfx_at :: proc(m: ^Mixer, key: string, x: f32, volume: f32 = 1, pitch: f32 = 0, vary: f32 = 0, bus := BUS_DEFAULT) -> Sfx_Handle {
+	return mixer_play_sfx(m, key, volume, screen_pan(x), pitch, vary, bus)
 }
 
 // A place across the screen (0 left edge .. 1 right edge) as a pan.
@@ -445,6 +463,7 @@ mixer_play_sfx_burst :: proc(
 	times: []f32 = nil,
 	pan: f32 = 0, // where the burst is, as for mixer_play_sfx (screen_pan for a place on the screen)
 	mixed := false,
+	bus := BUS_DEFAULT,
 ) -> Sfx_Handle {
 	fx, ok := sfx_find(&m.sounds, key)
 	if !ok || count <= 0 do return 0
@@ -477,9 +496,10 @@ mixer_play_sfx_burst :: proc(
 		if mixed {
 			if r := sfx_random_of(m, fx.group); r != nil do shot = r
 		}
+		b := sfx_bus_of(m, shot, bus)
 		for sv in shot.voices {
 			ev := sfx_event(sv, shot.volume * loud, shot_pan, shift, at)
-			sfx_add(m, voice_make(ev, sv.ins, m.mode), h)
+			sfx_add(m, voice_make(ev, sv.ins, m.mode), h, b)
 		}
 	}
 	return h
@@ -487,19 +507,20 @@ mixer_play_sfx_burst :: proc(
 
 // Play one note on an instrument of the orchestra (or of the sound effects),
 // by key: a stinger, a bell, a UI blip. `midi` 60 = middle C.
-mixer_play_note :: proc(m: ^Mixer, inst_key: string, midi: f32, seconds: f32 = 0.5, volume: f32 = 1, pan: f32 = 0) -> Sfx_Handle {
+// On the "ui" bus unless told otherwise.
+mixer_play_note :: proc(m: ^Mixer, inst_key: string, midi: f32, seconds: f32 = 0.5, volume: f32 = 1, pan: f32 = 0, bus := BUS_DEFAULT) -> Sfx_Handle {
 	if id, ok := registry_find(&m.reg, inst_key); ok {
-		return mixer_play_instrument(m, m.reg.list[id], midi, seconds, volume, pan)
+		return mixer_play_instrument(m, m.reg.list[id], midi, seconds, volume, pan, bus)
 	}
 	if id, ok := registry_find(&m.sounds.insts, inst_key); ok {
-		return mixer_play_instrument(m, m.sounds.insts.list[id], midi, seconds, volume, pan)
+		return mixer_play_instrument(m, m.sounds.insts.list[id], midi, seconds, volume, pan, bus)
 	}
 	return 0
 }
 
 // The same, with the instrument itself (the editor uses this to preview a
 // song's own instruments).
-mixer_play_instrument :: proc(m: ^Mixer, ins: Instrument, midi: f32, seconds: f32 = 0.5, volume: f32 = 1, pan: f32 = 0) -> Sfx_Handle {
+mixer_play_instrument :: proc(m: ^Mixer, ins: Instrument, midi: f32, seconds: f32 = 0.5, volume: f32 = 1, pan: f32 = 0, bus := BUS_DEFAULT) -> Sfx_Handle {
 	h := sfx_handle(m)
 	ev := Event {
 		start = m.frame,
@@ -509,7 +530,7 @@ mixer_play_instrument :: proc(m: ^Mixer, ins: Instrument, midi: f32, seconds: f3
 		pan   = clamp(pan, -1, 1),
 		track = -1,
 	}
-	sfx_add(m, voice_make(ev, ins, m.mode), h)
+	sfx_add(m, voice_make(ev, ins, m.mode), h, bus_live(m, bus == BUS_DEFAULT ? BUS_UI : bus))
 	return h
 }
 
@@ -540,10 +561,20 @@ mixer_sfx_key :: proc(m: ^Mixer, i: int) -> (key, name: string) {
 // Fill `out` (stereo, interleaved, SAMPLE_RATE) with the next block of
 // everything that is playing. Any length; the same length every call is best.
 mixer_render :: proc(m: ^Mixer, out: []f32) {
-	for &s in out do s = 0
 	frames := len(out) / 2
 	if len(m.scratch) < len(out) do resize(&m.scratch, len(out))
 	scratch := m.scratch[:len(out)]
+	// Each bus sums its sounds into its own buffer; the master's is `out`.
+	for &s in out do s = 0
+	for &b, i in m.buses {
+		if !b.alive || i == int(BUS_MASTER) do continue
+		if len(b.buf) != len(out) do resize(&b.buf, len(out))
+		for &s in b.buf do s = 0
+	}
+	dest :: proc(m: ^Mixer, bus: Bus, out: []f32) -> []f32 {
+		b := bus_live(m, bus)
+		return b == BUS_MASTER ? out : m.buses[b].buf[:]
+	}
 
 	for &slot in m.songs {
 		if slot.handle == 0 do continue
@@ -552,11 +583,12 @@ mixer_render :: proc(m: ^Mixer, out: []f32) {
 		// Move the song's level toward its goal, across this block.
 		if slot.level < slot.goal do slot.level = min(slot.level + slot.step * f32(frames), slot.goal)
 		else if slot.level > slot.goal do slot.level = max(slot.level - slot.step * f32(frames), slot.goal)
-		g0, g1 := slot.applied, slot.level * m.music_volume
+		g0, g1 := slot.applied, slot.level
+		into := dest(m, slot.bus, out)
 		for i in 0 ..< frames {
 			g := g0 + (g1 - g0) * f32(i + 1) / f32(frames)
-			out[i * 2] += scratch[i * 2] * g
-			out[i * 2 + 1] += scratch[i * 2 + 1] * g
+			into[i * 2] += scratch[i * 2] * g
+			into[i * 2 + 1] += scratch[i * 2 + 1] * g
 		}
 		slot.applied = g1
 		if !more || (slot.stopping && slot.level <= 0) do slot_free(&slot)
@@ -574,8 +606,9 @@ mixer_render :: proc(m: ^Mixer, out: []f32) {
 		}
 		offset := max(s.voice.ev.start - m.frame, 0)
 		if s.step > 0 do s.level = max(s.level - s.step * f32(frames), 0)
-		g1 := s.level * m.sfx_volume
-		done := voice_render(&s.voice, out[offset * 2:], s.applied, g1, frames, offset)
+		g1 := s.level
+		into := dest(m, s.bus, out)
+		done := voice_render(&s.voice, into[offset * 2:], s.applied, g1, frames, offset)
 		s.applied = g1
 		if done || s.level <= 0 {
 			unordered_remove(&m.sfx, i) // order does not matter: it is a sum
@@ -584,7 +617,19 @@ mixer_render :: proc(m: ^Mixer, out: []f32) {
 		}
 	}
 
-	for &s in out do s = clamp(s * MASTER * m.master, -1, 1)
+	// Each bus: its effect, then its volume and pan, into the master.
+	for &b, i in m.buses {
+		if !b.alive || i == int(BUS_MASTER) do continue
+		effect_run(&b.effect, b.buf[:])
+		b.peak = bus_send(&b, b.buf[:], out)
+	}
+	// The master: its effect, volume and pan; the headroom every voice is
+	// mixed with (synth.odin); the limiter.
+	master := &m.buses[BUS_MASTER]
+	effect_run(&master.effect, out)
+	master.peak = bus_send(master, out, out)
+	for &s in out do s *= MASTER
+	limiter_run(&m.limiter, out)
 	m.frame = block_end
 }
 
@@ -691,7 +736,7 @@ sfx_handle :: proc(m: ^Mixer) -> Sfx_Handle {
 }
 
 @(private)
-sfx_add :: proc(m: ^Mixer, v: Voice, h: Sfx_Handle) {
+sfx_add :: proc(m: ^Mixer, v: Voice, h: Sfx_Handle, bus: Bus) {
 	voice := v
 	// A fresh noise seed each time: two cannon shots should not be identical.
 	// (Metallic noise has to stay on its balanced loop: step along it
@@ -717,7 +762,7 @@ sfx_add :: proc(m: ^Mixer, v: Voice, h: Sfx_Handle) {
 		if oldest < 0 do return
 		unordered_remove(&m.sfx, oldest)
 	}
-	append(&m.sfx, Sfx_Live{voice = voice, handle = h, level = 1, applied = m.sfx_volume})
+	append(&m.sfx, Sfx_Live{voice = voice, handle = h, level = 1, applied = 1, bus = bus})
 }
 
 @(private)

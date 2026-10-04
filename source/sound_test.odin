@@ -14,6 +14,10 @@ package app
     the playhead moving across it. For a grouped sound, "all mixed" makes
     each shot a random one of the group (mixer_play_sfx_burst's `mixed`).
 
+    Below it, the bus the sound plays on (music/bus.odin): its volume, an
+    effect to try on it (muffled, thin, echo), its meter, and the master's
+    limiter with how far it is turning the mix down.
+
     Where on the screen: the position slider, 0 % the left edge, 50 % the
     middle, 100 % the right edge. A balance, not a pan: in the middle both
     ears hear it at full; moving it left turns the right ear down (to nothing
@@ -49,8 +53,8 @@ Sound_Test :: struct {
 
 sound_test_draw :: proc() {
 	st := &g.sfx_test
-	r := rect(panel_w() + 20, TOP_H + 20, 1280 - panel_w() - 40, 600)
-	fill(rect(0, 0, 1280, 720), {0, 0, 0, 150})
+	r := rect(panel_w() + 20, TOP_H + 20, screen_w() - panel_w() - 40, 600)
+	fill(rect(0, 0, screen_w(), screen_h()), {0, 0, 0, 150})
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Sound effects", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
@@ -138,6 +142,53 @@ sound_test_draw :: proc() {
 		ear("left", left, tx + 44, y)
 		ear("right", right, tx + 210, y)
 		y += 40
+	}
+
+	// The bus the selected sound plays on (music/bus.odin): its volume, an
+	// effect to try, its meter; and the master's limiter.
+	{
+		fxs := &list[st.selected]
+		bus := music.BUS_SFX
+		if fxs.bus != "" {
+			if bb, ok := music.mixer_bus_create(&g.audio, fxs.bus); ok do bus = bb
+		}
+		x := r.x + 12
+		label("bus", x, y + 5)
+		text(music.bus_name(&g.audio, bus), x + 60, y + 5, COL_TEXT)
+		x += 130
+		v := music.mixer_bus_volume(&g.audio, bus)
+		nv := stepper(rect(x, y, 90, 20), v, 0, 2, 0.05, 1, fmt.tprintf("%d%%", int(v * 100 + 0.5)))
+		if nv != v do music.mixer_set_bus_volume(&g.audio, bus, nv)
+		x += 100
+		EFFECT_NAMES := [music.Effect_Kind]string{.None = "no effect", .Low_Pass = "muffled", .High_Pass = "thin", .Echo = "echo", .Custom = "custom"}
+		kind := music.mixer_bus_effect(&g.audio, bus)
+		if button(rect(x, y, 90, 20), EFFECT_NAMES[kind], kind != .None) {
+			// Round the built-in effects: none, muffled, thin, echo.
+			switch kind {
+			case .None:
+				music.mixer_set_bus_low_pass(&g.audio, bus, 700)
+			case .Low_Pass:
+				music.mixer_set_bus_high_pass(&g.audio, bus, 1200)
+			case .High_Pass:
+				music.mixer_set_bus_echo(&g.audio, bus, 0.32, 0.4, 0.4)
+			case .Echo, .Custom:
+				music.mixer_set_bus_low_pass(&g.audio, bus, 0)
+			}
+		}
+		x += 100
+		// Its meter: the last block's peak.
+		mr := rect(x, y + 4, 80, 12)
+		fill(mr, COL_SHEET)
+		pk := clamp(music.mixer_bus_peak(&g.audio, bus) * music.MASTER, 0, 1)
+		fill(rect(mr.x, mr.y, mr.width * pk, mr.height), COL_GOOD)
+		outline(mr, COL_EDGE)
+		x += 96
+		lim := g.audio.limiter.on
+		if button(rect(x, y, 90, 20), lim ? "limiter on" : "limiter off", lim) do music.mixer_set_limiter(&g.audio, !lim)
+		x += 100
+		red := music.mixer_limiter_reduction(&g.audio)
+		text(lim ? fmt.tprintf("turning down %.1f dB", red) : "clipping at full scale", x, y + 5, red > 0.5 ? COL_ACCENT : COL_FAINT)
+		y += 32
 	}
 
 	// Many at once.

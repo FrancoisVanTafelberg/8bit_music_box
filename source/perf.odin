@@ -89,7 +89,7 @@ perf_end :: proc() {
 perf_draw :: proc() {
 	fps := rl.GetFPS()
 	s := fmt.tprintf("%d fps", fps)
-	r := rect(1280 - text_width(s) - 10, 11, text_width(s) + 6, 12)
+	r := rect(screen_w() - text_width(s) - 10, 11, text_width(s) + 6, 12)
 	c := fps >= 100 ? COL_GOOD : (fps >= 50 ? COL_ACCENT : COL_BAD)
 	text(s, r.x + 3, r.y + 1, g.perf.show ? COL_ACCENT : c)
 	if ui_take_click(r) || rl.IsKeyPressed(.F3) do g.perf.show = !g.perf.show
@@ -101,7 +101,7 @@ perf_panel :: proc() {
 	p := &g.perf
 	W :: 380
 	H :: 330
-	r := rect(1280 - W - 8, TOP_H + 6, W, H)
+	r := rect(screen_w() - W - 8, TOP_H + 6, W, H)
 	fill(r, {10, 11, 20, 235})
 	outline(r, COL_ACCENT)
 	x := r.x + 10

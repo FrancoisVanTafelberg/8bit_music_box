@@ -35,7 +35,7 @@ GUTTER_NAME_X :: GUTTER_W - 24 // where the note names start
 // right of the screen.
 panel_w :: proc() -> f32 {return g.helper ? 104 : 208}
 bars_x :: proc() -> f32 {return panel_w() + GUTTER_W}
-bars_w :: proc() -> f32 {return g.helper ? FB_X - 8 - bars_x() : 1280 - bars_x() - 8}
+bars_w :: proc() -> f32 {return g.helper ? fb_left() - 8 - bars_x() : screen_w() - bars_x() - 8}
 sheet_r :: proc() -> f32 {return bars_x() + bars_w() + 8} // the sheet's right edge
 BAR_NUM_Y :: TOP_H + 2
 ROWS_Y :: TOP_H + 18
@@ -43,9 +43,10 @@ ROWS_Y :: TOP_H + 18
 // piano, or - with the range button on - only the active layer's instrument's
 // compass, each row taller for it. The music box starts on the piano, the
 // Cello Helper on the instrument.
-PIANO_ROWS_H :: music.STEP_COUNT * 12 // the space the rows have
+// The space the rows have: down to the page strip, which keeps to the bottom.
+rows_space :: proc() -> int {return int(strip_y()) - 4 - ROWS_Y}
 ROW_H_MAX :: 36
-STRIP_Y :: ROWS_Y + PIANO_ROWS_H + 4
+strip_y :: proc() -> f32 {return screen_h() - STATUS_H - STRIP_H - 4}
 
 sheet_lo :: #force_inline proc() -> int {return g.sheet_lo}
 sheet_hi :: #force_inline proc() -> int {return g.sheet_hi}
@@ -68,7 +69,7 @@ sheet_range_update :: proc() {
 	}
 	if hi < lo do lo, hi = music.STEP_LO, music.STEP_HI
 	g.sheet_lo, g.sheet_hi = lo, hi
-	g.row_h = clamp(PIANO_ROWS_H / (hi - lo + 1), 12, ROW_H_MAX)
+	g.row_h = clamp(rows_space() / (hi - lo + 1), 12, ROW_H_MAX)
 }
 
 STRIP_H :: 18
@@ -216,13 +217,12 @@ in_range :: proc(inst: music.Inst_Id, p: music.Pitch) -> bool {
 
 sheet_draw :: proc() {
 	if score_on() {
-		// Drawn already, into its own texture (score.odin): shown here.
-		score_blit()
+		score_draw()
 		strip_draw()
 		if g.helper do helper_draw()
 		return
 	}
-	fill(rect(panel_w(), TOP_H, sheet_r() - panel_w(), 720 - TOP_H - STATUS_H), COL_SHEET)
+	fill(rect(panel_w(), TOP_H, sheet_r() - panel_w(), screen_h() - TOP_H - STATUS_H), COL_SHEET)
 	t := active_track()
 	bt := music.bar_ticks(&g.song)
 	left, right := f32(bars_x()), f32(bars_x() + bars_w())
@@ -510,12 +510,12 @@ gutter_draw :: proc(hov: Hover) {
 @(private = "file")
 strip_draw :: proc() {
 	n := page_count()
-	text(fmt.tprintf("%d/%d", g.page + 1, n), panel_w() + 4, STRIP_Y + 4, COL_DIM)
+	text(fmt.tprintf("%d/%d", g.page + 1, n), panel_w() + 4, strip_y() + 4, COL_DIM)
 	// The practice controls (input.odin) have the right-hand end.
 	w := min(f32(bars_w() - 30 - PRACTICE_W - 8) / f32(n), 48)
 	play_page := g.player.playing ? player_tick(&g.player, &g.song) / page_ticks() : -1
 	for i in 0 ..< n {
-		r := rect(bars_x() + f32(i) * w, STRIP_Y, w - 2, STRIP_H)
+		r := rect(bars_x() + f32(i) * w, strip_y(), w - 2, STRIP_H)
 		c := COL_BUTTON
 		if i == g.page do c = COL_BUTTON_ON
 		fill(r, hovered(r) ? COL_BUTTON_HOT : c)
@@ -534,7 +534,7 @@ strip_draw :: proc() {
 		if w >= 16 do text_centered(fmt.tprintf("%d", i + 1), r, i == g.page ? COL_ACCENT : COL_DIM)
 		if ui_take_click(r) do g.page = i
 	}
-	add := rect(bars_x() + f32(n) * w, STRIP_Y, 26, STRIP_H)
+	add := rect(bars_x() + f32(n) * w, strip_y(), 26, STRIP_H)
 	if button(add, "+") {
 		g.song.bars = (page_count() + 1) * page_bars()
 		g.page = page_count() - 1

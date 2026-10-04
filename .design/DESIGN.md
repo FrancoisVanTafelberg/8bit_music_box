@@ -158,7 +158,8 @@ instruments — the sheet shows what plays.
 
 One row per **line or space** (a diatonic step), not per semitone — it reads like sheet
 music and the rows are twice as tall to click. 88 piano keys are 52 steps (A0 … C8),
-at 12 canvas pixels a row.
+at 12 points a row or more: the rows share out the height the window gives them, up to
+36 points each.
 
 * Steps are numbered from C0 = 0, so C4 (middle C) = 28. Octave = step / 7,
   letter = step % 7.
@@ -192,7 +193,7 @@ counted from the start of its bar — a quarter note has 4 slots in 4/4, an eigh
 has 12. A dotted note snaps to half its length (a dotted quarter lands on eighths), which
 is where dotted notes actually fall in real music. Alt while placing snaps to 32nds.
 
-### 3.3 Layout (1280 × 720 canvas)
+### 3.3 Layout (no canvas: the window's own size, in points)
 
 ```
 ┌──────────────────────── top bar: title · tempo · time · key · transport · file ────────────────────────┐
@@ -206,10 +207,24 @@ is where dotted notes actually fall in real music. Alt while placing snaps to 32
 └──────────────────────── status bar: hovered pitch, frequency, position, hints ─────────────────────────┘
 ```
 
-The canvas is drawn at 1280 × 720 and scaled to the window — 1:1 at 720p, a sharp 2×
-at 1440p, and the two-step "sharp" upscale in between (1.5× at 1080p). That is the
-virtual-resolution code from Animal Kingdoms (`source/rlu`), with the canvas raised from
-960 × 540. The default raylib font is a pixel font, which suits it.
+**No canvas** (`source/window.odin`). Everything is drawn straight to the window at its
+real resolution, as the fuzzyfinder does, so text, staff lines and note heads are sharp at
+any size. (It used to draw a fixed 1280 × 720 canvas with raylib's pixel font and scale it
+up - Animal Kingdoms' `rlu`, right for a pixel-art game, soft and blocky for a tool.)
+
+* The layout is written in **points**; the **UI scale** (`g.scale`) is pixels per point,
+  and drawing goes through a 2D camera zoomed by it. Text is JetBrains Mono (OFL, in the
+  exe via `#load`, as in the fuzzyfinder) rasterised at FONT × scale pixels and drawn at
+  FONT points, so every glyph lands one texel to one pixel; shapes are drawn with 4× MSAA.
+* The layout reads the window's size every frame (`screen_w()`, `screen_h()`, in points):
+  a bigger window gives the sheet more room - wider bars, taller rows (up to 36 points), a
+  longer fingerboard. 1280 × 720 points is only the least room it needs.
+* **The scale:** automatic is the largest, in 5 % steps, that leaves the layout its
+  1280 × 720 points - 1 at 720p, 1.5 at 1080p, 2 at 1440p, 3 at 4K. `Ctrl+-` makes the UI
+  10 % smaller (more room for the music), `Ctrl+=` bigger again (never past what fits),
+  `Ctrl+0` automatic; remembered in `settings.txt`. F11: borderless full screen.
+* `MUSIC_BOX_WINDOW=2560x1440` opens the window at another size - for trying the layout out
+  at sizes the screen in front of you is not (the screenshot tests use it).
 
 **Key lines** (the "lines" toggle, on by default). The sheet has a row per letter, so every
 row is already in the key: a click on an F row in G major places F♯. What the toggle shows
@@ -281,9 +296,9 @@ active layer as a printed part. Only the active layer is drawn - it is that part
   on white.
 * **Drawn without a font:** clefs, rests, flags and accidentals are pen strokes - smooth
   lines through a few points, each with its own width (`pen_stroke`) - so they look the
-  same everywhere and scale with the staff space (`SP`, 9 px). The score is drawn before
-  the canvas into its own texture at twice the size and shrunk onto the canvas: every edge
-  anti-aliased (`score_prerender`, `score_blit`).
+  same everywhere and scale with the staff space (`SP`, 9 points). Drawn straight to the
+  window at its own resolution like everything else (`score_draw`), so it is as sharp as
+  the screen.
 * **Not yet:** voices (two rhythms on one staff draw as separate chords at the same place),
   grace notes, 8va lines for very high piano notes, clef changes within a line, and
   transposing parts (a clarinet in Bb is shown at concert pitch).
@@ -419,11 +434,12 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `source/` | package `app` — one package, one file per concern. All state in one `App` block (`g`) so hot reload keeps the song you are editing |
 | `source/score.odin` | the Score view: the sheet as sheet music (§3.4a); `score_glyphs.odin` draws its clefs, rests, flags, accidentals and note heads |
 | `source/helper.odin` | the Helper: the selected layer's fingerboard (`fingerboard.odin`) or keyboard (`keyboard.odin`) (§4.3) |
-| `source/rlu/` | virtual resolution, vendored from Animal Kingdoms (canvas 1280 × 720) |
+| `source/window.odin` | the window, the UI scale (points to pixels), the font, `settings.txt` (§3.3). (`source/rlu/`, the old fixed canvas from Animal Kingdoms, is marked for deletion: `tools/clean_marked`) |
 | `source/music/` | package `music` — **no raylib**. Theory (pitches, keys, lengths), the song model, the `.song` format, the instrument table, the synth engine, sound effects, the Mixer, WAV writing and MIDI import. Headless, so `tools/render` can use it, and so can any other program (§4.2) |
 | `source/music_rl/` | package `music_rl`: the Mixer's sound out through a raylib `AudioStream`. The only raylib-facing piece of the engine |
 | `tools/render/` | CLI: render a `.song` or `.mid` straight to WAV, or sound effects (`-- sfx cannon`, `-- sfx all`) |
 | `tools/pitch_test/` | checks the one-note pitch detection on a rendered cello part in a noisy room (`-- -noisy` for a louder one) |
+| `tools/bus_test/` | checks the mixer's buses, effects and limiter, headless |
 | `tools/chord_test/` | checks the chord detection and the Check mode's verdicts on rendered chords in a noisy room (`-- -noisy`, `-- -v`) |
 | `examples/battle_demo/` | the engine inside another program: a march with layers toggled live, battle sounds on keys |
 | `instruments/` | the orchestra, `.inst` files |
@@ -496,7 +512,9 @@ music_rl.output_update(&out, &m)
 | **Layers** | by layer name ("Trumpet 1"): `mixer_set_layer`, `mixer_set_layer_gain`, `mixer_solo_layer`, `mixer_layer_on`. By instrument key, reaching every layer that plays it ("trumpet"): `mixer_set_instrument`, `mixer_set_instrument_gain`, `mixer_solo_instrument`, `mixer_instrument_on`. `mixer_set_all_layers` for everything. Names ignore case; setters return how many layers they changed. `mixer_layer_count` / `mixer_layer_name` list them for a menu |
 | **Bursts** | `mixer_play_sfx_burst(key, count, seconds, volume, pan_spread, vary, pan)`: many of one effect, start times drawn from a normal distribution (σ = seconds/6, redrawn if outside), each shot with its own pitch, loudness and pan (`pan` ± `pan_spread`); the group scaled by 1/√(shots in the busiest 50 ms) so it does not clip. One handle for all. `mixed = true`: each shot a random member of the key's group. The editor's SFX tester uses it |
 | **Sound effects** | `mixer_play_sfx(key, volume, pan, pitch, vary)` → a `Sfx_Handle`; `vary` shifts each shot by a random amount so ten muskets are not one musket ten times; `mixer_stop_sfx`. **Pan is a balance, not a pan law:** p = (pan+1)/2, left = min(1, 2(1-p)), right = min(1, 2p) - the near ear stays at full level and only the far ear drops (pan -1: left only; 0: both full; +1: right only). `mixer_play_sfx_at(key, x, ...)` takes a screen position instead (0 left edge, 0.5 middle, 1 right edge; `screen_pan(x)` converts), so a cannon on the left of the screen sounds from the left. Music keeps its constant-power pan. The SFX tester's **position** slider (with a meter per ear) tries it. `mixer_play_sfx_group(group, ...)`: a random one of a group (below). `mixer_play_note(inst_key, midi)` plays a single orchestra note (a UI blip, a stinger) |
-| **Levels** | `master`, `music_volume`, `sfx_volume`: plain fields, the options-menu sliders |
+| **Buses** | (`music/bus.odin`) every sound plays on a bus; each bus sums its sounds, runs its effect, and is added into the master with its volume and pan (a balance); the master has the same, then a limiter. Always there: `BUS_MASTER`, `BUS_MUSIC` (songs), `BUS_SFX` (sound effects), `BUS_UI` (note previews, blips). More by name, up to 16: `mixer_bus_create(&m, "battle")`, or `bus battle` in a `.sfx` file (made the first time that sound plays). `bus =` on `mixer_play_song` / `_sfx` / `_sfx_burst` / `_note` picks one (`BUS_DEFAULT`: the sound's own); `mixer_set_song_bus` / `mixer_set_sfx_bus` move a playing sound; `mixer_bus_destroy` moves what was on it to the master. `mixer_set_bus_volume` (the options-menu sliders: music, effects, master), `mixer_set_bus_pan`, `mixer_bus_peak` (a meter) |
+| **Effects** | per bus, one at a time: `mixer_set_bus_low_pass(bus, hz)` (muffled: ~700 behind a wall, ~300 under water), `mixer_set_bus_high_pass(bus, hz)` (thin: a radio), `mixer_set_bus_echo(bus, delay, feedback, mix)` (a valley, a hall), or your own `mixer_set_bus_effect(bus, proc, data)` on the bus's interleaved block (a procedure pointer: set it again after a hot reload; the built-ins are data and survive one) |
+| **Limiter** | on the master, last: where the mix would pass the threshold (0.89, -1 dB) it is turned down at once, just enough, and eased back over 0.15 s - so a dense volley gets quieter instead of crackling; a quiet mix passes untouched (bit for bit). `mixer_set_limiter(on, threshold)`, `mixer_limiter_reduction()` in dB. Off: clipped at full scale, as before. `tools/bus_test` checks all of it headless |
 | **Output** | `mixer_render(&m, block)` fills any block of stereo f32 at 44.1 kHz. `music_rl` does it for raylib; any other audio API works the same way |
 
 Rules that keep it simple: handles are safe after their sound has ended (calls on them do

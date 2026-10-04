@@ -310,7 +310,7 @@ colour_mix :: proc(a, b: rl.Color, t: f32) -> rl.Color {
 @(private = "file")
 fb_point :: proc(p: Fb_Pos) -> rl.Vector2 {
 	// Past the end of what the board shows: pinned to its end.
-	y := fb_in_view(p.semis) ? fb_y(p.semis) : FB_END_Y + 4
+	y := fb_in_view(p.semis) ? fb_y(p.semis) : fb_end_y() + 4
 	return {fb_x(p.string, y), y}
 }
 

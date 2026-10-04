@@ -40,6 +40,9 @@ A sound effect is a handful of voices, each an instrument playing one pitch:
   name "Cannon"
   volume 1                         # the whole effect
   group cannons                    # optional: one of a set of variations
+  bus battle                       # optional: the bus it plays on (made when first
+                                   # used): a volume, a pan and an effect for all the
+                                   # battle sounds at once. Default: the "sfx" bus
   # voice <instrument> <pitch> <start s> <length s> [volume] [pan -1..1]
   voice boom    A1  0     0.9  1
   voice blast   C3  0     0.6  0.9

@@ -17,11 +17,14 @@ package app
 import "core:fmt"
 import "music"
 import music_rl "music_rl"
-import "rlu"
 import rl "vendor:raylib"
 
 App :: struct {
-	v:          rlu.Virtual,
+	// The UI scale: pixels to a point (window.odin), and the size asked for
+	// (0: automatic, the largest the window fits); the fonts made for it.
+	scale:      f32,
+	ui_size:    f32,
+	fonts:      Fonts,
 	song:       music.Song,
 	// Where the song lives on disk; "" until it is first saved or loaded.
 	path:       string,
@@ -73,10 +76,9 @@ App :: struct {
 	// in the Score view, the tick being played (the page scrolls up).
 	scroll_view: f32,
 	// The sheet as a grid or as sheet music (score.odin), and the Score
-	// view's paper (false: white ink on black) and its texture.
+	// view's paper (false: white ink on black).
 	view:        Sheet_View,
 	score_paper: bool,
-	score_rt:    rl.RenderTexture2D,
 	sheet_lo:   int,
 	sheet_hi:   int,
 	row_h:      int,
@@ -138,11 +140,8 @@ g: ^App
 @(export)
 game_init_window :: proc() {
 	g = new(App)
-	rlu.init(
-		&g.v,
-		APP_TITLE,
-		rlu.Wanted{mode = .Windowed, w = 1920, h = 1080, at = {rlu.WINDOW_UNPLACED, rlu.WINDOW_UNPLACED}},
-	)
+	g.scale = 1
+	window_open(APP_TITLE)
 	rl.SetTargetFPS(120)
 	rl.InitAudioDevice()
 }
@@ -162,6 +161,8 @@ game_init :: proc() {
 	g.sfx_test = {count = 100, seconds = 2, volume = 1, spread = true, position = 0.5}
 	input_init()
 	files_init()
+	settings_load()
+	ui_scale_update()
 	music.mixer_init(&g.audio)
 	instruments_reload(true)
 	player_init(&g.player)
@@ -176,17 +177,9 @@ game_init :: proc() {
 game_update :: proc() -> bool {
 	g.frames += 1
 	perf_begin()
-	rlu.update(&g.v)
+	ui_scale_update()
 
-	if rlu.too_small(&g.v) {
-		rl.BeginDrawing()
-		rl.ClearBackground(COL_BG)
-		rl.DrawText("Make the window at least 1280 x 720.", 20, 20, 20, COL_TEXT)
-		rl.EndDrawing()
-		return !rl.WindowShouldClose()
-	}
-
-	if rl.IsKeyPressed(.F11) do rlu.toggle_fullscreen(&g.v)
+	if rl.IsKeyPressed(.F11) do fullscreen_toggle()
 	// F7, as in Animal Kingdoms: reload the data files - here, the instruments.
 	if rl.IsKeyPressed(.F7) do instruments_reload(false)
 
@@ -214,11 +207,11 @@ game_update :: proc() -> bool {
 	// see it, the panels before the sheet.
 	keys_update()
 	perf_mark(.Logic)
-	// The Score view draws itself first, into its own texture (score.odin).
-	if score_on() do score_prerender()
 	{
-		rlu.begin(&g.v)
+		rl.BeginDrawing()
 		rl.ClearBackground(COL_BG)
+		// Everything is laid out in points; the camera makes them pixels.
+		rl.BeginMode2D({zoom = g.scale})
 		// With an overlay up, nothing underneath it may take the mouse: the
 		// frame's input is set aside, the page drawn deaf, and the input
 		// handed to the overlay alone.
@@ -242,8 +235,9 @@ game_update :: proc() -> bool {
 		// has had its chance to claim the click.
 		sheet_input()
 	}
+	rl.EndMode2D()
 	perf_mark(.Draw)
-	rlu.present(&g.v)
+	rl.EndDrawing()
 	perf_mark(.Present)
 	perf_end()
 
@@ -253,7 +247,6 @@ game_update :: proc() -> bool {
 
 @(export)
 game_shutdown :: proc() {
-	if g.score_rt.id != 0 do rl.UnloadRenderTexture(g.score_rt)
 	input_shutdown()
 	player_destroy(&g.player)
 	music.song_destroy(&g.song)
@@ -268,7 +261,7 @@ game_shutdown :: proc() {
 @(export)
 game_shutdown_window :: proc() {
 	rl.CloseAudioDevice()
-	rlu.destroy(&g.v)
+	fonts_unload(&g.fonts)
 	rl.CloseWindow()
 	free(g)
 }
