@@ -40,7 +40,7 @@ TIME_SIGS := [?][2]i32{{4, 4}, {3, 4}, {2, 4}, {2, 2}, {6, 8}, {9, 8}, {12, 8}, 
 
 topbar_draw :: proc() {
 	fill(rect(0, 0, screen_w(), TOP_H), COL_PANEL)
-	rl.DrawLineV({0, TOP_H - 1}, {screen_w(), TOP_H - 1}, COL_EDGE)
+	rl.DrawLineV({0, TOP_H - 1}, {screen_w(), TOP_H - 1}, COL_RULE)
 	y := f32(6)
 	h := f32(20)
 
@@ -177,7 +177,7 @@ LAYER_H :: 20
 
 panel_draw :: proc() {
 	fill(rect(0, TOP_H, panel_w(), screen_h() - TOP_H - STATUS_H), COL_PANEL)
-	rl.DrawLineV({panel_w() - 1, TOP_H}, {panel_w() - 1, screen_h() - STATUS_H}, COL_EDGE)
+	rl.DrawLineV({panel_w() - 1, TOP_H}, {panel_w() - 1, screen_h() - STATUS_H}, COL_RULE)
 	x := f32(8)
 	w := f32(panel_w() - 16)
 	y := f32(TOP_H + 8)
@@ -376,7 +376,7 @@ wave_desc :: proc(ins: ^music.Instrument) -> string {
 statusbar_draw :: proc() {
 	y := f32(screen_h() - STATUS_H)
 	fill(rect(0, y, screen_w(), STATUS_H), COL_PANEL)
-	rl.DrawLineV({0, y}, {screen_w(), y}, COL_EDGE)
+	rl.DrawLineV({0, y}, {screen_w(), y}, COL_RULE)
 
 	msg := status_text()
 	age := rl.GetTime() - g.status_time
@@ -442,7 +442,7 @@ overlay_draw :: proc() {
 @(private = "file")
 instruments_overlay :: proc() {
 	r := rect(panel_w() + 20, TOP_H + 20, screen_w() - panel_w() - 40, 520)
-	fill(rect(0, 0, screen_w(), screen_h()), {0, 0, 0, 150})
+	fill(rect(0, 0, screen_w(), screen_h()), COL_SCRIM)
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Add an instrument layer", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
@@ -494,7 +494,7 @@ open_overlay :: proc() {
 @(private = "file")
 open_overlay_draw :: proc() {
 	r := rect(panel_w() + 20, TOP_H + 20, screen_w() - panel_w() - 40, 560)
-	fill(rect(0, 0, screen_w(), screen_h()), {0, 0, 0, 150})
+	fill(rect(0, 0, screen_w(), screen_h()), COL_SCRIM)
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Open", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)

@@ -43,7 +43,7 @@ helper_toggle :: proc() {
 // The right-hand panel, with the Helper on.
 helper_draw :: proc() {
 	fill(rect(fb_left(), TOP_H, fb_w(), screen_h() - TOP_H - STATUS_H), COL_PANEL)
-	rl.DrawLineV({fb_left(), TOP_H}, {fb_left(), screen_h() - STATUS_H}, COL_EDGE)
+	rl.DrawLineV({fb_left(), TOP_H}, {fb_left(), screen_h() - STATUS_H}, COL_RULE)
 	if fb_board() != nil {
 		fingerboard_draw()
 		return

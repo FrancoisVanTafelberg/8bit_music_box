@@ -54,7 +54,7 @@ Sound_Test :: struct {
 sound_test_draw :: proc() {
 	st := &g.sfx_test
 	r := rect(panel_w() + 20, TOP_H + 20, screen_w() - panel_w() - 40, 600)
-	fill(rect(0, 0, screen_w(), screen_h()), {0, 0, 0, 150})
+	fill(rect(0, 0, screen_w(), screen_h()), COL_SCRIM)
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Sound effects", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
@@ -187,13 +187,13 @@ sound_test_draw :: proc() {
 		if button(rect(x, y, 90, 20), lim ? "limiter on" : "limiter off", lim) do music.mixer_set_limiter(&g.audio, !lim)
 		x += 100
 		red := music.mixer_limiter_reduction(&g.audio)
-		text(lim ? fmt.tprintf("turning down %.1f dB", red) : "clipping at full scale", x, y + 5, red > 0.5 ? COL_ACCENT : COL_FAINT)
+		text(lim ? fmt.tprintf("turning down %.1f dB", red) : "clipping at full scale", x, y + 5, red > 0.5 ? COL_WARN : COL_FAINT)
 		y += 32
 	}
 
 	// Many at once.
 	fx := &list[st.selected]
-	rl.DrawLine(i32(r.x + 12), i32(y), i32(r.x + r.width - 12), i32(y), COL_EDGE)
+	rl.DrawLineV({r.x + 12, y}, {r.x + r.width - 12, y}, COL_RULE)
 	y += 10
 	grouped := fx.group != ""
 	mixed := grouped && st.mixed

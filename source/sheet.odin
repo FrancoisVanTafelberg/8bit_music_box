@@ -233,7 +233,7 @@ sheet_draw :: proc() {
 		for step in sheet_lo() ..= sheet_hi() {
 			p := music.Pitch{i8(step), music.key_alter(int(g.song.key), step)}
 			if !in_range(t.inst, p) {
-				fill(rect(bars_x(), row_y(step), bars_w(), row_h()), {8, 9, 16, 255})
+				fill(rect(bars_x(), row_y(step), bars_w(), row_h()), {5, 6, 5, 255})
 			}
 		}
 	}
@@ -266,12 +266,12 @@ sheet_draw :: proc() {
 		y := row_center(step)
 		switch {
 		case music.step_is_grand_staff(step):
-			rl.DrawLineEx({bars_x(), y}, {right, y}, 1, {150, 156, 196, 255})
+			rl.DrawLineEx({bars_x(), y}, {right, y}, 1, {140, 154, 126, 255})
 		case step == 28:
 			// Middle C: dashed, the ledger line between the staves.
-			for x := f32(bars_x()); x < right; x += 8 do rl.DrawLineEx({x, y}, {min(x + 4, right), y}, 1, {120, 124, 170, 255})
+			for x := f32(bars_x()); x < right; x += 8 do rl.DrawLineEx({x, y}, {min(x + 4, right), y}, 1, {112, 126, 100, 255})
 		case:
-			rl.DrawLineEx({bars_x(), y}, {right, y}, 1, {40, 44, 70, 255})
+			rl.DrawLineEx({bars_x(), y}, {right, y}, 1, {32, 38, 30, 255})
 		}
 	}
 
@@ -288,18 +288,18 @@ sheet_draw :: proc() {
 			if x < left - 0.5 || x > right + 0.5 do continue
 			switch {
 			case k == 0:
-				rl.DrawLineEx({x, top}, {x, bottom}, 2, {170, 170, 214, 255})
+				rl.DrawLineEx({x, top}, {x, bottom}, 2, {164, 178, 150, 255})
 			case k % beat == 0:
-				rl.DrawLineEx({x, top}, {x, bottom}, 1, {70, 74, 110, 255})
+				rl.DrawLineEx({x, top}, {x, bottom}, 1, {58, 68, 54, 255})
 			case k % sn == 0 && f32(sn) * px_per_tick() >= 5:
-				rl.DrawLineEx({x, top}, {x, bottom}, 1, {30, 33, 54, 255})
+				rl.DrawLineEx({x, top}, {x, bottom}, 1, {24, 29, 23, 255})
 			}
 		}
 		// Bar number, and past the song's end a note that it is empty room.
 		bx := tick_x(start)
 		if bx >= left - 1 && bx < right - 16 do text(fmt.tprintf("%d", bar + 1), bx + 8, BAR_NUM_Y, bar < g.song.bars ? COL_DIM : COL_FAINT)
 	}
-	rl.DrawLineEx({right, top}, {right, bottom}, 2, {170, 170, 214, 255})
+	rl.DrawLineEx({right, top}, {right, bottom}, 2, {164, 178, 150, 255})
 
 	gutter_draw(hov)
 
@@ -341,7 +341,7 @@ sheet_draw :: proc() {
 	if g.player.playing && (scrolling() || in_view(playing_tick)) {
 		// Scrolling, it stays at the left edge and the page moves.
 		x := scrolling() ? left + 1 : tick_x(playing_tick)
-		rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, COL_ACCENT)
+		rl.DrawLineEx({x, top - 4}, {x, bottom}, 2, COL_MATCH)
 	}
 	// Bar or Page scope: where Play will stop - or, repeating, where it
 	// goes back from (and the start it goes back to).
@@ -482,7 +482,7 @@ gutter_draw :: proc(hov: Hover) {
 		if hov.ok && hov.step == step do c = COL_ACCENT
 		// Every row by its full name, letter and octave: D3, F#3, C4.
 		text(name, x + GUTTER_NAME_X, y + (row_h() - 10) / 2, c)
-		if is_c do rl.DrawLineEx({x + GUTTER_NAME_X - 2, y + row_h()}, {x + GUTTER_W, y + row_h()}, 1, COL_EDGE)
+		if is_c do rl.DrawLineEx({x + GUTTER_NAME_X - 2, y + row_h()}, {x + GUTTER_W, y + row_h()}, 1, COL_RULE)
 
 		// The row's frequency ratio to the reference note (key lines on).
 		if g.key_lines {
@@ -557,7 +557,7 @@ metronome_draw :: proc(playing_tick: i32) {
 		x := tick_x(n.tick)
 		down := n.vel >= 110
 		h := f32(down ? 7 : 4)
-		c := down ? rl.Color{200, 200, 220, 255} : rl.Color{130, 134, 170, 255}
+		c := down ? rl.Color{204, 212, 194, 255} : rl.Color{120, 132, 112, 255}
 		if muted do c = COL_FAINT
 		if playing_tick >= n.tick && playing_tick < n.tick + music.beat_ticks(&g.song) && !muted do c = COL_ACCENT
 		fill(rect(x + 1, f32(ROWS_Y) - h - 1, down ? 4 : 3, h), c)

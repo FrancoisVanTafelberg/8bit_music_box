@@ -490,7 +490,7 @@ input_sheet_draw :: proc() {
 		lx := x + r + 6
 		if lx + text_width(s) + 6 > right do lx = x - r - 10 - text_width(s)
 		fill(rect(lx - 3, ly - 7, text_width(s) + 6, 14), {0, 0, 0, 170})
-		text(s, lx, ly - 5, abs(cents) <= 10 ? COL_GOOD : (abs(cents) <= music.CHECK_TUNE ? COL_ACCENT : COL_BAD))
+		text(s, lx, ly - 5, abs(cents) <= 10 ? COL_GOOD : (abs(cents) <= music.CHECK_TUNE ? COL_WARN : COL_BAD))
 	}
 }
 
@@ -549,7 +549,7 @@ input_score_draw :: proc() {
 		lx := x + r + 6
 		if lx + text_width(s) + 6 > right do lx = x - r - 10 - text_width(s)
 		fill(rect(lx - 3, ly - 7, text_width(s) + 6, 14), {0, 0, 0, 170})
-		text(s, lx, ly - 5, abs(cents) <= 10 ? COL_GOOD : (abs(cents) <= music.CHECK_TUNE ? COL_ACCENT : COL_BAD))
+		text(s, lx, ly - 5, abs(cents) <= 10 ? COL_GOOD : (abs(cents) <= music.CHECK_TUNE ? COL_WARN : COL_BAD))
 	}
 }
 

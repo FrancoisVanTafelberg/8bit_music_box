@@ -16,21 +16,28 @@ package app
 import "core:strings"
 import rl "vendor:raylib"
 
-// --- Palette: a dark NES-ish night sky ---
-COL_BG :: rl.Color{14, 16, 28, 255}
-COL_PANEL :: rl.Color{24, 26, 44, 255}
-COL_PANEL_HI :: rl.Color{38, 41, 68, 255}
-COL_SHEET :: rl.Color{18, 20, 34, 255}
-COL_EDGE :: rl.Color{58, 62, 98, 255}
-COL_TEXT :: rl.Color{226, 226, 240, 255}
-COL_DIM :: rl.Color{128, 132, 164, 255}
-COL_FAINT :: rl.Color{80, 84, 116, 255}
-COL_ACCENT :: rl.Color{255, 204, 64, 255}
-COL_GOOD :: rl.Color{110, 220, 140, 255}
-COL_BAD :: rl.Color{250, 96, 96, 255}
-COL_BUTTON :: rl.Color{44, 48, 80, 255}
-COL_BUTTON_HOT :: rl.Color{64, 70, 116, 255}
-COL_BUTTON_ON :: rl.Color{92, 78, 34, 255}
+// --- Palette: the fuzzyfinder's (and Animal Kingdoms' menus) ---
+// Near-black, with green for everything that is not text: a black ground,
+// dark moss fills, sage outlines, a brighter green for whatever is selected
+// or playing, and text in a warm off-white that leans the same way.
+COL_BG :: rl.Color{9, 10, 10, 255} // the ground
+COL_PANEL :: rl.Color{13, 15, 14, 255} // panes that sit on it
+COL_PANEL_HI :: rl.Color{22, 27, 21, 255} // hover, menus
+COL_SHEET :: rl.Color{11, 13, 12, 255} // the sheet, wells, tracks (the fuzzyfinder's gutter)
+COL_RULE :: rl.Color{38, 45, 35, 255} // the 1px lines between panes
+COL_EDGE :: rl.Color{120, 138, 104, 255} // sage: outlines of boxes and buttons
+COL_TEXT :: rl.Color{226, 232, 214, 255}
+COL_DIM :: rl.Color{150, 160, 145, 255}
+COL_FAINT :: rl.Color{88, 96, 84, 255}
+COL_ACCENT :: rl.Color{168, 196, 128, 255} // selected, focused, playing
+COL_MATCH :: rl.Color{214, 244, 120, 255} // the brightest thing on screen
+COL_GOOD :: rl.Color{168, 196, 128, 255}
+COL_WARN :: rl.Color{222, 186, 100, 255} // nearly: a note 10-20 cents out, a busy frame
+COL_BAD :: rl.Color{226, 112, 96, 255}
+COL_BUTTON :: rl.Color{30, 37, 28, 255}
+COL_BUTTON_HOT :: rl.Color{42, 52, 38, 255}
+COL_BUTTON_ON :: rl.Color{36, 46, 30, 255}
+COL_SCRIM :: rl.Color{0, 0, 0, 170} // under an overlay
 
 FONT :: 11 // points: the text everywhere
 FONT_BIG :: 20 // points: titles
@@ -141,7 +148,9 @@ button :: proc(r: rl.Rectangle, label: string, on := false, enabled := true) -> 
 	if !enabled do bg = COL_PANEL
 	fill(r, bg)
 	outline(r, on ? COL_ACCENT : COL_EDGE)
-	text_centered(fit_text(label, r.width - 4), r, enabled ? (on ? COL_ACCENT : COL_TEXT) : COL_FAINT)
+	// On: the brightest green, so a toggle that is on reads at a glance
+	// against the sage of the ones that are off.
+	text_centered(fit_text(label, r.width - 4), r, enabled ? (on ? COL_MATCH : COL_TEXT) : COL_FAINT)
 	return enabled && ui_take_click(r)
 }
 

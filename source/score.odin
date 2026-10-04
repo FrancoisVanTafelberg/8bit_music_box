@@ -1050,7 +1050,7 @@ markers_draw :: proc(top: f32, clefs: []music.Clef, ink: Score_Ink, playing_tick
 		return
 	}
 	now := scrolling() ? g.scroll_view : f32(playing_tick)
-	vline(now, top, clefs, ink.accent, 2, false)
+	vline(now, top, clefs, g.score_paper ? ink.accent : COL_MATCH, 2, false)
 	p := &g.player
 	end := p.stop_tick
 	if p.loop do end = p.from_tick + p.loop_ticks

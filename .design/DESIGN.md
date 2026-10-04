@@ -223,6 +223,13 @@ up - Animal Kingdoms' `rlu`, right for a pixel-art game, soft and blocky for a t
   1280 × 720 points - 1 at 720p, 1.5 at 1080p, 2 at 1440p, 3 at 4K. `Ctrl+-` makes the UI
   10 % smaller (more room for the music), `Ctrl+=` bigger again (never past what fits),
   `Ctrl+0` automatic; remembered in `settings.txt`. F11: borderless full screen.
+* **Colours:** the fuzzyfinder's palette (`ui.odin`), itself from Animal Kingdoms' menus:
+  a near-black ground, dark moss panes and buttons, sage outlines, 1 px rules between
+  panes, warm off-white text; the brighter sage for what is selected or focused, the
+  brightest lime (`COL_MATCH`) for the playhead and the text of a toggle that is on, an
+  amber (`COL_WARN`) for "nearly" (a note 10-20 cents out), salmon for wrong. The grid's
+  lines are the same green-greys; layer colours, the key lines' warm/cool tints, the
+  fingerboard's wood and the Score view's black paper are unchanged.
 * `MUSIC_BOX_WINDOW=2560x1440` opens the window at another size - for trying the layout out
   at sizes the screen in front of you is not (the screenshot tests use it).
 
