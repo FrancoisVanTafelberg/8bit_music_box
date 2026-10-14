@@ -114,6 +114,7 @@ Songs the old Cello Helper saved in `cello_songs\` still show in Open, marked [c
 | **Undo** | `Ctrl+Z`, `Ctrl+Y` / `Ctrl+Shift+Z` |
 | **Files** | `Ctrl+S` (or Save) opens the Save menu: **Overwrite** the file the song came from, or **Save new** - a new file beside it (the name suggested is the current one's with `_2`, `_3` ..., typed over as you like; Enter saves), after which the new file is the one being worked on and the original stays as it was; an existing file is never overwritten that way. `Ctrl+O` open, `Ctrl+N` new, `Ctrl+E` export WAV |
 | **Import** | put `.mid` files in `imports\` and Open them, or drag a `.mid` / `.song` onto the window |
+| **Import audio** | a recording - `.wav`, or `.mp4` / `.m4a` / `.mp3` / `.ogg` / `.flac` / `.webm` with `ffmpeg` on PATH - in `imports\` (Open lists it as `[audio]`) or dragged onto the window. Choose the voices (1-4) and two instruments (cello and viola by default: every voice written for both), tempo (auto or set), time, snap grid; **Transcribe**. Out comes a **draft** song, one layer per voice per instrument, to correct on the sheet; Save puts it with the private songs. Works well on one instrument recorded close; a full band comes out a tangle |
 | **Export** | WAV built in; MP3 / OGG / FLAC light up when `ffmpeg` is on PATH |
 | **Sound mode** | the 8-bit button: click cycles **4-bit** (NES 16-step volume, grittiest), **8-bit** (default), **16-bit** (a player's touch: tuning, vibrato and bow scratch vary note to note), **32-bit** (modelled bowed strings and wooden bodies); right-click goes back. Export uses it too |
 | `F3` | performance monitor: where each frame's time goes (logic, audio mixing, drawing, present), the mixing load, voices, underruns, and a graph of the last 240 frames. The FPS is always shown top right (click it too) |
@@ -128,16 +129,17 @@ Rows the active instrument cannot play are shaded and refuse clicks.
 | | |
 |---|---|
 | `source/` | package `app`: the editor. All state in one block for hot reload |
-| `source/music/` | package `music`, no raylib: theory, song model, `.song` format, instruments, synth, sound effects, the Mixer, WAV, MIDI import |
+| `source/music/` | package `music`, no raylib: theory, song model, `.song` format, instruments, synth, sound effects, the Mixer, WAV, MIDI import, audio import |
 | `source/music_rl/` | the Mixer's sound out through raylib |
 | `source/window.odin` | the window and the UI scale: drawn at the window's own resolution, sharp at any size (`Ctrl+-` / `Ctrl+=` / `Ctrl+0` UI size) |
 | `tools/render/` | `odin run tools/render -- songs/ode_to_joy.song` renders to WAV with no window (`-4` `-8` `-16` `-32` pick the sound mode); `-- sfx all` renders every sound effect |
+| `tools/audio_test/` | `odin run tools/audio_test -o:speed` checks audio import on rendered public-domain songs (`-- -noisy` adds a room) |
 | `examples/battle_demo/` | the engine in another program: `odin run examples/battle_demo` |
 | `instruments/` | every instrument, as text files (`.inst`): add or change them without a rebuild, F7 reloads. See `instruments/README.txt` |
 | `sounds/` | sound effects that are not music (cannon, musket, sword clash...), as text files (`.sfx`). See `sounds/README.txt` |
 | `songs/` | saved songs (plain text, hand-editable) |
 | `cello_songs/` | songs the old Cello Helper saved (still listed in Open) |
-| `imports/` | MIDI files to open |
+| `imports/` | MIDI files and recordings to open |
 | `exports/` | rendered audio |
 | `songs_that_cannot_be_used_for_legal_reasons/` | songs and MIDI of music that is **not** public domain: playable here, never copied to the repo or committed |
 

@@ -14,7 +14,7 @@ This is a living document. Change it when a decision changes.
 | MB-2 | Tempo changes mid-song (ritardando, a new section at a new speed). Today a song has one tempo; MIDI import takes the first one. | faithful MIDI import of some pieces |
 | MB-3 | Ties and notes longer than the snap grid allows (a note held across a bar line is stored fine, but there is no tie *notation*). | engraving-quality display |
 | MB-4 | Dynamics: velocity is stored per note (0–127) but there is no UI for it yet. A lane under the sheet? A wheel-with-Alt on a note? | expressive playback |
-| MB-5 | Audio → notes: which approach (see §8), and is it worth it once DOSBox MIDI capture (§9) gives us the original scores exactly? | audio import |
+| MB-5 | ~~Audio → notes: which approach?~~ Decided: in-app draft transcription built on the chord detector (§8). Open: a better separation of voices in a dense mix (today voices are ranked by pitch), and tempo changes within a recording (MB-2). | better audio import |
 
 ---
 
@@ -35,8 +35,9 @@ This is a living document. Change it when a decision changes.
   the page when it reaches the edge.
 * Songs are saved as **plain text** (`.song`) and exported to **WAV** (built in), and to
   **MP3 / OGG / FLAC** through ffmpeg when it is installed.
-* **MIDI files import** straight onto the sheet. Audio files (WAV/MP3) are a later,
-  best-effort "draft transcription" (§8).
+* **MIDI files import** straight onto the sheet. **Recordings** (.wav, or .mp4 / .mp3 /
+  .m4a / .ogg / .flac / .webm through ffmpeg) import as a best-effort draft transcription,
+  one layer per voice per instrument (§8).
 
 ## 2. How 8-bit sound works (and why an instrument is more than a waveform)
 
@@ -441,6 +442,7 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `main_hot_reload/` | the hot-reload host, unchanged apart from names: owns the window, swaps `build/hot_reload/game.dll` |
 | `main_release/` | shipping entry point |
 | `source/` | package `app` — one package, one file per concern. All state in one `App` block (`g`) so hot reload keeps the song you are editing |
+| `source/audio_import_ui.odin` | the Import audio window and its progress bar; the hearing itself is `music/audio_import.odin` (§8) |
 | `source/score.odin` | the Score view: the sheet as sheet music (§3.4a); `score_glyphs.odin` draws its clefs, rests, flags, accidentals and note heads |
 | `source/helper.odin` | the Helper: the selected layer's fingerboard (`fingerboard.odin`) or keyboard (`keyboard.odin`) (§4.3) |
 | `source/window.odin` | the window, the UI scale (points to pixels), the font, `settings.txt` (§3.3). (`source/rlu/`, the old fixed canvas from Animal Kingdoms, is marked for deletion: `tools/clean_marked`) |
@@ -449,12 +451,13 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `tools/render/` | CLI: render a `.song` or `.mid` straight to WAV, or sound effects (`-- sfx cannon`, `-- sfx all`) |
 | `tools/pitch_test/` | checks the one-note pitch detection on a rendered cello part in a noisy room (`-- -noisy` for a louder one) |
 | `tools/bus_test/` | checks the mixer's buses, effects and limiter, headless |
+| `tools/audio_test/` | checks audio import on rendered public-domain songs: notes heard, false notes, tempo, key, notes on the right tick (`-- -noisy`, `-- -v`) |
 | `tools/chord_test/` | checks the chord detection and the Check mode's verdicts on rendered chords in a noisy room (`-- -noisy`, `-- -v`) |
 | `examples/battle_demo/` | the engine inside another program: a march with layers toggled live, battle sounds on keys |
 | `instruments/` | the orchestra, `.inst` files |
 | `sounds/` | sound effects, `.sfx` files |
 | `songs/` | saved songs |
-| `imports/` | drop `.mid` files here (or drag them onto the window) |
+| `imports/` | drop `.mid` files and recordings here (or drag them onto the window) |
 | `exports/` | rendered WAV / MP3 / OGG / FLAC |
 
 ### 4.1 The synth
@@ -740,7 +743,7 @@ end
 | MP3 / OGG / FLAC | render WAV, then `ffmpeg -y -i song.wav song.mp3`. Buttons appear only when `ffmpeg` is on PATH |
 
 Encoding MP3 in-process would mean vendoring LAME or shine; not worth it while ffmpeg exists.
-raylib can *decode* MP3/OGG/FLAC/WAV itself (`rl.LoadWave`), which is what audio import will use.
+Audio import reads .wav itself (`music.wav_read`) and has ffmpeg decode everything else (§8).
 
 ## 7. MIDI import (in v0)
 
@@ -755,21 +758,61 @@ Standard MIDI File, format 0 or 1.
   import reports how many.
 * First tempo, time signature and key signature are used (MB-2).
 
-## 8. Audio import (later)
+## 8. Audio import
 
-Honest expectation: turning a mixed orchestral recording into exact notes is an unsolved
-research problem. What is realistic, in order of effort:
+A recording in, a **draft** out: the notes it is sure of, in time, to correct on the sheet.
+Not a finished transcription - nothing does that reliably - and it says so in the window.
 
-1. **Monophonic** (one melody line, e.g. a solo): YIN/pYIN pitch tracking + onset
-   detection → very usable. The YIN half now exists (`music/pitch.odin`, input mode §3.7);
-   a file import would add onsets and note segmentation on top.
-2. **Polyphonic draft**: constant-Q spectrogram → peak-pick per 16th-note slice → notes,
-   tempo from onset autocorrelation. Gives a sketch to fix by hand on the sheet; the sheet
-   is exactly the tool for that clean-up.
-3. **ML transcription** (e.g. Spotify's Basic Pitch) run *outside* the app, producing a
-   `.mid` that the MIDI importer takes. Best quality, zero code in the app.
+**Files.** `.wav` is read directly (`music.wav_read`: 8/16/24/32-bit PCM, 32-bit float,
+any channels, averaged to mono). Everything else - `.mp4`, `.m4a`, `.mp3`, `.ogg`,
+`.flac`, `.webm`, `.aac`, `.opus` - is decoded by ffmpeg (`-vn -ac 1 -ar 22050`, so a
+video's picture is ignored) into a temporary `.wav` in `exports/`, read, and deleted. No
+ffmpeg, no .mp4: the error says so. 1 s to 20 minutes. Listed by Open from `imports/` (and
+the private folder) as `[audio]`, or dragged onto the window.
 
-Recommendation: option 3 now, option 2 in-app later if it is still wanted.
+**The window** (`source/audio_import_ui.odin`): voices (1-4), two instruments (default
+**cello and viola**: every voice is written for each, so a tune can be practised on either),
+tempo (auto, or set), time signature, the snap grid (8th / 16th / 32nd / 8th triplet), the
+notes listened for (E1-C7) and the noise gate. **Transcribe** hears it a slice per frame
+(about 25 ms of work each; a progress bar; Stop, Esc or a click outside cancels). The
+result replaces the song being edited (after the usual unsaved-changes confirm), unsaved,
+and **Save puts it with the private songs** - a recording is usually of someone else's
+music (`songs_that_cannot_be_used_for_legal_reasons/`).
+
+**How it hears** (`source/music/audio_import.odin`, no raylib - a tool runs it in one go):
+
+1. **Hearing.** Resampled to 22050 Hz and normalised; before it, a quarter second of the
+   recording's own quietest moment (or silence, if nothing in it is 20 dB under its
+   loudest), so the chord detector (§3.7) learns the room's hiss and hum first instead of
+   learning the first note as "the room". The detector reports what sounds every 12 ms:
+   one voice uses its single-note mode (the note, not its overtones), more voices up to
+   that many notes.
+2. **Onsets.** Found first, for the whole recording: the loudness (RMS over 23 ms - a whole
+   wave of the lowest notes, or it would rise and fall with the wave itself - every 6 ms)
+   rising fast to 1.5× its low point of the last 46 ms. An onset ends every note sounding
+   and starts it again - that is how a repeated note is told from a long one - and a note
+   heard within 120 ms after an onset began *at* it (the detector's window, 90-190 ms long,
+   is always late). Notes under 60 ms are dropped.
+3. **Time and key.** The tempo (50-200) is the beat whose multiples and halves best fit the
+   gaps between nearby onsets, with a mild pull toward 100; the grid is slid to where the
+   onsets fit it best and starts at the first note. Starts and ends snap to the grid; a
+   note is cut where the next in its line begins. The key signature is the major or minor
+   key whose Krumhansl-Kessler profile best matches how long each pitch class sounds (which
+   tells D major from G major in a tune that never plays C#).
+4. **Voices and layers.** Voices are ranked by pitch among the notes sounding together,
+   highest = voice 1. For each voice, for each instrument, a layer; the whole voice moves
+   by the octave shift that puts most of it in the instrument's range (its shape is kept),
+   and only notes still outside are folded in one by one.
+
+**How well** (`tools/audio_test`, songs rendered by the engine, notes known): one
+instrument - violin, cello, flute, fife, trumpet - 97-100% of notes found with no false
+ones, the tempo and key right every time, 92-100% on the right tick. With hiss, hum and an
+echo added, 87-100%. Melody plus bass on two voices: ~89%, with ~30 false notes (overtones
+read as notes). A cello playing rolled three-note chords under a violin: ~60%. About 50 ms
+of work per second of music.
+
+What it does not do: a full band with drums (comes out a tangle), tempo changes (MB-2),
+ties across bar lines in the draft (MB-3), dynamics beyond a velocity per note.
 
 ## 9. How to Dosbox capture (research, high value)
 
@@ -801,4 +844,4 @@ those are, and where to get them, is in `.design/COLONIZATION_MUSIC.md`.
 | v2 | tempo map (MB-2), ties (MB-3), chip-strict voice limit (MB-1) | |
 | — | instrument files (`instruments/*.inst`, F7 reload) and song-embedded instruments | **done** |
 | — | the Mixer: an engine for other programs (songs, live layer muting, looping, fades, sound effects in `sounds/*.sfx`) | **done** |
-| v3 | audio → notes draft transcription (§8) | |
+| v3 | audio → notes draft transcription (§8) | **done** (a draft: one instrument works well, a dense mix does not) |

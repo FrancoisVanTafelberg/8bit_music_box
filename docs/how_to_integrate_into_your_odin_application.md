@@ -85,8 +85,9 @@ Copy these from the Music Box repository into your project, keeping the two pack
 | `midi.odin` | MIDI file import | **yes**, unless you import `.mid` files |
 | `wav.odin` | writing WAV files | **yes**, unless you render to disk |
 | `pitch.odin`, `chord.odin` | microphone pitch and chord detection | **yes**: editor-only |
+| `audio_import.odin` | a recording to a draft song (uses `chord.odin`) | **yes**: editor-only |
 
-The cut-down set (without the last four) is verified to compile on its own.
+The cut-down set (without the last five rows) is verified to compile on its own.
 
 ---
 

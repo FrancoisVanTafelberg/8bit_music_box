@@ -19,6 +19,7 @@ Overlay :: enum {
 	Colour, // the colour picker for the active layer (Set colour)
 	Mic, // the microphone: device, level, gate, latency (input.odin)
 	Save, // Overwrite, or Save as a new file (files.odin)
+	Audio_Import, // a recording -> a draft song (audio_import_ui.odin)
 }
 
 overlay_none :: proc() -> bool {
@@ -430,6 +431,8 @@ overlay_draw :: proc() {
 		mic_overlay_draw()
 	case .Save:
 		save_menu_draw()
+	case .Audio_Import:
+		audio_import_draw()
 	}
 	// Whatever the overlay did not take, nobody underneath gets.
 	if g.ui.clicked || g.ui.right {
@@ -498,9 +501,9 @@ open_overlay_draw :: proc() {
 	fill(r, COL_PANEL)
 	outline(r, COL_ACCENT)
 	text("Open", r.x + 12, r.y + 10, COL_TEXT, FONT_BIG)
-	text("Songs from songs/, MIDI from imports/, [private] = not public domain, [cello] = the old Cello Helper's cello_songs/. Or drag a .song / .mid onto the window.", r.x + 12, r.y + 34, COL_DIM)
+	text("Songs from songs/, MIDI and recordings (.wav, .mp4...) from imports/, [private] = not public domain. Or drag a file onto the window.", r.x + 12, r.y + 34, COL_DIM)
 	if len(g.open_files) == 0 {
-		text("Nothing here yet. Save a song, or put a .mid file in imports/.", r.x + 12, r.y + 70, COL_TEXT)
+		text("Nothing here yet. Save a song, or put a .mid or a recording in imports/.", r.x + 12, r.y + 70, COL_TEXT)
 	}
 	cols := 3
 	colw := (r.width - 24) / f32(cols)
@@ -511,8 +514,9 @@ open_overlay_draw :: proc() {
 		cy := r.y + 60 + f32(i % per_col) * 24
 		name := f
 		if k := strings.last_index_any(name, "/\\"); k >= 0 do name = name[k + 1:]
-		is_midi := !strings.has_suffix(name, music.SONG_EXT)
-		shown := is_midi ? fmt.tprintf("[midi] %s", name) : name
+		shown := name
+		if is_audio_file(name) do shown = fmt.tprintf("[audio] %s", name)
+		else if !strings.has_suffix(name, music.SONG_EXT) do shown = fmt.tprintf("[midi] %s", name)
 		if strings.contains(f, PRIVATE_DIR) do shown = fmt.tprintf("[private] %s", shown)
 		if strings.contains(f, CELLO_DIR) do shown = fmt.tprintf("[cello] %s", shown)
 		if button(rect(cx, cy, colw - 8, 20), shown) {

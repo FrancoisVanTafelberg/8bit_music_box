@@ -107,6 +107,8 @@ App :: struct {
 
 	// Panels
 	overlay:      Overlay,
+	// Import audio: the recording, its settings, the hearing in progress.
+	audio_import: Audio_Import_UI,
 	// The Save menu: the name a new file gets, being typed, and where the
 	// menu hangs from.
 	save_name:    [64]u8,
@@ -192,6 +194,7 @@ game_update :: proc() -> bool {
 	perf_mark(.Logic)
 	player_update(&g.player, &g.song)
 	input_update()
+	audio_import_update()
 	perf_mark(.Audio)
 	per_page := page_ticks()
 	if scrolling() {

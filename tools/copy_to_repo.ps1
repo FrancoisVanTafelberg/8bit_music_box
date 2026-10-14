@@ -27,7 +27,8 @@
          belongs to that repository.
       3. Copy .8bit_music_box\ over it, skipping what is generated, local or
          huge - .temp, build, exports, last_song.txt, last_cello_song.txt, settings.txt - the not-public-domain
-         songs_that_cannot_be_used_for_legal_reasons\, and .gitignore, unless
+         songs_that_cannot_be_used_for_legal_reasons\, recordings in imports\
+         (.wav .mp4 .m4a .mp3 .ogg .flac .webm .aac .opus), and .gitignore, unless
          the target has none yet, in which case the source's is used to seed it.
 
     Nothing is written to .8bit_music_box. It is read-only to this script.
@@ -268,6 +269,23 @@ foreach ($item in $copying) {
     }
     Copy-Item -LiteralPath $item.FullName -Destination $dest -Recurse -Force
     $copied++
+}
+
+# Recordings in imports\ (for audio import) are usually of someone else's
+# music, and big: copied with the folder, then taken out again.
+$RecordingExts = @('.wav', '.mp4', '.m4a', '.mp3', '.ogg', '.flac', '.webm', '.aac', '.opus')
+$srcImports = Join-Path $sourceFull 'imports'
+if (Test-Path -LiteralPath $srcImports) {
+    $recordings = @(Get-ChildItem -LiteralPath $srcImports -File -Recurse -Force |
+                    Where-Object { $RecordingExts -contains $_.Extension.ToLower() })
+    foreach ($f in $recordings) {
+        Note "skip  imports\$($f.Name) (a recording)"
+        if (-not $DryRun) {
+            $rel = $f.FullName.Substring($srcImports.Length).TrimStart('\', '/')
+            $dst = Join-Path (Join-Path $targetFull 'imports') $rel
+            if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
+        }
+    }
 }
 
 # The target's .gitignore is its own; but a brand-new repo with none at all

@@ -4,7 +4,7 @@ package app
     Songs on disk: where they live, opening, saving, exporting, importing.
 
         songs/     .song files (plain text, see DESIGN.md 5)
-        imports/   .mid files to bring in
+        imports/   .mid files, and recordings (.wav, .mp4...), to bring in
         exports/   rendered .wav, and .mp3 / .ogg / .flac through ffmpeg
 
     The folders sit next to wherever the app is run from - the project root
@@ -50,7 +50,7 @@ join :: proc(parts: ..string) -> string {
 	return strings.join(all[:], "/", context.temp_allocator)
 }
 
-// Every .song in songs/ and every .mid in imports/, songs first.
+// Every .song in songs/, every .mid and recording in imports/, songs first.
 files_scan :: proc() {
 	for f in g.open_files do delete(f)
 	clear(&g.open_files)
@@ -68,7 +68,9 @@ files_scan :: proc() {
 	scan("songs", {music.SONG_EXT})
 	scan(CELLO_DIR, {music.SONG_EXT}) // the old Cello Helper's, if there are any
 	scan("imports", {".mid", ".midi"})
+	scan("imports", AUDIO_EXTS[:]) // recordings: audio import
 	scan(PRIVATE_DIR, {music.SONG_EXT, ".mid", ".midi"})
+	scan(PRIVATE_DIR, AUDIO_EXTS[:])
 }
 
 file_new :: proc() {
@@ -124,11 +126,24 @@ file_open :: proc(path: string) {
 			rep.layers,
 			rep.transposed > 0 ? fmt.tprintf(" (%d moved by octaves into range)", rep.transposed) : "",
 		)
-	case strings.has_suffix(lower, ".wav"), strings.has_suffix(lower, ".mp3"), strings.has_suffix(lower, ".ogg"), strings.has_suffix(lower, ".flac"):
-		set_error("audio -> notes is not in this build yet (DESIGN.md 8); convert to .mid first")
+	case is_audio_file(lower):
+		audio_import_open(path)
 	case:
 		set_error("don't know how to open %s", path)
 	}
+}
+
+// The draft audio import made (audio_import_ui.odin), as the song being
+// edited: new, unsaved, and saved with the private songs by default - a
+// recording is usually of somebody else's music.
+file_from_audio :: proc(job: ^music.Audio_Import, title: string) -> (notes, layers: int) {
+	player_stop(&g.player)
+	notes, layers, _ = music.audio_import_song(job, &g.song, title)
+	set_path("")
+	after_load()
+	g.private = true
+	g.dirty = true
+	return
 }
 
 @(private = "file")
