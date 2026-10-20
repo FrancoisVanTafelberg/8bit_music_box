@@ -327,10 +327,10 @@ violin, viola, cello and contrabass, not the guitar). `source/fingers.odin`.
   and stems, but stay inside the line's band.
 * **The lanes** (272 points, left of the page): one per string, lowest on the left,
   coloured (lowest first: orange, green, blue, red - a cello's C G D A, a violin's G D A E).
-  Notes come down their string's lane toward a ring at the bottom, one bar (at least two
-  beats) in view, each a block as long as the note with its finger on it; the ring fills
-  with its string's colour and shows the finger while the note sounds. The hand position of
-  the sounding (or next) note is named at the top. While playing, it moves with the
+  Notes rise up their string's lane toward a ring at the top (the string's name above it),
+  one bar (at least two beats) in view, each a block as long as the note with its finger
+  near its top edge; the ring fills with its string's colour and shows the finger while the
+  note sounds. The hand position of the sounding (or next) note is named at the bottom. While playing, it moves with the
   playhead; stopped, it shows the selected note (or the cursor).
 * **The fingering** (`finger_plan`): every note gets a string, a finger and a hand position,
   chosen for the whole layer at once as a shortest path, with the hand position as the

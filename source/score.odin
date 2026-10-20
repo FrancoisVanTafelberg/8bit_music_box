@@ -102,7 +102,7 @@ view_toggle :: proc() {
 	case .Score:
 		set_status("Score view: the active layer as sheet music, %d lines of %d bars a page (V: %s; Shift+V: paper)", SCORE_SYSTEMS, score_bars_per_system(), fingers_board() != nil ? "the Fingers view" : "back to the grid")
 	case .Fingers:
-		set_status("Fingers view: the score with each note's string and finger, and the lanes coming down to them (V: back to the grid)")
+		set_status("Fingers view: the score with each note's string and finger, and the lanes rising up to them (V: back to the grid)")
 	case .Grid:
 		set_status("Grid view (V: the Score view)")
 	}

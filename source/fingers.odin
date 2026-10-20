@@ -8,17 +8,17 @@ package app
     is skipped when the active layer is not a bowed string instrument.
 
         +-------------+---------------------------------------------+
-        |  |  |##|  | |      0  3      0  3 4 4  3 1      <- finger |
+        |  O  (3) O  O|      0  3      0  3 4 4  3 1      <- finger |
         |  |  |##|  | |  ===|==o==o====|==o=o=o==o=o=====  (string's |
         |  |  |##|  | |      G  B      G  B C C  B A        colour) |
         |  |  |##|  | |                               <- letter    |
-        |  O  (3) O  O|                                             |
+        |  |  |##|  | |                                             |
         +-------------+---------------------------------------------+
-         C  G  D  A      the page: the Score view's, unchanged
+         (C G D A over the rings)  the page: the Score view's, unchanged
 
     THE LANES (left): one per string, lowest on the left, each in its own
-    colour. The notes come down them toward a ring at the bottom - a block
-    as long as the note, the finger on it - and the ring lights up with the
+    colour. The notes rise up them toward a ring at the top - a block as
+    long as the note, the finger on it - and the ring lights up with the
     finger while the note sounds: Play, and the hand's next moves are in
     sight a bar ahead. Stopped, it shows the selected note (or the cursor).
 
@@ -327,21 +327,23 @@ lanes_draw :: proc() {
 	n := int(b.n_strings)
 	lane_w := (r.width - 16) / f32(n)
 	rad := min(lane_w * 0.38, 25)
-	ring_y := r.y + r.height - rad - 26 // the rings' middle
-	top := r.y + 24 // under the hand position's name
+	// The rings at the top, under the strings' names; the notes rise up the
+	// lanes to them from the bottom, over the hand position's name.
+	ring_y := r.y + 22 + rad // the rings' middle
+	bottom := r.y + r.height - 22
 	now := lanes_now()
-	// A bar (at least two beats) from the top of the lanes to the rings.
+	// A bar (at least two beats) from the rings to the bottom of the lanes.
 	look := f32(max(music.bar_ticks(&g.song), 2 * music.beat_ticks(&g.song)))
-	per_tick := (ring_y - top) / look
+	per_tick := (bottom - ring_y) / look
 	lane_x :: proc(r: rl.Rectangle, lane_w: f32, s: int) -> f32 {return r.x + 8 + (f32(s) + 0.5) * lane_w}
 
 	for s in 0 ..< n {
 		x := lane_x(r, lane_w, s)
-		rl.DrawLineEx({x, top}, {x, ring_y - rad}, 1.5, with_alpha(string_colour(s), 110))
+		rl.DrawLineEx({x, ring_y + rad}, {x, bottom}, 1.5, with_alpha(string_colour(s), 110))
 	}
 
-	// The blocks: every note from now to a bar ahead, down its string's lane,
-	// cut off at the ring (and at the top).
+	// The blocks: every note from now to a bar ahead, rising up its string's
+	// lane, cut off at the ring (and at the bottom).
 	sounding: [music.BOARD_MAX_STRINGS]i8
 	for &f in sounding do f = -1
 	for note, i in t.notes {
@@ -353,17 +355,17 @@ lanes_draw :: proc() {
 		col := string_colour(int(fn.string))
 		x := lane_x(r, lane_w, int(fn.string))
 		w := lane_w * 0.72
-		y_bot := min(ring_y - (t0 - now) * per_tick, ring_y)
-		y_top := max(ring_y - (t1 - now) * per_tick + 2, top) // a gap between notes
+		y_top := max(ring_y + (t0 - now) * per_tick, ring_y)
+		y_bot := min(ring_y + (t1 - now) * per_tick - 2, bottom) // a gap between notes
 		if y_bot - y_top < 1 do continue
 		br := rl.Rectangle{x - w / 2, y_top, w, y_bot - y_top}
 		dark := colour_mix(col, {0, 0, 0, 255}, 0.45)
 		rl.DrawRectangleGradientH(i32(br.x), i32(br.y), i32(br.width), i32(br.height), col, dark)
 		rl.DrawRectangleRoundedLinesEx(br, 0.12, 4, 1, colour_mix(col, {255, 255, 255, 255}, 0.3))
-		// The finger, near the block's bottom edge (where it is played).
+		// The finger, near the block's top edge (where it is played).
 		lbl := finger_label(fn.finger)
 		lh := f32(FONT_BIG)
-		ly := max(y_bot - lh - 6, br.y + 2)
+		ly := min(y_top + 6, br.y + br.height - lh - 2)
 		if br.height >= lh * 0.8 {
 			text(lbl, x - text_width(lbl, FONT_BIG) / 2 + 1, ly + 1, {0, 0, 0, 140}, FONT_BIG)
 			text(lbl, x - text_width(lbl, FONT_BIG) / 2, ly, rl.WHITE, FONT_BIG)
@@ -385,7 +387,7 @@ lanes_draw :: proc() {
 		}
 		// The string's name.
 		name := fb_string_name(s)
-		text(name, x - text_width(name) / 2, ring_y + rad + 6, ink.faint)
+		text(name, x - text_width(name) / 2, ring_y - rad - 16, ink.faint)
 	}
 	// Which hand position the sounding (or next) note is in.
 	pos := -1
@@ -395,7 +397,7 @@ lanes_draw :: proc() {
 		break
 	}
 	if pos >= 0 && pos < int(b.n_positions) {
-		text(board_pos_name(b, pos), r.x + 8, r.y + 6, ink.faint)
+		text(board_pos_name(b, pos), r.x + 8, bottom + 6, ink.faint)
 	}
 }
 
