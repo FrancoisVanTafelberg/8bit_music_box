@@ -78,6 +78,8 @@ App :: struct {
 	// The sheet as a grid or as sheet music (score.odin), and the Score
 	// view's paper (false: white ink on black).
 	view:        Sheet_View,
+	// The Fingers view's fingering of the active layer (fingers.odin).
+	fingers:     Finger_Plan,
 	score_paper: bool,
 	sheet_lo:   int,
 	sheet_hi:   int,

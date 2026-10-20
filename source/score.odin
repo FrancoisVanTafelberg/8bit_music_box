@@ -45,6 +45,7 @@ import rl "vendor:raylib"
 Sheet_View :: enum u8 {
 	Grid,
 	Score,
+	Fingers, // the Score view with the fingering (fingers.odin)
 }
 
 SP :: f32(9) // a staff space, in canvas pixels
@@ -64,7 +65,8 @@ BEAM_GAP :: 0.75 * SP // from one beam to the next
 MIDDLE_C :: 28 // the step (C4) a grand staff splits at: here and up, the treble staff
 MAX_HEADS :: 12
 
-score_on :: proc() -> bool {return g.view == .Score}
+// The page as sheet music: the Score view, or the Fingers view built on it.
+score_on :: proc() -> bool {return g.view != .Grid}
 
 // ---------------------------------------------------------------------------
 // Colours: black paper by default, white on request
@@ -84,12 +86,24 @@ score_ink :: proc() -> Score_Ink {
 view_toggle :: proc() {
 	// Keep the same music in front of you: the page that holds the first
 	// bar of the page being shown.
+	// Grid -> Score -> Fingers -> Grid; Fingers only for a bowed string
+	// instrument.
 	first_bar := g.page * page_bars()
-	g.view = g.view == .Grid ? .Score : .Grid
+	switch g.view {
+	case .Grid:
+		g.view = .Score
+	case .Score:
+		g.view = fingers_board() != nil ? .Fingers : .Grid
+	case .Fingers:
+		g.view = .Grid
+	}
 	g.page = clamp(first_bar / page_bars(), 0, page_count() - 1)
-	if score_on() {
-		set_status("Score view: the active layer as sheet music, %d lines of %d bars a page (V: back to the grid; Shift+V: paper)", SCORE_SYSTEMS, score_bars_per_system())
-	} else {
+	switch g.view {
+	case .Score:
+		set_status("Score view: the active layer as sheet music, %d lines of %d bars a page (V: %s; Shift+V: paper)", SCORE_SYSTEMS, score_bars_per_system(), fingers_board() != nil ? "the Fingers view" : "back to the grid")
+	case .Fingers:
+		set_status("Fingers view: the score with each note's string and finger, and the lanes coming down to them (V: back to the grid)")
+	case .Grid:
 		set_status("Grid view (V: the Score view)")
 	}
 }
@@ -104,7 +118,9 @@ paper_toggle :: proc() {
 // ---------------------------------------------------------------------------
 
 score_area :: proc() -> rl.Rectangle {
-	return {panel_w(), TOP_H, sheet_r() - panel_w(), f32(strip_y()) - 4 - TOP_H}
+	// The Fingers view's lanes take the left of it (fingers.odin).
+	l := fingers_on() ? LANES_W : 0
+	return {panel_w() + l, TOP_H, sheet_r() - panel_w() - l, f32(strip_y()) - 4 - TOP_H}
 }
 
 sys_h :: proc() -> f32 {return score_area().height / SCORE_SYSTEMS}
@@ -614,16 +630,21 @@ score_draw_page :: proc(ink: Score_Ink) {
 	if g.helper do n_trail = fb_current_trail(trail[:])
 	ties := make([dynamic]Tie_End, context.temp_allocator)
 	evs := make([dynamic]Ev, context.temp_allocator)
+	fingering := fingers_on()
+	marks := make([dynamic]Finger_Mark, context.temp_allocator)
 
 	for i in first ..= last {
 		s := score_sys(i, top, clefs[i])
 		if !s.visible do continue
 		sys_frame_draw(&s, ink)
 		if t == nil do continue
+		clear(&marks)
 		for b in 0 ..< s.n_bars {
 			score_bar(t, s.first + b, &s, &evs)
 			bar_draw(t, &s, evs[:], ink, playing_tick, trail[:n_trail], &ties)
+			if fingering do fingers_collect(evs[:], &marks)
 		}
+		if fingering do fingers_marks_draw(&s, marks[:], ink)
 	}
 	ties_draw(ties[:], ink)
 	if title_room(top) do text_centered(g.song.title, {score_area().x, score_area().y + 4, score_area().width, 12}, ink.faint)

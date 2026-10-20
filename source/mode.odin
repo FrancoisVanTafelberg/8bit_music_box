@@ -14,7 +14,7 @@ BARS_PER_PAGE :: 4 // a song's length is kept to whole grid pages
 // Bars on a page: the grid's four, or the Score view's lines of bars
 // (score.odin).
 page_bars :: proc() -> i32 {
-	return g.view == .Score ? score_bars_per_system() * SCORE_SYSTEMS : BARS_PER_PAGE
+	return score_on() ? score_bars_per_system() * SCORE_SYSTEMS : BARS_PER_PAGE
 }
 
 // Where the Cello Helper used to save. Open still lists what is in it.

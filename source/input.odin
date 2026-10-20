@@ -557,7 +557,7 @@ input_score_draw :: proc() {
 // The practice controls: under the sheet, right of the page boxes.
 // ---------------------------------------------------------------------------
 
-PRACTICE_W :: 308
+PRACTICE_W :: 316
 
 practice_draw :: proc() {
 	y := f32(strip_y())
@@ -565,11 +565,11 @@ practice_draw :: proc() {
 	x := f32(bars_x() + bars_w() - PRACTICE_W)
 	// The sheet as a grid or as sheet music (score.odin); right-click: paper.
 	{
-		r := rect(x, y, 48, h)
-		if button(r, "Score", score_on()) do view_toggle()
+		r := rect(x, y, 56, h)
+		if button(r, fingers_on() ? "Fingers" : "Score", score_on()) do view_toggle()
 		if ui_take_right(r) && score_on() do paper_toggle()
 	}
-	x += 52
+	x += 60
 	if button(rect(x, y, 48, h), "Metro", g.metronome) do metronome_toggle()
 	x += 52
 	if button(rect(x, y, 36, h), "Mic", g.input.on) do input_toggle()

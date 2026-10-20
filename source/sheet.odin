@@ -218,6 +218,7 @@ in_range :: proc(inst: music.Inst_Id, p: music.Pitch) -> bool {
 sheet_draw :: proc() {
 	if score_on() {
 		score_draw()
+		if fingers_on() do lanes_draw()
 		strip_draw()
 		if g.helper do helper_draw()
 		return

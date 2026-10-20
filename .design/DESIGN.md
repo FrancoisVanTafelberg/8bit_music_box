@@ -313,6 +313,42 @@ active layer as a printed part. Only the active layer is drawn - it is that part
   grace notes, 8va lines for very high piano notes, clef changes within a line, and
   transposing parts (a clarinet in Bb is shown at concert pitch).
 
+### 3.4b The Fingers view (bowed strings)
+
+A third view, after the Score in the button's round (Grid → Score → Fingers → Grid; skipped
+when the active layer's instrument has no unfretted board with hand positions - so for the
+violin, viola, cello and contrabass, not the guitar). `source/fingers.odin`.
+
+* **The page** is the Score view's, unchanged in size (up to 4 lines of 4 bars; fewer bars
+  a line if the sheet is narrow), moved right to make room for the lanes. Each note gets its
+  **finger** above the staff in its **string's colour** (`0` open, `1`-`4`, `T` thumb) and
+  its **letter** below (with its accidental, in the key). A chord's fingers stack with the
+  highest note on top, its letters with the highest first. The rows clear the line's heads
+  and stems, but stay inside the line's band.
+* **The lanes** (272 points, left of the page): one per string, lowest on the left,
+  coloured (lowest first: orange, green, blue, red - a cello's C G D A, a violin's G D A E).
+  Notes come down their string's lane toward a ring at the bottom, one bar (at least two
+  beats) in view, each a block as long as the note with its finger on it; the ring fills
+  with its string's colour and shows the finger while the note sounds. The hand position of
+  the sounding (or next) note is named at the top. While playing, it moves with the
+  playhead; stopped, it shows the selected note (or the cursor).
+* **The fingering** (`finger_plan`): every note gets a string, a finger and a hand position,
+  chosen for the whole layer at once as a shortest path, with the hand position as the
+  state (the positions are the instrument file's `position` lines, §4.3):
+  * a note on its position's finger costs 0.1; an open string 0 in any position; a finger a
+    semitone off its place *inside* the hand (a violinist's low 2, high 3) 0.3, a semitone
+    *beyond* the hand (a stretch) 1.5; further off, not in that position;
+  * a shift costs 2 + ¼ per semitone the hand moves, ×0.3 when it can hide behind an open
+    string (either side) or a rest of a beat or more;
+  * every note costs 0.04 per semitone its position is from the instrument's home position
+    (`board_default`, 1st position): 1st position when it will do;
+  * a chord (notes within a quarter beat of each other while the first sounds, as the
+    Helper's tracking groups them) is one step: its notes on different strings, in one
+    position; a note no position plays is left unfingered.
+  Worked out again only when the layer's notes or the instrument change (a hash of both;
+  `App.fingers`). This is separate from the Helper's tracking (§4.3), which places notes
+  by its own chosen rule (same string / nearest / best) and does not assign fingers.
+
 ### 3.5 Play mode
 
 `Space` plays from the start of the current page (`Shift+Space` from the beginning).
@@ -443,6 +479,7 @@ Same shape as Animal Kingdoms, trimmed to what a tool needs:
 | `main_release/` | shipping entry point |
 | `source/` | package `app` — one package, one file per concern. All state in one `App` block (`g`) so hot reload keeps the song you are editing |
 | `source/audio_import_ui.odin` | the Import audio window and its progress bar; the hearing itself is `music/audio_import.odin` (§8) |
+| `source/fingers.odin` | the Fingers view: the fingering of a bowed string layer, the string lanes, fingers and letters on the score (§3.4b) |
 | `source/score.odin` | the Score view: the sheet as sheet music (§3.4a); `score_glyphs.odin` draws its clefs, rests, flags, accidentals and note heads |
 | `source/helper.odin` | the Helper: the selected layer's fingerboard (`fingerboard.odin`) or keyboard (`keyboard.odin`) (§4.3) |
 | `source/window.odin` | the window, the UI scale (points to pixels), the font, `settings.txt` (§3.3). (`source/rlu/`, the old fixed canvas from Animal Kingdoms, is marked for deletion: `tools/clean_marked`) |
